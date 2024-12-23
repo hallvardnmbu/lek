@@ -1,0 +1,65 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PaGame - Music & Games</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Top Section -->
+        <div class="top-section">
+            <!-- Controls -->
+            <div class="controls-group">
+                <h3>Controls</h3>
+                <div class="playback-controls">
+                    <button id="pauseBtn" class="control-btn">
+                        <img src="icons/pause.png" alt="Pause">
+                    </button>
+                    <button id="playBtn" class="control-btn">
+                        <img src="icons/play.png" alt="Play">
+                    </button>
+                    <button id="skipBtn" class="control-btn">
+                        <img src="icons/skip.png" alt="Skip">
+                    </button>
+                </div>
+                <div class="feedback-controls">
+                    <button id="volumeDownBtn" class="control-btn">
+                        <img src="icons/volume-down.png" alt="Volume Down">
+                    </button>
+                    <button id="volumeUpBtn" class="control-btn">
+                        <img src="icons/volume-up.png" alt="Volume Up">
+                    </button>
+                    <button id="startBtn" class="control-btn">START</button>
+                    <button id="continueBtn" class="control-btn hidden">
+                        <img src="icons/continue.png" alt="Continue">
+                    </button>
+                    <button id="disableBtn" class="control-btn hidden">
+                        <img src="icons/power.png" alt="Power">
+                    </button>
+                </div>
+            </div>
+
+            <!-- Contestants -->
+            <div class="contestants-group">
+                <h3>Contestants</h3>
+                <div id="contestantsList"></div>
+            </div>
+        </div>
+
+        <!-- Bottom Section -->
+        <div class="bottom-section">
+            <div class="add-game-group">
+                <h3>Add game</h3>
+                <select id="gameModeSelect" class="game-select"></select>
+                <button id="addGameBtn" class="control-btn">
+                    <img src="icons/add.png" alt="Add">
+                </button>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+/* styles/main.css */
+:root {
+    --button-size: 55px;
+    --border-color: gray;
+    --border-radius: 4px;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.top-section {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.controls-group,
+.contestants-group {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 15px;
+}
+
+.controls-group {
+    flex: 2;
+}
+
+.contestants-group {
+    flex: 1;
+    min-width: calc(var(--button-size) * 5);
+}
+
+.playback-controls,
+.feedback-controls {
+    display: flex;
+    gap: 20px;
+    margin: 10px 0;
+}
+
+.control-btn {
+    width: var(--button-size);
+    height: var(--button-size);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.control-btn img {
+    width: 24px;
+    height: 24px;
+}
+
+.hidden {
+    display: none;
+}
