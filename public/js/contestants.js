@@ -1,83 +1,95 @@
-// js/contestants.js
-export class ContestantsManager {
-  constructor() {
-    this.contestants = [];
-    this.setupContestantsUI();
+window.onload = loadSettings;
+
+function loadSettings() {
+  const settings = JSON.parse(sessionStorage.getItem("gameSettings")) || {
+    difficulty: "medium",
+    playlist: "6TutgaHFfkThmrrobwA2y9",
+    contestants: [],
+  };
+
+  // Restore selections
+  document.getElementById("difficulty").value = settings.difficulty;
+  document.getElementById("playlist").value = settings.playlist;
+
+  // Restore contestants
+  const contestantsList = document.getElementById("contestants");
+  contestantsList.innerHTML = "";
+
+  settings.contestants.forEach(({ name, rigged }) => {
+    createPlayerElement(name, rigged);
+  });
+}
+
+function saveSettings() {
+  const settings = {
+    difficulty: document.getElementById("difficulty").value,
+    playlist: document.getElementById("playlist").value,
+    contestants: Array.from(document.getElementById("contestants").children).map((li) => ({
+      name: li.textContent.trim(),
+      rigged: li.querySelector("img").dataset.rigged === "true",
+    })),
+  };
+
+  sessionStorage.setItem("gameSettings", JSON.stringify(settings));
+
+  document.getElementById("ready").style.display =
+    document.getElementById("contestants").children.length >= 2 ? "block" : "none";
+}
+
+function createPlayerElement(name, isRigged = false) {
+  const player = document.createElement("li");
+  player.textContent = name;
+
+  const image = document.createElement("img");
+  image.src = "/icons/win95/Smiley face.ico";
+  image.alt = ":-)";
+  image.dataset.rigged = isRigged;
+
+  if (isRigged) {
+    image.src = "/icons/win95/Warning.ico";
   }
 
-  setupContestantsUI() {
-    const container = document.createElement("div");
-    container.className = "contestants-container";
+  image.onclick = (e) => {
+    e.stopPropagation();
+    const newRigged = !JSON.parse(image.dataset.rigged);
+    image.dataset.rigged = newRigged;
+    image.src = newRigged ? "/icons/win95/Warning.ico" : "/icons/win95/Smiley face.ico";
+    saveSettings();
+  };
 
-    // Add contestant input
-    const inputContainer = document.createElement("div");
-    inputContainer.className = "contestant-input";
+  player.onmouseover = () => {
+    image.src = "/icons/win95/Cross.ico";
+  };
+  player.onmouseout = () => {
+    image.src =
+      image.dataset.rigged === "true" ? "/icons/win95/Warning.ico" : "/icons/win95/Smiley face.ico";
+  };
 
-    const input = document.createElement("input");
-    input.type = "text";
-    input.placeholder = "Name";
+  // Remove player on click
+  player.onclick = () => {
+    player.remove();
+    saveSettings();
+  };
 
-    const addButton = document.createElement("button");
-    addButton.textContent = "Include";
-    addButton.addEventListener("click", () => this.addContestant(input.value));
+  player.insertBefore(image, player.firstChild);
+  document.getElementById("contestants").appendChild(player);
 
-    input.addEventListener("keypress", (e) => {
-      if (e.key === "Enter") {
-        this.addContestant(input.value);
-      }
-    });
+  document.getElementById("ready").style.display =
+    document.getElementById("contestants").children.length >= 2 ? "block" : "none";
+}
 
-    inputContainer.appendChild(input);
-    inputContainer.appendChild(addButton);
-    container.appendChild(inputContainer);
+function addPlayer() {
+  const input = document.getElementById("contestant");
+  const name = input.value.trim();
 
-    // Contestants list
-    this.list = document.createElement("ul");
-    this.list.className = "contestants-list";
-    container.appendChild(this.list);
-
-    document.getElementById("contestantsList").appendChild(container);
-  }
-
-  addContestant(name) {
-    if (name && !this.contestants.includes(name)) {
-      this.contestants.push(name);
-      this.updateContestantsList();
-    }
-  }
-
-  removeContestant(name) {
-    const index = this.contestants.indexOf(name);
-    if (index > -1) {
-      this.contestants.splice(index, 1);
-      this.updateContestantsList();
-    }
-  }
-
-  updateContestantsList() {
-    this.list.innerHTML = "";
-    this.contestants.forEach((name) => {
-      const li = document.createElement("li");
-      li.textContent = name;
-      li.addEventListener("click", () => this.removeContestant(name));
-      this.list.appendChild(li);
-    });
-  }
-
-  rigContestant(name) {
-    const items = this.list.getElementsByTagName("li");
-    for (let item of items) {
-      if (item.textContent.toLowerCase() === name.toLowerCase()) {
-        item.style.color = "red";
-        break;
-      }
-    }
-  }
-
-  unrigAll() {
-    const items = this.list.getElementsByTagName("li");
-    for (let item of items) {
-      item.style.color = "black";
-    }
+  if (name) {
+    createPlayerElement(name);
+    input.value = "";
+    saveSettings();
   }
 }
+
+// Enter key handler
+document.getElementById("contestant").addEventListener("keypress", (e) => {
+  if (e.key === "Enter") addPlayer();
+});
