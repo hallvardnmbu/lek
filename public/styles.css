@@ -18,9 +18,24 @@ body {
     background: black;
 
     padding: var(--gap) calc(10 * var(--gap));
+
+    min-height: 90vh;
 }
-span {
+span,
+footer {
     text-align: justify;
+}
+footer {
+    margin-top: auto;
+}
+section {
+    width: 100%;
+
+    text-align: center;
+
+    padding: var(--gap);
+    border: var(--border) solid gainsboro;
+    border-radius: var(--gap);
 }
 
 img {
@@ -32,6 +47,7 @@ ul img {
     height: calc(2 * var(--fontsize));
 }
 
+a,
 button {
     color: khaki;
 
@@ -47,11 +63,18 @@ button {
     border: none;
     background-color: transparent;
 }
+a:hover,
 button:hover,
 select:hover,
 input:hover {
     cursor: pointer;
     color: orange;
+}
+a:active,
+button:active,
+select:active,
+input:active {
+    color: darkslategray;
 }
 select,
 input {
@@ -83,9 +106,10 @@ ul li {
     gap: var(--gap);
     align-items: center;
 
+    color: khaki;
     font-style: italic;
 }
 ul li:hover {
     cursor: pointer;
-    color: khaki;
+    color: darkslategray;
 }

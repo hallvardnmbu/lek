@@ -1,7 +1,7 @@
 window.onload = loadSettings;
 
 function loadSettings() {
-  const settings = JSON.parse(sessionStorage.getItem("gameSettings")) || {
+  const settings = JSON.parse(sessionStorage.getItem("settings")) || {
     difficulty: "medium",
     playlist: "6TutgaHFfkThmrrobwA2y9",
     contestants: [],
@@ -30,7 +30,7 @@ function saveSettings() {
     })),
   };
 
-  sessionStorage.setItem("gameSettings", JSON.stringify(settings));
+  sessionStorage.setItem("settings", JSON.stringify(settings));
 
   document.getElementById("ready").style.display =
     document.getElementById("contestants").children.length >= 2 ? "block" : "none";
@@ -41,28 +41,29 @@ function createPlayerElement(name, isRigged = false) {
   player.textContent = name;
 
   const image = document.createElement("img");
-  image.src = "/icons/win95/Smiley face.ico";
+  image.src = "/icons/Smiley face.ico";
   image.alt = ":-)";
   image.dataset.rigged = isRigged;
 
   if (isRigged) {
-    image.src = "/icons/win95/Warning.ico";
+    image.src = "/icons/Plush bear.ico";
   }
 
   image.onclick = (e) => {
     e.stopPropagation();
     const newRigged = !JSON.parse(image.dataset.rigged);
     image.dataset.rigged = newRigged;
-    image.src = newRigged ? "/icons/win95/Warning.ico" : "/icons/win95/Smiley face.ico";
+    image.src = newRigged ? "/icons/Plush bear.ico" : "/icons/Smiley face.ico";
     saveSettings();
   };
 
-  player.onmouseover = () => {
-    image.src = "/icons/win95/Cross.ico";
-  };
-  player.onmouseout = () => {
+  image.onmouseover = () => {
     image.src =
-      image.dataset.rigged === "true" ? "/icons/win95/Warning.ico" : "/icons/win95/Smiley face.ico";
+      image.dataset.rigged === "true" ? "/icons/Smiley face.ico" : "/icons/Plush bear.ico";
+  };
+  image.onmouseout = () => {
+    image.src =
+      image.dataset.rigged === "true" ? "/icons/Plush bear.ico" : "/icons/Smiley face.ico";
   };
 
   // Remove player on click

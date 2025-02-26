@@ -15,14 +15,66 @@
     </script>
 </head>
 <body>
-    <img src="/icons/win95/MIDI keyboard (connected).ico">
+    <span id="star"></span>
+    <script>
+        const star = {
+          object: document.getElementById('star'),
+          frame: 1,
+          frames: 10
+        };
+
+        function updateStar() {
+            star.object.innerHTML = `<img src="/icons/animations/star/Star (${star.frame} of ${star.frames}).ico">`;
+            star.frame = star.frame >= star.frames ? 1 : star.frame + 1;
+        }
+
+        updateStar();
+        setInterval(updateStar, 200);
+    </script>
 
     <br>
 
-    <span>Hei. Før du fortsetter må du tillate at nettsiden kan styre musikken. Trykk på knappen under for å gjøre dette. Spotify sender da en kode til nettsiden, som slettes når du lukker siden.</span>
+    <span id="explosion" style="height: calc(4 * var(--fontsize));"></span>
+    <button id="explode" onclick="playExplosion()">Pang.</button>
+    <script>
+        let explosion = {
+          object: document.getElementById('explosion'),
+          frame: 1,
+          frames: 3,
+          playing: false,
+          interval: null
+        };
 
-    <button onclick="authorize()">Send meg til Spotify og så tilbake!</button>
+        function playExplosion() {
+            if (explosion.playing) return;
 
-    <script src="/js/spotify.js"></script>
+            explosion.playing = true;
+            explosion.frame = 1;
+
+            explosion.interval = setInterval(() => {
+                if (explosion.frame <= explosion.frames) {
+                    explosion.object.innerHTML = `<img src="/icons/animations/explosion/Explosion (${explosion.frame} of ${explosion.frames}).ico">`;
+                } else {
+                    clearInterval(explosion.interval);
+                    explosion.playing = false;
+                    explosion.object.innerHTML = "";
+                }
+
+                explosion.frame++;
+            }, 200);
+        }
+    </script>
+
+    <br>
+
+    <span>Hei.</span>
+
+    <section>
+        <span>Bip-bop. Her kommer spillet.</span>
+    </section>
+
+    <footer>
+        Hallo! Jeg er dum og har gjort noe feil. Send meg tilbake til <a href="/settings">innstillinger</a> for å fikse det. Eller vil du kanskje helt tilbake til <a href="/spotify">spotify-innlogging</a>? Nåja. For noe styr.
+    </footer>
 </body>
 </html>
