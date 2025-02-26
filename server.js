@@ -26,26 +26,15 @@ app.use(
 );
 
 app.get("/spotify", (req, res) => {
-  res.render("spotify");
-});
-app.get("/callback", async (req, res) => {
-  req.session.spotifyCode = req.query.code;
-  res.redirect("/settings");
-});
-app.get("/id", (req, res) => {
-  res.send(process.env.SPOTIFY_CLIENT_ID);
+  res.render("spotify", { id: process.env.SPOTIFY_CLIENT_ID });
 });
 
 app.get("/settings", (req, res) => {
-  res.render("settings");
+  res.render("settings", { spotify: req.query.code });
 });
 
 app.get("/", (req, res) => {
-  // if (!req.session.spotifyCode) {
-  //   res.redirect("/spotify");
-  // }
-
-  res.render("settings", { spotifyCode: req.session.spotifyCode });
+  res.render("game");
 });
 
 app.listen(port, () => {

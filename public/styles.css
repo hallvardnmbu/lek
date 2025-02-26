@@ -70,6 +70,7 @@ input {
 }
 input {
     width: 12.5em;
+    text-decoration: underline;
 }
 
 ul {

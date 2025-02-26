@@ -24,29 +24,25 @@ async function generateCode() {
   return base64encode(hashed);
 }
 
-async function authorize() {
+async function authorize(id) {
   try {
-    let clientId = await fetch("/id").then((res) => res.text());
-
-    let code = window.localStorage.getItem("code");
-    if (!code) {
-      code = await generateCode();
-      window.localStorage.setItem("code", code);
+    let verifier = window.sessionStorage.getItem("verifier");
+    if (!verifier) {
+      verifier = await generateCode();
+      window.sessionStorage.setItem("verifier", verifier);
     }
 
-    console.log(clientId);
-
-    const redirectUri = `${window.location.origin}/callback`;
+    const redirectUri = `${window.location.origin}/settings`;
 
     const scope = "user-read-playback-state user-modify-playback-state";
     const authorizeUrl = new URL("https://accounts.spotify.com/authorize");
 
     const params = {
       response_type: "code",
-      client_id: clientId,
+      client_id: id,
       scope,
       code_challenge_method: "S256",
-      code_challenge: code,
+      code_challenge: verifier,
       redirect_uri: redirectUri,
     };
     authorizeUrl.search = new URLSearchParams(params).toString();

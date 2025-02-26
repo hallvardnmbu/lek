@@ -1,8 +1,21 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>pagame</title>
+    <title>lek • innstillinger</title>
     <link rel="stylesheet" href="/styles.css">
+
+    <script>
+      if ('<%= spotify %>') {
+          console.log('SETTINGS: Spotify code found.');
+          sessionStorage.setItem('spotify', '<%= spotify %>');
+          history.replaceState(null, '', '/settings');
+      }
+
+      if (!sessionStorage.getItem('spotify')) {
+          console.log('SETTINGS: No Spotify code found.');
+          window.location.href = '/spotify';
+      }
+    </script>
 </head>
 <body>
     <img src="/icons/win95/Task Manager.ico">
@@ -21,7 +34,7 @@
         <option value="5B3gb8HbvFm02ccQVH33IO">Disco-disco</option>
         <option value="0UZZ621jxVtzR09zxufSKX">Jente-disco</option>
         <option value="0XH1JLrIyQn2p9XWqNFAcC">Wowawe rock</option>
-    </select>. Og i og med at jeg ikke er synsk, så må du dessverre fylle inn navnene på døm som skal være med. Det gjør du én og én, ved å fylle inn <input type="text" id="contestant" placeholder="navnet på deltakeren"> og så <button onclick="addPlayer()">trykke her</button>.</span>
+    </select>. Og i og med at jeg ikke er synsk, så må du dessverre fylle inn navnene på døm som skal være med. Det gjør du én og én, ved å fylle inn <input type="text" id="contestant" placeholder="navnet på deltakeren"> og så <button onclick="addPlayer()">trykke her</button> (eller enter).</span>
 
     <ul id="contestants">
     </ul>
