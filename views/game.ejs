@@ -5,11 +5,9 @@
     <link rel="stylesheet" href="/styles.css">
 
     <script>
-    if (!sessionStorage.getItem('spotify')) {
-        console.log('GAME: No Spotify code found.');
+    if (!sessionStorage.getItem('token')) {
         window.location.href = '/spotify';
     } else if (!sessionStorage.getItem('settings')) {
-        console.log('GAME: No settings found.');
         window.location.href = '/settings';
     }
     </script>
@@ -73,8 +71,13 @@
         <span>Bip-bop. Her kommer spillet.</span>
     </section>
 
+    <button onclick="pauseSong()">Pause...</button>
+
     <footer>
         Hallo! Jeg er dum og har gjort noe feil. Send meg tilbake til <a href="/settings">innstillinger</a> for å fikse det. Eller vil du kanskje helt tilbake til <a href="/spotify">spotify-innlogging</a>? Nåja. For noe styr.
     </footer>
+
+    <script src="/js/spotify.js"></script>
+    <script src="/js/authenticate.js"></script>
 </body>
 </html>

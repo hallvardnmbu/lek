@@ -4,17 +4,11 @@
     <title>lek • innstillinger</title>
     <link rel="stylesheet" href="/styles.css">
 
+    <script src="/js/authenticate.js"></script>
     <script>
-      if ('<%= spotify %>') {
-          console.log('SETTINGS: Spotify code found.');
-          sessionStorage.setItem('spotify', '<%= spotify %>');
-          history.replaceState(null, '', '/settings');
-      }
-
-      if (!sessionStorage.getItem('spotify')) {
-          console.log('SETTINGS: No Spotify code found.');
-          window.location.href = '/spotify';
-      }
+        if (!sessionStorage.getItem('token')) {
+            window.location.href = '/spotify';
+        }
     </script>
 </head>
 <body>

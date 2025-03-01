@@ -1,18 +1,39 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-    <title>lek • spotify</title>
-    <link rel="stylesheet" href="/styles.css">
-</head>
-<body>
-    <img src="/icons/MIDI keyboard (connected).ico">
+    <head>
+        <title>lek • spotify</title>
+        <link rel="stylesheet" href="/styles.css" />
 
-    <br>
+        <script src="/js/authenticate.js"></script>
+    </head>
+    <body>
+        <span id="keyboard"></span>
+        <script>
+            const keyboard = {
+              object: document.getElementById('keyboard'),
+              frame: 1,
+              frames: 2
+            };
 
-    <span>Hei. Før du fortsetter må du tillate at nettsiden kan styre musikken. Trykk på knappen under for å gjøre dette. Spotify sender da en kode til nettsiden, som slettes når du lukker siden.</span>
+            function updateKeyboard() {
+                keyboard.object.innerHTML = `<img src="/icons/animations/keyboard/MIDI keyboard (${keyboard.frame} of ${keyboard.frames}).ico">`;
+                keyboard.frame = keyboard.frame >= keyboard.frames ? 1 : keyboard.frame + 1;
+            }
 
-    <button onclick="authorize('<%= id %>')">Send meg til Spotify og så tilbake!</button>
+            updateKeyboard();
+            setInterval(updateKeyboard, 1500);
+        </script>
 
-    <script src="/js/spotify.js"></script>
-</body>
+        <br>
+
+        <span
+            >Hei. Før du fortsetter må du tillate at nettsiden kan styre musikken. Trykk på knappen
+            under for å gjøre dette. Spotify sender da en kode til nettsiden, som slettes når du
+            lukker siden.</span
+        >
+
+        <button onclick="initiateSpotifyAuth('<%= id %>')">
+            Send meg til Spotify og så tilbake!
+        </button>
+    </body>
 </html>

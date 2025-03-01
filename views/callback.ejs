@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>lek • mellomledd</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/js/authenticate.js"></script>
+</head>
+<body>
+    <span id="star"></span>
+    <script>
+        const star = {
+          object: document.getElementById('star'),
+          frame: 1,
+          frames: 10
+        };
+
+        function updateStar() {
+            star.object.innerHTML = `<img src="/icons/animations/star/Star (${star.frame} of ${star.frames}).ico">`;
+            star.frame = star.frame >= star.frames ? 1 : star.frame + 1;
+        }
+
+        updateStar();
+        setInterval(updateStar, 200);
+    </script>
+
+    <br>
+
+    <span><%= message %></span>
+
+    <% if (code) { %>
+      <script>
+        document.addEventListener('DOMContentLoaded', function() {
+          const code = '<%= code %>';
+          const id = '<%= id %>';
+
+          exchangeCodeForToken(code, id)
+            .then(() => {
+              setTimeout(() => {
+                window.location.href = '/settings';
+              }, 3000);
+            })
+            .catch(error => {
+              setTimeout(() => {
+                window.location.href = '/spotify';
+              }, 3000);
+            });
+        });
+      </script>
+    <% } else { %>
+      <script>
+          setTimeout(() => {
+            window.location.href = '/spotify';
+          }, 3000);
+      </script>
+    <% } %>
+</body>
+</html>
