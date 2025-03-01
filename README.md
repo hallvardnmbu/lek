@@ -2,8 +2,9 @@ Hei. Under arbeid. Til dels en kopi av `hallvardnmbu/pagame`, men i JavaScript o
 
 - [x] Kobling mot Spotify
   - [x] Autentisering
-  - [ ] Krontrollering av avspilling
+  - [x] Krontrollering av avspilling
 - [x] Valg av spilleliste
+  - [ ] Start avspilling av valgt liste
 - [x] Valg av vanskelighetsgrad
 - [x] Legge til spillere
 - [ ] Håndtering av spill
