@@ -9,14 +9,14 @@ async function playSong() {
     });
 
     if (!response.ok && response.status !== 204) {
-      console.error(`Play error: ${response.status}`);
-      return { success: false, status: response.status };
+      window.location.href = "/spotify";
+      return;
     }
 
-    return { success: true };
+    return;
   } catch (error) {
-    console.error("Error playing song:", error);
-    return { success: false, error: error.message };
+    window.location.href = "/spotify";
+    return;
   }
 }
 
@@ -31,14 +31,14 @@ async function pauseSong() {
     });
 
     if (!response.ok && response.status !== 204) {
-      console.error(`Pause error: ${response.status} ${response.statusText}`);
-      return { success: false, status: response.status };
+      window.location.href = "/spotify";
+      return;
     }
 
-    return { success: true };
+    return;
   } catch (error) {
-    console.error("Error pausing song:", error);
-    return { success: false, error: error.message };
+    window.location.href = "/spotify";
+    return;
   }
 }
 
@@ -52,14 +52,14 @@ async function skipSong() {
     });
 
     if (!response.ok && response.status !== 204) {
-      console.error(`Skip error: ${response.status}`);
-      return { success: false, status: response.status };
+      window.location.href = "/spotify";
+      return;
     }
 
-    return { success: true };
+    return;
   } catch (error) {
-    console.error("Error skipping song:", error);
-    return { success: false, error: error.message };
+    window.location.href = "/spotify";
+    return;
   }
 }
 
@@ -73,19 +73,14 @@ async function getCurrentSong() {
     });
 
     // 204 means success but no content (nothing playing)
-    if (response.status === 204) {
-      return { playing: false, data: null };
-    }
-
-    if (!response.ok) {
-      console.error(`Get current song error: ${response.status}`);
-      return { success: false, status: response.status };
+    if (!response.ok && response.status !== 204) {
+      window.location.href = "/spotify";
+      return;
     }
 
     const data = await response.json();
 
     return {
-      success: true,
       playing: data.is_playing,
       data: {
         name: data.item.name,
@@ -99,8 +94,8 @@ async function getCurrentSong() {
       },
     };
   } catch (error) {
-    console.error("Error getting current song:", error);
-    return { success: false, error: error.message };
+    window.location.href = "/spotify";
+    return;
   }
 }
 
@@ -115,8 +110,8 @@ async function startShufflePlaylist(playlistId) {
     });
 
     if (!shuffleResponse.ok && shuffleResponse.status !== 204) {
-      console.error(`Enable shuffle error: ${shuffleResponse.status}`);
-      return { success: false, status: shuffleResponse.status, phase: "shuffle" };
+      window.location.href = "/spotify";
+      return;
     }
 
     // Then start playing the playlist
@@ -132,14 +127,14 @@ async function startShufflePlaylist(playlistId) {
     });
 
     if (!playResponse.ok && playResponse.status !== 204) {
-      console.error(`Play playlist error: ${playResponse.status}`);
-      return { success: false, status: playResponse.status, phase: "play" };
+      window.location.href = "/spotify";
+      return;
     }
 
-    return { success: true };
+    return;
   } catch (error) {
-    console.error("Error starting shuffle playlist:", error);
-    return { success: false, error: error.message };
+    window.location.href = "/spotify";
+    return;
   }
 }
 
@@ -156,18 +151,17 @@ async function getPlaylistTracks(playlistId) {
     );
 
     if (!response.ok) {
-      console.error(`Get playlist tracks error: ${response.status}`);
-      return { success: false, status: response.status };
+      window.location.href = "/spotify";
+      return;
     }
 
     const data = await response.json();
     return {
-      success: true,
       tracks: data.items.filter((item) => item.track).map((item) => item.track),
     };
   } catch (error) {
-    console.error("Error getting playlist tracks:", error);
-    return { success: false, error: error.message };
+    window.location.href = "/spotify";
+    return;
   }
 }
 
@@ -183,7 +177,8 @@ async function queueRandomSongFromPlaylist(playlistId) {
     const tracks = playlistResult.tracks;
 
     if (!tracks || tracks.length === 0) {
-      return { success: false, error: "No tracks found in playlist" };
+      window.location.href = "/spotify";
+      return;
     }
 
     // Select a random track
@@ -201,12 +196,11 @@ async function queueRandomSongFromPlaylist(playlistId) {
     );
 
     if (!response.ok && response.status !== 204) {
-      console.error(`Queue song error: ${response.status}`);
-      return { success: false, status: response.status };
+      window.location.href = "/spotify";
+      return;
     }
 
     return {
-      success: true,
       queuedSong: {
         name: randomTrack.name,
         artist: randomTrack.artists.map((artist) => artist.name).join(", "),
@@ -218,7 +212,7 @@ async function queueRandomSongFromPlaylist(playlistId) {
       },
     };
   } catch (error) {
-    console.error("Error queueing random song:", error);
-    return { success: false, error: error.message };
+    window.location.href = "/spotify";
+    return;
   }
 }
