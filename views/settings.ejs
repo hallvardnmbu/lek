@@ -16,11 +16,11 @@
 
     <br>
 
-    <span>Hei. Det ser ut som du har klart å logge inn på Spotify. Bra jobbet! Før du kan spille må du velge vanskelighetsgrad, spilleliste og deltakere. Vanskelighetsgraden er <select name="difficulty" id="difficulty" onchange="saveSettings()">
+    <span>Hei. Det ser ut som du har klart å logge inn på Spotify. Bra jobbet! Før du kan spille må du velge vanskelighetsgrad, spilleliste og deltakere. Vanskelighetsgraden er <select name="difficulty" id="difficulty" onchange="updateSettings()">
         <option value="low">Bruh</option>
         <option value="medium">OK??</option>
         <option value="high">Hard</option>
-    </select>, og spillelisten er <select name="playlist" id="playlist" onchange="saveSettings()">
+    </select>, og spillelisten er <select name="playlist" id="playlist" onchange="updateSettings()">
         <option value="6TutgaHFfkThmrrobwA2y9">Den vanlige</option>
         <option value="37i9dQZF1DX6xOPeSOGone">Heismusikk?</option>
         <option value="37i9dQZF1DX9qNs32fujYe">Tungmetall!</option>
@@ -35,6 +35,7 @@
 
     <span id="ready" style="display: none;">Nok mas! Vi vil <a href="/">starte</a>!</span>
 
-    <script src="/js/contestants.js"></script>
+    <script src="/js/spotify.js"></script>
+    <script src="/js/settings.js"></script>
 </body>
 </html>

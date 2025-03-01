@@ -18,9 +18,19 @@ function loadSettings() {
   settings.contestants.forEach(({ name, rigged }) => {
     createPlayerElement(name, rigged);
   });
+
+  // Start shuffle playing the selected playlist.
+  startShufflePlaylist(settings.playlist);
 }
 
-function saveSettings() {
+function saveSettings(settings) {
+  sessionStorage.setItem("settings", JSON.stringify(settings));
+
+  document.getElementById("ready").style.display =
+    document.getElementById("contestants").children.length >= 2 ? "block" : "none";
+}
+
+function updateSettings() {
   const settings = {
     difficulty: document.getElementById("difficulty").value,
     playlist: document.getElementById("playlist").value,
@@ -29,11 +39,10 @@ function saveSettings() {
       rigged: li.querySelector("img").dataset.rigged === "true",
     })),
   };
+  saveSettings(settings);
 
-  sessionStorage.setItem("settings", JSON.stringify(settings));
-
-  document.getElementById("ready").style.display =
-    document.getElementById("contestants").children.length >= 2 ? "block" : "none";
+  // Start shuffle playing the selected playlist.
+  startShufflePlaylist(settings.playlist);
 }
 
 function createPlayerElement(name, isRigged = false) {

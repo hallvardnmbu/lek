@@ -32,60 +32,73 @@
 
     <br>
 
-    <span id="explosion" style="height: calc(4 * var(--fontsize));"></span>
-    <button id="explode" onclick="playExplosion()">Pang.</button>
-    <script>
-        let explosion = {
-          object: document.getElementById('explosion'),
-          frame: 1,
-          frames: 3,
-          playing: false,
-          interval: null
-        };
-
-        function playExplosion() {
-            if (explosion.playing) return;
-
-            explosion.playing = true;
-            explosion.frame = 1;
-
-            explosion.interval = setInterval(() => {
-                if (explosion.frame <= explosion.frames) {
-                    explosion.object.innerHTML = `<img src="/icons/animations/explosion/Explosion (${explosion.frame} of ${explosion.frames}).ico">`;
-                } else {
-                    clearInterval(explosion.interval);
-                    explosion.playing = false;
-                    explosion.object.innerHTML = "";
-                }
-
-                explosion.frame++;
-            }, 200);
-        }
-    </script>
-
-    <br>
-
-    <span>Hei.</span>
-
     <section>
         <span>Bip-bop. Her kommer spillet.</span>
     </section>
 
-    <span>
-        For å styre sangen som spilles kan du
-        <button onclick="pauseSong()">pause</button> den,
-        <button onclick="playSong()">starte</button> den igjen eller
-        <button onclick="skipSong()">hoppe over</button> den.
-    </span>
+    <section>
+        <span>Bip-bop. Her kan man legge til og ta bort aktive spill.</span>
+    </section>
 
     <footer>
-        Hallo! Jeg er dum og har gjort noe feil. Send meg tilbake til
-        <a href="/settings">innstillinger</a>
-        for å fikse det. Eller vil du kanskje helt tilbake til
-        <a href="/spotify">spotify-innlogging</a>?
-        Nåja. For noe styr.
+        <span id="explosion" style="height: calc(4 * var(--fontsize));"></span>
+        <button id="explode" onclick="playExplosion()">Pang.</button>
+        <script>
+            let explosion = {
+              object: document.getElementById('explosion'),
+              frame: 1,
+              frames: 3,
+              playing: false,
+              interval: null
+            };
+
+            function playExplosion() {
+                if (explosion.playing) return;
+
+                explosion.playing = true;
+                explosion.frame = 1;
+
+                explosion.interval = setInterval(() => {
+                    if (explosion.frame <= explosion.frames) {
+                        explosion.object.innerHTML = `<img src="/icons/animations/explosion/Explosion (${explosion.frame} of ${explosion.frames}).ico">`;
+                    } else {
+                        clearInterval(explosion.interval);
+                        explosion.playing = false;
+                        explosion.object.innerHTML = "";
+                    }
+
+                    explosion.frame++;
+                }, 200);
+            }
+        </script>
+
+        <hr>
+
+        <span>
+            For å styre sangen som spilles kan du
+            <button onclick="pauseSong()">pause</button> den,
+            <button onclick="playSong()">starte</button> den igjen eller
+            <button onclick="skipSong()">hoppe over</button> den.
+        </span>
+
+        <span>
+            Du kan også endre lydnivået ved å dra på
+            <input type="range" id="volumeSlider" min="0" max="100" value="50" onchange="updateVolume(this.value)" />, eller endre tidsintervall ved å dra på
+            <input type="range" id="delaySlider" min="1" max="8" value="2" onchange="updateDelay(this.value)" />. Jeg velger å ikke vise deg verdiene. Du får prøve deg litt frem.
+        </span>
+
+        <hr>
+
+        <span>
+            Hallo! Jeg er dum og har gjort noe feil. Send meg tilbake til
+            <a href="/settings">innstillinger</a>
+            for å fikse det. Eller vil du kanskje helt tilbake til
+            <a href="/spotify">spotify-innlogging</a>?
+            Nåja. For noe styr.
+        </span>
     </footer>
 
+    <script src="/js/game.js"></script>
     <script src="/js/spotify.js"></script>
     <script src="/js/authenticate.js"></script>
 </body>

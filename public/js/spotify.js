@@ -1,5 +1,30 @@
+async function isPlaying() {
+  try {
+    const response = await fetch("https://api.spotify.com/v1/me/player", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      window.location.href = "/spotify";
+      return;
+    }
+
+    const data = await response.json();
+    return data.is_playing;
+  } catch (error) {
+    window.location.href = "/spotify";
+    return;
+  }
+}
+
 async function playSong() {
   try {
+    if (isPlaying()) return;
+
     const response = await fetch("https://api.spotify.com/v1/me/player/play", {
       method: "PUT",
       headers: {
@@ -22,6 +47,8 @@ async function playSong() {
 
 async function pauseSong() {
   try {
+    if (!isPlaying()) return;
+
     const response = await fetch("https://api.spotify.com/v1/me/player/pause", {
       method: "PUT",
       headers: {
@@ -44,6 +71,8 @@ async function pauseSong() {
 
 async function skipSong() {
   try {
+    if (!isPlaying()) return;
+
     const response = await fetch("https://api.spotify.com/v1/me/player/next", {
       method: "POST",
       headers: {
@@ -65,6 +94,8 @@ async function skipSong() {
 
 async function getCurrentSong() {
   try {
+    if (!isPlaying()) return;
+
     const response = await fetch("https://api.spotify.com/v1/me/player/currently-playing", {
       method: "GET",
       headers: {
@@ -101,6 +132,9 @@ async function getCurrentSong() {
 
 async function startShufflePlaylist(playlistId) {
   try {
+    // If not playing, start playing
+    playSong();
+
     // First enable shuffle mode
     const shuffleResponse = await fetch("https://api.spotify.com/v1/me/player/shuffle?state=true", {
       method: "PUT",
@@ -110,6 +144,7 @@ async function startShufflePlaylist(playlistId) {
     });
 
     if (!shuffleResponse.ok && shuffleResponse.status !== 204) {
+      console.error("Failed to enable shuffle mode");
       window.location.href = "/spotify";
       return;
     }
@@ -127,6 +162,7 @@ async function startShufflePlaylist(playlistId) {
     });
 
     if (!playResponse.ok && playResponse.status !== 204) {
+      console.error("Failed to start playing the playlist");
       window.location.href = "/spotify";
       return;
     }
@@ -141,7 +177,7 @@ async function startShufflePlaylist(playlistId) {
 async function getPlaylistTracks(playlistId) {
   try {
     const response = await fetch(
-      `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100`,
+      `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=200`,
       {
         method: "GET",
         headers: {
@@ -167,6 +203,8 @@ async function getPlaylistTracks(playlistId) {
 
 async function queueRandomSongFromPlaylist(playlistId) {
   try {
+    playSong();
+
     // Get tracks from the playlist
     const playlistResult = await getPlaylistTracks(playlistId);
 
@@ -211,6 +249,26 @@ async function queueRandomSongFromPlaylist(playlistId) {
         albumArt: randomTrack.album.images[0]?.url || null,
       },
     };
+  } catch (error) {
+    window.location.href = "/spotify";
+    return;
+  }
+}
+
+async function updateVolume(volume) {
+  try {
+    const response = await fetch("https://api.spotify.com/v1/me/player/volume", {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({ volume_percent: volume }),
+    });
+
+    if (!response.ok) {
+      window.location.href = "/spotify";
+      return;
+    }
   } catch (error) {
     window.location.href = "/spotify";
     return;
