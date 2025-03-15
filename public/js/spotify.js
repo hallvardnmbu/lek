@@ -77,6 +77,7 @@ async function skipSong() {
       method: "POST",
       headers: {
         Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+        "Content-Type": "application/json",
       },
     });
 
@@ -100,6 +101,7 @@ async function getCurrentSong() {
       method: "GET",
       headers: {
         Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+        "Content-Type": "application/json",
       },
     });
 
@@ -140,6 +142,7 @@ async function startShufflePlaylist(playlistId) {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+        "Content-Type": "application/json",
       },
     });
 
@@ -167,6 +170,7 @@ async function startShufflePlaylist(playlistId) {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+          "Content-Type": "application/json",
         },
       });
     }
@@ -190,6 +194,7 @@ async function getPlaylistTracks(playlistId) {
         method: "GET",
         headers: {
           Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+          "Content-Type": "application/json",
         },
       },
     );
@@ -237,6 +242,7 @@ async function queueRandomSongFromPlaylist(playlistId) {
         method: "POST",
         headers: {
           Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+          "Content-Type": "application/json",
         },
       },
     );
@@ -265,13 +271,17 @@ async function queueRandomSongFromPlaylist(playlistId) {
 
 async function updateVolume(volume) {
   try {
-    const response = await fetch("https://api.spotify.com/v1/me/player/volume", {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+    const response = await fetch(
+      `https://api.spotify.com/v1/me/player/volume?volume_percent=${100 - parseInt(volume)}`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ volume_percent: volume }),
       },
-      body: JSON.stringify({ volume_percent: volume }),
-    });
+    );
 
     if (!response.ok) {
       window.location.href = "/spotify";
