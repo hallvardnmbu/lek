@@ -135,19 +135,13 @@ async function startShufflePlaylist(playlistId) {
     // If not playing, start playing
     playSong();
 
-    // First enable shuffle mode
-    const shuffleResponse = await fetch("https://api.spotify.com/v1/me/player/shuffle?state=true", {
+    // Trying to enable shuffle mode before starting playlist
+    let shuffleResponse = await fetch("https://api.spotify.com/v1/me/player/shuffle?state=true", {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${sessionStorage.getItem("token")}`,
       },
     });
-
-    if (!shuffleResponse.ok && shuffleResponse.status !== 204) {
-      console.error("Failed to enable shuffle mode");
-      window.location.href = "/spotify";
-      return;
-    }
 
     // Then start playing the playlist
     const playResponse = await fetch("https://api.spotify.com/v1/me/player/play", {
@@ -165,6 +159,20 @@ async function startShufflePlaylist(playlistId) {
       console.error("Failed to start playing the playlist");
       window.location.href = "/spotify";
       return;
+    }
+
+    // If shuffle mode is not enabled, try again
+    if (!shuffleResponse.ok && shuffleResponse.status !== 204) {
+      shuffleResponse = await fetch("https://api.spotify.com/v1/me/player/shuffle?state=true", {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+        },
+      });
+    }
+
+    if (!shuffleResponse.ok && shuffleResponse.status !== 204) {
+      console.error("Failed to enable shuffle mode :-(");
     }
 
     return;
