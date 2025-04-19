@@ -11,27 +11,55 @@ async function isPlaying() {
     if (!response.ok) {
       window.location.href = "/spotify";
       return;
+    } else if (response.status === 204) {
+      // No active devices.
+      // In this case, try to find a computer device.
+      // If none, use the first available device.
+      // TODO: Handle error if no devices are available.
+
+      const devicesResponse = await fetch("https://api.spotify.com/v1/me/player/devices", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const devices = await devicesResponse.json();
+
+      // Extract the id of the first "Computer" device. If none, use the first device.
+      const computerDevice = devices.devices.find((device) => device.type === "Computer");
+      const deviceId = computerDevice ? computerDevice.id : devices.devices[0].id;
+
+      await playSong(deviceId);
+
+      // Return false to prevent further execution in `playSong`.
+      return false;
     }
 
     const data = await response.json();
     return data.is_playing;
   } catch (error) {
+    console.error(error);
     window.location.href = "/spotify";
     return;
   }
 }
 
-async function playSong() {
+async function playSong(deviceId = null) {
   try {
-    if (isPlaying()) return;
+    if (!deviceId && (await isPlaying())) return;
 
-    const response = await fetch("https://api.spotify.com/v1/me/player/play", {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${sessionStorage.getItem("token")}`,
-        "Content-Type": "application/json",
+    const response = await fetch(
+      `https://api.spotify.com/v1/me/player/play${deviceId ? `?device_id=${deviceId}` : ""}`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+          "Content-Type": "application/json",
+        },
       },
-    });
+    );
 
     if (!response.ok && response.status !== 204) {
       window.location.href = "/spotify";
@@ -47,7 +75,7 @@ async function playSong() {
 
 async function pauseSong() {
   try {
-    if (!isPlaying()) return;
+    if (!(await isPlaying())) return;
 
     const response = await fetch("https://api.spotify.com/v1/me/player/pause", {
       method: "PUT",
@@ -71,7 +99,7 @@ async function pauseSong() {
 
 async function skipSong() {
   try {
-    if (!isPlaying()) return;
+    if (!(await isPlaying())) return;
 
     const response = await fetch("https://api.spotify.com/v1/me/player/next", {
       method: "POST",
@@ -95,7 +123,7 @@ async function skipSong() {
 
 async function getCurrentSong() {
   try {
-    if (!isPlaying()) return;
+    if (!(await isPlaying())) return;
 
     const response = await fetch("https://api.spotify.com/v1/me/player/currently-playing", {
       method: "GET",
@@ -116,12 +144,13 @@ async function getCurrentSong() {
     return {
       playing: data.is_playing,
       data: {
+        playlist: data.context?.uri.split(":")[2] || null,
         name: data.item.name,
         artist: data.item.artists.map((artist) => artist.name).join(", "),
         album: data.item.album.name,
         duration: data.item.duration_ms,
+        release: data.item.album.release_date,
         progress: data.progress_ms,
-        albumArt: data.item.album.images[0]?.url || null,
         uri: data.item.uri,
         id: data.item.id,
       },
@@ -135,7 +164,7 @@ async function getCurrentSong() {
 async function startShufflePlaylist(playlistId) {
   try {
     // If not playing, start playing
-    playSong();
+    await playSong();
 
     // Trying to enable shuffle mode before starting playlist
     let shuffleResponse = await fetch("https://api.spotify.com/v1/me/player/shuffle?state=true", {
@@ -216,7 +245,7 @@ async function getPlaylistTracks(playlistId) {
 
 async function queueRandomSongFromPlaylist(playlistId) {
   try {
-    playSong();
+    await playSong();
 
     // Get tracks from the playlist
     const playlistResult = await getPlaylistTracks(playlistId);

@@ -1,6 +1,6 @@
 window.onload = loadSettings;
 
-function loadSettings() {
+async function loadSettings() {
   const settings = JSON.parse(sessionStorage.getItem("settings")) || {
     difficulty: "medium",
     playlist: "6TutgaHFfkThmrrobwA2y9",
@@ -20,17 +20,18 @@ function loadSettings() {
   });
 
   // Start shuffle playing the selected playlist.
-  startShufflePlaylist(settings.playlist);
+  await startShufflePlaylist(settings.playlist);
 }
 
 function saveSettings(settings) {
+  console.log(settings);
   sessionStorage.setItem("settings", JSON.stringify(settings));
 
   document.getElementById("ready").style.display =
     document.getElementById("contestants").children.length >= 2 ? "block" : "none";
 }
 
-function updateSettings() {
+async function updateSettings() {
   const settings = {
     difficulty: document.getElementById("difficulty").value,
     playlist: document.getElementById("playlist").value,
@@ -42,7 +43,10 @@ function updateSettings() {
   saveSettings(settings);
 
   // Start shuffle playing the selected playlist.
-  startShufflePlaylist(settings.playlist);
+  const current = await getCurrentSong();
+  if (current.data.playlist !== settings.playlist) {
+    await startShufflePlaylist(settings.playlist);
+  }
 }
 
 function createPlayerElement(name, isRigged = false) {
@@ -63,7 +67,7 @@ function createPlayerElement(name, isRigged = false) {
     const newRigged = !JSON.parse(image.dataset.rigged);
     image.dataset.rigged = newRigged;
     image.src = newRigged ? "/icons/Plush bear.ico" : "/icons/Smiley face.ico";
-    saveSettings();
+    updateSettings();
   };
 
   image.onmouseover = () => {
@@ -78,7 +82,7 @@ function createPlayerElement(name, isRigged = false) {
   // Remove player on click
   player.onclick = () => {
     player.remove();
-    saveSettings();
+    updateSettings();
   };
 
   player.insertBefore(image, player.firstChild);
@@ -92,10 +96,12 @@ function addPlayer() {
   const input = document.getElementById("contestant");
   const name = input.value.trim();
 
+  // TODO: Handle duplicate names.
+
   if (name) {
     createPlayerElement(name);
     input.value = "";
-    saveSettings();
+    updateSettings();
   }
 }
 
