@@ -21,6 +21,9 @@ async function generateCodeChallenge(codeVerifier) {
 // Initiate the authorization flow
 async function initiateSpotifyAuth(id) {
   try {
+    // Store CLIENT_ID in sessionStorage
+    sessionStorage.setItem('spotifyClientId', id);
+
     // Generate and store the code verifier in session storage
     const codeVerifier = generateCodeVerifier();
     sessionStorage.setItem("verifier", codeVerifier);
@@ -101,12 +104,16 @@ async function exchangeCodeForToken(code, id) {
 }
 
 // Refresh an expired token
-async function refreshAccessToken(id) {
+async function refreshAccessToken() { // Removed id parameter
   try {
     const refreshToken = sessionStorage.getItem("refresh");
+    const clientId = sessionStorage.getItem('spotifyClientId');
 
     if (!refreshToken) {
       throw new Error("No refresh token available");
+    }
+    if (!clientId) {
+      throw new Error("Spotify CLIENT_ID not found in sessionStorage.");
     }
 
     const tokenUrl = "https://accounts.spotify.com/api/token";
@@ -114,7 +121,7 @@ async function refreshAccessToken(id) {
     const body = new URLSearchParams({
       grant_type: "refresh_token",
       refresh_token: refreshToken,
-      client_id: id,
+      client_id: clientId, // Use clientId from sessionStorage
     });
 
     const response = await fetch(tokenUrl, {
@@ -146,7 +153,12 @@ async function refreshAccessToken(id) {
 }
 
 // Get a valid access token (refreshing if necessary)
-async function getValidAccessToken(id) {
+async function getValidAccessToken() { // Removed id parameter
+  const clientId = sessionStorage.getItem('spotifyClientId');
+  if (!clientId) {
+    throw new Error("Spotify CLIENT_ID not found in sessionStorage. Cannot proceed with getting token.");
+  }
+
   const expiryTime = sessionStorage.getItem("expiry");
   const accessToken = sessionStorage.getItem("token");
 
@@ -156,6 +168,7 @@ async function getValidAccessToken(id) {
   }
 
   // Otherwise, refresh the token
-  const tokenData = await refreshAccessToken(id);
+  // refreshAccessToken will now use the clientId from sessionStorage
+  const tokenData = await refreshAccessToken();
   return tokenData.access_token;
 }
