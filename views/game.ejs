@@ -117,144 +117,185 @@
     <script>
         // Game control functions
         let gameInstance = null;
+        // Removed local waitingForClick variable, gameInstance.waitingForClick is the source of truth.
 
-        function pauseGame() {
-            if (gameInstance && gameInstance.isRunning) {
-                gameInstance.isRunning = false;
-                updateGameMode("du har pauset. tulling", "for å fortsette igjen må du selvfølgelig trykke på knappen under selv. idiot.");
-                document.getElementById('pause-game').disabled = true;
-                document.getElementById('resume-game').disabled = false;
+        function resolvePromiseAndCleanup(gameInst) {
+            if (gameInst && gameInst.currentClickPromiseResolve) {
+                gameInst.currentClickPromiseResolve();
             }
+            if (gameInst) {
+                gameInst.waitingForClick = false; // Critical: update the game instance's state
+                gameInst.currentClickPromiseResolve = null;
+                gameInst.currentClickPromiseReject = null;
+            }
+
+            const gameInfo = document.getElementById('game-information');
+            if (gameInfo) {
+                gameInfo.classList.remove('waiting-for-click');
+                const indicator = gameInfo.querySelector('.click-indicator');
+                if (indicator) indicator.remove();
+            }
+            const continueButton = document.getElementById('continue-button');
+            if (continueButton) {
+                continueButton.style.display = 'none';
+            }
+            // Remove the global click handler after it's done its job or if the promise is resolved/rejected externally
+            document.removeEventListener('click', globalClickHandler);
         }
 
-        function resumeGame() {
-            if (gameInstance && !gameInstance.isRunning) {
-                gameInstance.isRunning = true;
-                gameInstance._gameLoop();
-                document.getElementById('pause-game').disabled = false;
-                document.getElementById('resume-game').disabled = true;
+        function rejectPromiseAndCleanup(gameInst, reason) {
+            if (gameInst && gameInst.currentClickPromiseReject) {
+                gameInst.currentClickPromiseReject(reason);
             }
+            if (gameInst) {
+                gameInst.waitingForClick = false; // Critical: update the game instance's state
+                gameInst.currentClickPromiseResolve = null;
+                gameInst.currentClickPromiseReject = null;
+            }
+
+            const gameInfo = document.getElementById('game-information');
+            if (gameInfo) {
+                gameInfo.classList.remove('waiting-for-click');
+                const indicator = gameInfo.querySelector('.click-indicator');
+                if (indicator) indicator.remove();
+            }
+            const continueButton = document.getElementById('continue-button');
+            if (continueButton) {
+                continueButton.style.display = 'none';
+            }
+            document.removeEventListener('click', globalClickHandler);
         }
 
-        function skipCurrentMode() {
-            if (gameInstance && gameInstance.currentMode) {
-                updateGameMode("hopper over", "... ... ...");
-            }
-        }
+        // Define globalClickHandler once to be able to remove it.
+        let globalClickHandler;
 
-        // Initialize sliders and store game instance globally for controls
-        window.addEventListener('load', () => {
-            // Initialize slider values from sessionStorage
-            const savedDelay = sessionStorage.getItem("delay") || "2";
-            document.getElementById('delaySlider').value = savedDelay;
-
-            // Initialize volume slider
-            const volumeSlider = document.getElementById('volumeSlider');
-            volumeSlider.value = 50; // Default volume
-
-            setTimeout(() => {
-                // Try to get the game instance after it's created
-                if (window.game) {
-                    gameInstance = window.game;
+        window.waitForClick = function(message, gameInst) {
+            return new Promise((resolve, reject) => {
+                if (!gameInst) {
+                    console.error("waitForClick called without gameInstance!");
+                    reject(new Error("waitForClick called without gameInstance!"));
+                    return;
                 }
-            }, 1000);
-        });
-    </script>
 
-    <script>
-        // Game control functions
-        let gameInstance = null;
-        let waitingForClick = false;
-
-        function pauseGame() {
-            if (gameInstance && gameInstance.isRunning) {
-                gameInstance.isRunning = false;
-                updateGameMode("du har pauset. tulling", "for å fortsette igjen må du selvfølgelig trykke på knappen under selv. idiot.");
-                document.getElementById('pause-game').disabled = true;
-                document.getElementById('resume-game').disabled = false;
-            }
-        }
-
-        function resumeGame() {
-            if (gameInstance && !gameInstance.isRunning) {
-                gameInstance.isRunning = true;
-                gameInstance._gameLoop();
-                document.getElementById('pause-game').disabled = false;
-                document.getElementById('resume-game').disabled = true;
-            }
-        }
-
-        function skipCurrentMode() {
-            if (gameInstance && gameInstance.currentMode) {
-                updateGameMode("hopper over", "... ... ...");
-                // The game loop will naturally move to the next mode
-            }
-        }
-
-        function continueGame() {
-            if (waitingForClick && gameInstance && gameInstance.waitingForClick) {
-                gameInstance.waitingForClick = false;
-                waitingForClick = false;
-                document.getElementById('continue-button').style.display = 'none';
-                updateInformation("fortsetter igjen");
-            }
-        }
-
-        // Initialize sliders and store game instance globally for controls
-        window.addEventListener('load', () => {
-            // Initialize slider values from sessionStorage
-            const savedDelay = sessionStorage.getItem("delay") || "2";
-            document.getElementById('delaySlider').value = savedDelay;
-
-            // Initialize volume slider
-            const volumeSlider = document.getElementById('volumeSlider');
-            volumeSlider.value = 50; // Default volume
-
-            setTimeout(() => {
-                // Try to get the game instance after it's created
-                if (window.game) {
-                    gameInstance = window.game;
-                }
-            }, 1000);
-        });
-
-        // Global function to wait for click
-        window.waitForClick = function(message) {
-            return new Promise((resolve) => {
-                waitingForClick = true;
-                if (gameInstance) gameInstance.waitingForClick = true;
+                // gameInst.waitingForClick should already be true, set by game.js's _waitForClick
+                // but we ensure it here if this function were ever called directly for some reason.
+                gameInst.waitingForClick = true;
+                gameInst.currentClickPromiseResolve = resolve;
+                gameInst.currentClickPromiseReject = reject;
 
                 const gameInfo = document.getElementById('game-information');
                 updateInformation(message + "\n\ntrykk (hvor som helst?) for å fortsette...");
 
-                // Add visual feedback
                 gameInfo.classList.add('waiting-for-click');
-                gameInfo.innerHTML += '<div class="click-indicator">trykk</div>';
+                // Ensure not to duplicate indicators if function is somehow called multiple times
+                if (!gameInfo.querySelector('.click-indicator')) {
+                    gameInfo.innerHTML += '<div class="click-indicator">trykk</div>';
+                }
 
                 const continueButton = document.getElementById('continue-button');
                 if (continueButton) {
                     continueButton.style.display = 'block';
                 }
 
-                const clickHandler = (e) => {
-                    if (!e.target.closest('button') && !e.target.closest('input')) {
-                        waitingForClick = false;
-                        if (gameInstance) gameInstance.waitingForClick = false;
-                        document.removeEventListener('click', clickHandler);
+                // Assign to globalClickHandler so it can be removed by name
+                globalClickHandler = (e) => {
+                    // Check if the click target is NOT a button or an input element
+                    // and that the game is actually waiting for a click from this mechanism
+                    if (gameInst.waitingForClick && !e.target.closest('button#pause-game') && !e.target.closest('button#skip-mode') && !e.target.closest('button#resume-game') && !e.target.closest('input[type="range"]')) {
+                        // If continue button is explicitly clicked, it will call continueGame(), which calls resolvePromiseAndCleanup.
+                        // This handler is for general clicks on the page.
+                        if (e.target.closest('button#continue-button')) return;
 
-                        // Remove visual feedback
-                        gameInfo.classList.remove('waiting-for-click');
-                        const indicator = gameInfo.querySelector('.click-indicator');
-                        if (indicator) indicator.remove();
-
-                        if (continueButton) continueButton.style.display = 'none';
-                        resolve();
+                        resolvePromiseAndCleanup(gameInst);
+                        // No document.removeEventListener here, resolvePromiseAndCleanup handles it.
                     }
                 };
-
-                document.addEventListener('click', clickHandler);
+                document.addEventListener('click', globalClickHandler);
             });
         };
+
+        function pauseGame() {
+            if (gameInstance) {
+                if (gameInstance.waitingForClick && gameInstance.isCurrentlyWaiting) { // isCurrentlyWaiting ensures _waitForClick is on stack
+                    rejectPromiseAndCleanup(gameInstance, new Error('Game paused'));
+                }
+                // Proceed with pausing the game logic even if it wasn't waiting for a click
+                gameInstance.isRunning = false;
+                updateGameMode("du har pauset. tulling", "for å fortsette igjen må du selvfølgelig trykke på knappen under selv. idiot.");
+                document.getElementById('pause-game').disabled = true;
+                document.getElementById('resume-game').disabled = false;
+            }
+        }
+
+        function resumeGame() {
+            if (gameInstance && !gameInstance.isRunning) {
+                gameInstance.isRunning = true;
+                // If the game was paused while waiting for a click, the promise was rejected.
+                // _gameLoop should handle restarting appropriately.
+                // If it was paused NOT during a wait, then _gameLoop continues.
+                gameInstance._gameLoop(); // This will create a new game loop if one isn't active.
+                updateGameMode("Spillet fortsetter", "Gjør deg klar!"); // Provide some feedback
+                document.getElementById('pause-game').disabled = false;
+                document.getElementById('resume-game').disabled = true;
+            }
+        }
+
+        function skipCurrentMode() {
+            if (gameInstance) {
+                // Set the skipRequested flag on the game instance.
+                // This will be checked by _interruptibleSleep and the game loop.
+                gameInstance.skipRequested = true;
+
+                updateGameMode("Skipping Mode", "One moment...");
+
+                // If the game is currently waiting for a click (i.e., _waitForClick is active),
+                // reject the promise to interrupt it immediately.
+                if (gameInstance.waitingForClick && gameInstance.isCurrentlyWaiting) {
+                    rejectPromiseAndCleanup(gameInstance, new Error('Mode skipped'));
+                }
+
+                // If not waiting for a click, the game loop or current game mode's
+                // _interruptibleSleep will pick up the skipRequested flag.
+                // No need to call gameInstance._gameLoop() or other methods here,
+                // as the existing game loop will handle the skip.
+            }
+        }
+
+        function continueGame() {
+            // This function is now primarily for the "Fortsett NÅ!" button.
+            // It directly resolves the promise if gameInstance is waiting.
+            if (gameInstance && gameInstance.waitingForClick) {
+                // gameInstance.waitingForClick will be set to true by _waitForClick in game.js
+                // resolvePromiseAndCleanup will set it to false.
+                resolvePromiseAndCleanup(gameInstance);
+                updateInformation("fortsetter igjen"); // This might be overwritten by game.js quickly
+            }
+        }
+
+        // Initialize sliders and store game instance globally for controls
+        window.addEventListener('load', () => {
+            // Initialize slider values from sessionStorage
+            const savedDelay = sessionStorage.getItem("delay") || "2";
+            document.getElementById('delaySlider').value = savedDelay;
+
+            // Initialize volume slider
+            const volumeSlider = document.getElementById('volumeSlider');
+            volumeSlider.value = 50; // Default volume
+
+            // Try to get the game instance after it's created
+            if (window.game) {
+                gameInstance = window.game;
+            } else {
+                console.warn("gameInstance not immediately available on load. Retrying in 1s.");
+                setTimeout(() => {
+                    if (window.game) {
+                        gameInstance = window.game;
+                    } else {
+                        console.error("Failed to initialize gameInstance. Game controls may not work.");
+                    }
+                }, 1000);
+            }
+        });
     </script>
 </body>
 </html>
