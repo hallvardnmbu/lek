@@ -116,55 +116,8 @@
 
     <script>
         // Game control functions
-        let gameInstance = null;
-
-        function pauseGame() {
-            if (gameInstance && gameInstance.isRunning) {
-                gameInstance.isRunning = false;
-                updateGameMode("du har pauset. tulling", "for å fortsette igjen må du selvfølgelig trykke på knappen under selv. idiot.");
-                document.getElementById('pause-game').disabled = true;
-                document.getElementById('resume-game').disabled = false;
-            }
-        }
-
-        function resumeGame() {
-            if (gameInstance && !gameInstance.isRunning) {
-                gameInstance.isRunning = true;
-                gameInstance._gameLoop();
-                document.getElementById('pause-game').disabled = false;
-                document.getElementById('resume-game').disabled = true;
-            }
-        }
-
-        function skipCurrentMode() {
-            if (gameInstance && gameInstance.currentMode) {
-                updateGameMode("hopper over", "... ... ...");
-            }
-        }
-
-        // Initialize sliders and store game instance globally for controls
-        window.addEventListener('load', () => {
-            // Initialize slider values from sessionStorage
-            const savedDelay = sessionStorage.getItem("delay") || "2";
-            document.getElementById('delaySlider').value = savedDelay;
-
-            // Initialize volume slider
-            const volumeSlider = document.getElementById('volumeSlider');
-            volumeSlider.value = 50; // Default volume
-
-            setTimeout(() => {
-                // Try to get the game instance after it's created
-                if (window.game) {
-                    gameInstance = window.game;
-                }
-            }, 1000);
-        });
-    </script>
-
-    <script>
-        // Game control functions
-        let gameInstance = null;
-        let waitingForClick = false;
+        let gameInstance = null; // This will be assigned in window.onload
+        let localWaitingForClickFlag = false; // Renamed to avoid conflict
 
         function pauseGame() {
             if (gameInstance && gameInstance.isRunning) {
@@ -191,17 +144,37 @@
             }
         }
 
-        function continueGame() {
-            if (waitingForClick && gameInstance && gameInstance.waitingForClick) {
+        async function continueGame() { // Made async
+            if (speechSynthesis && speechSynthesis.speaking && gameInstance && typeof gameInstance.isSpeaking !== 'undefined') {
+                speechSynthesis.cancel();
+                gameInstance.isSpeaking = false;
+                console.log("Speech cancelled by continueGame");
+            }
+            if (localWaitingForClickFlag && gameInstance && gameInstance.waitingForClick) {
                 gameInstance.waitingForClick = false;
-                waitingForClick = false;
-                document.getElementById('continue-button').style.display = 'none';
-                updateInformation("fortsetter igjen");
+                localWaitingForClickFlag = false;
+                const continueButton = document.getElementById('continue-button');
+                if (continueButton) continueButton.style.display = 'none';
+                // updateInformation is already async and will be awaited if called directly
+                // For now, the original logic of just setting flags is maintained,
+                // game loop / waitForClick resolve will handle UI updates.
+                // If specific message needed here: await updateInformation("fortsetter igjen");
             }
         }
 
         // Initialize sliders and store game instance globally for controls
         window.addEventListener('load', () => {
+            // Assign the global game instance created in game.js
+            if (window.game) {
+                gameInstance = window.game;
+            } else {
+                // Fallback if game.js loads slower, though initializeGame in game.js should handle this.
+                setTimeout(() => {
+                    if (window.game) gameInstance = window.game;
+                    else console.error("Game instance not found after load and timeout.");
+                }, 1000);
+            }
+
             // Initialize slider values from sessionStorage
             const savedDelay = sessionStorage.getItem("delay") || "2";
             document.getElementById('delaySlider').value = savedDelay;
@@ -209,27 +182,31 @@
             // Initialize volume slider
             const volumeSlider = document.getElementById('volumeSlider');
             volumeSlider.value = 50; // Default volume
-
-            setTimeout(() => {
-                // Try to get the game instance after it's created
-                if (window.game) {
-                    gameInstance = window.game;
-                }
-            }, 1000);
         });
 
         // Global function to wait for click
-        window.waitForClick = function(message) {
-            return new Promise((resolve) => {
-                waitingForClick = true;
+        window.waitForClick = async function(message) { // Made async
+            return new Promise(async (resolve) => { // Promise callback made async
+                localWaitingForClickFlag = true;
                 if (gameInstance) gameInstance.waitingForClick = true;
 
                 const gameInfo = document.getElementById('game-information');
-                updateInformation(message + "\n\ntrykk (hvor som helst?) for å fortsette...");
+                // updateInformation is already async and handles its own speech.
+                // The message here is the primary instruction.
+                // The "click to continue" part is usually not spoken due to filters in updateInformation.
+                await updateInformation(message + "\n\ntrykk (hvor som helst?) for å fortsette...");
+                // No need to call gameInstance.speak here directly as updateInformation does it.
 
                 // Add visual feedback
                 gameInfo.classList.add('waiting-for-click');
-                gameInfo.innerHTML += '<div class="click-indicator">trykk</div>';
+                // Ensure the "click to continue" message is visible if not spoken
+                if (!gameInfo.innerHTML.includes("trykk (hvor som helst?) for å fortsette...")) {
+                    gameInfo.innerHTML = gameInfo.innerHTML.replace(/<br>\s*<br>$/, '') + "<br><br>trykk (hvor som helst?) for å fortsette...";
+                }
+                if (!gameInfo.querySelector('.click-indicator')) {
+                    gameInfo.innerHTML += '<div class="click-indicator">trykk</div>';
+                }
+
 
                 const continueButton = document.getElementById('continue-button');
                 if (continueButton) {
@@ -237,10 +214,20 @@
                 }
 
                 const clickHandler = (e) => {
-                    if (!e.target.closest('button') && !e.target.closest('input')) {
-                        waitingForClick = false;
+                    // Check if the click is on the continue button OR anywhere else not a button/input
+                    const isContinueButton = e.target.id === 'continue-button';
+                    const isGeneralClick = !e.target.closest('button:not(#continue-button)') && !e.target.closest('input');
+
+                    if (isContinueButton || isGeneralClick) {
+                        if (speechSynthesis && speechSynthesis.speaking && gameInstance && typeof gameInstance.isSpeaking !== 'undefined') {
+                            speechSynthesis.cancel();
+                            gameInstance.isSpeaking = false;
+                            console.log("Speech cancelled by clickHandler");
+                        }
+                        localWaitingForClickFlag = false;
                         if (gameInstance) gameInstance.waitingForClick = false;
                         document.removeEventListener('click', clickHandler);
+                        if (continueButton) continueButton.removeEventListener('click', clickHandler); // Also remove if attached to button
 
                         // Remove visual feedback
                         gameInfo.classList.remove('waiting-for-click');
@@ -253,6 +240,8 @@
                 };
 
                 document.addEventListener('click', clickHandler);
+                // Ensure continue button also triggers the same logic if clicked directly
+                if (continueButton) continueButton.addEventListener('click', clickHandler);
             });
         };
     </script>

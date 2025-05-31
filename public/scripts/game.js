@@ -1,12 +1,28 @@
 window.onload = initializeGame;
 
-function updateInformation(content, options = {}) {
+async function updateInformation(content, options = {}) {
   const gameInformation = document.getElementById("game-information");
-  
+  const informationalOnlyMessages = [
+    "Waiting...",
+    "Next game in...",
+    "click to continue",
+    "Preparing for fun",
+    "hopper over",
+    "fortsetter igjen" // Added based on plan for continueGame
+  ];
+
   if (options.override) {
     gameInformation.innerHTML = content;
   } else {
     gameInformation.innerHTML = content.replace(/\n/g, '<br>');
+  }
+
+  if (window.game && window.game.speak && !informationalOnlyMessages.some(msg => content.toLowerCase().includes(msg.toLowerCase()))) {
+    try {
+      await window.game.speak(content);
+    } catch (error) {
+      console.error("Error during speak:", error);
+    }
   }
 }
 
@@ -44,12 +60,12 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function initializeGame() {
+async function initializeGame() {
   const settings = loadSettings();
   const delay = loadDelay();
   const game = new Game(settings, delay);
   window.game = game; // Expose globally for controls
-  game._start();
+  await game._start();
 }
 
 class Game {
@@ -60,6 +76,7 @@ class Game {
     this.isRunning = false;
     this.currentMode = null;
     this.waitingForClick = false;
+    this.isSpeaking = false; // Added for TTS
     this.rigged = settings.contestants.find(c => c.rigged)?.name || null;
 
     this.action = {
@@ -97,6 +114,42 @@ class Game {
     this.gameModes = this._getGameModes();
     
     console.log("Game initialized with modes:", Object.keys(this.gameModes));
+  }
+
+  async speak(text) {
+    if (!speechSynthesis) {
+      console.warn("Speech synthesis not supported.");
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve, reject) => {
+      // Clean text: remove HTML, convert newlines/<br> to spaces for smoother speech
+      const cleanedText = text.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]*>/g, '').replace(/\n/g, ' ');
+      const utterance = new SpeechSynthesisUtterance(cleanedText);
+
+      utterance.onstart = () => {
+        this.isSpeaking = true;
+        console.log("Speech started for:", cleanedText);
+      };
+
+      utterance.onend = () => {
+        this.isSpeaking = false;
+        console.log("Speech ended for:", cleanedText);
+        resolve();
+      };
+
+      utterance.onerror = (event) => {
+        this.isSpeaking = false;
+        console.error("Speech synthesis error:", event.error);
+        reject(event.error);
+      };
+
+      // Cancel any ongoing speech before starting a new one
+      if (speechSynthesis.speaking) {
+        speechSynthesis.cancel();
+      }
+      speechSynthesis.speak(utterance);
+    });
   }
 
   _getGameModes() {
@@ -152,9 +205,10 @@ class Game {
   async _start() {
     await pauseSong();
     const contestantNames = this.contestants.map(c => typeof c === 'string' ? c : c.name);
-    updateInformation(
+    await updateInformation(
       `Welcome to the drinking game!\n${contestantNames.join(", ")}.\nLet the games begin!`
     );
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     updateGameMode("Starting Game", "Preparing for fun!");
     
     await sleep(3000);
@@ -166,6 +220,7 @@ class Game {
 
   async _gameLoop() {
     while (this.isRunning) {
+      while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
       try {
         const modeKeys = Object.keys(this.gameModes);
         const randomKey = modeKeys[Math.floor(Math.random() * modeKeys.length)];
@@ -184,14 +239,16 @@ class Game {
         
         updateGameMode("Waiting", `Next game in ${waitTime} seconds...`);
         
-        // Wait with periodic checks for pause and click interruption
+        // Wait with periodic checks for pause, click interruption, and speech
         for (let i = 0; i < waitTime && this.isRunning && !this.waitingForClick; i++) {
+          while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
           await sleep(1000);
         }
         
       } catch (error) {
         console.error("Error in game loop:", error);
-        updateInformation("Something went wrong, but the game continues!");
+        await updateInformation("Something went wrong, but the game continues!");
+        while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
         await sleep(2000);
       }
     }
@@ -219,12 +276,16 @@ class Game {
   async draw() {
     await pauseSong();
     const person = this._getRandomContestant();
-    updateInformation(`Attention everyone!\n${person}, you need to draw something for the others to guess.\nThe others must try to figure out what it is.`);
+    await updateInformation(`Attention everyone!\n${person}, you need to draw something for the others to guess.\nThe others must try to figure out what it is.`);
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     
     await this._waitForClick("Drawing time! When the drawing is complete, click to continue.");
+    // _waitForClick already handles speaking and waiting for speech completion via updateInformation
     
-    updateInformation(`Time to reveal! ${person}, show everyone what you drew.`);
+    await updateInformation(`Time to reveal! ${person}, show everyone what you drew.`);
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await this._waitForClick("Everyone guess what the drawing is!");
+    // _waitForClick already handles speaking and waiting for speech completion via updateInformation
     
     const amount = this._getRandomAction();
     const outcomes = [
@@ -234,7 +295,8 @@ class Game {
       `If some guessed correctly, the correct guessers hand out ${amount}`
     ];
     
-    updateInformation(outcomes[Math.floor(Math.random() * outcomes.length)]);
+    await updateInformation(outcomes[Math.floor(Math.random() * outcomes.length)]);
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(3000);
     await playSong();
   }
@@ -242,16 +304,19 @@ class Game {
   async drink_bitch() {
     const person = this._getRandomContestant();
     await pauseSong();
-    updateInformation("Attention please!");
+    await updateInformation("Attention please!");
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(2000);
-    updateInformation(`${person}, drink up!`);
+    await updateInformation(`${person}, drink up!`);
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(2000);
     await playSong();
   }
 
   async music_length() {
     await pauseSong();
-    updateInformation("How long is the song that just played?");
+    await updateInformation("How long is the song that just played?");
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(5000);
     
     try {
@@ -259,13 +324,14 @@ class Game {
       if (current && current.data) {
         const minutes = Math.floor(current.data.duration / 60000);
         const seconds = Math.floor((current.data.duration % 60000) / 1000);
-        updateInformation(`The song is ${minutes} minutes and ${seconds} seconds long.\nClosest guess wins and may ${this._getRandomActionString()}.`);
+        await updateInformation(`The song is ${minutes} minutes and ${seconds} seconds long.\nClosest guess wins and may ${this._getRandomActionString()}.`);
       } else {
-        updateInformation(`Couldn't get song info. Everyone ${this._getRandomActionString()}!`);
+        await updateInformation(`Couldn't get song info. Everyone ${this._getRandomActionString()}!`);
       }
     } catch (error) {
-      updateInformation(`Song info unavailable. Everyone ${this._getRandomActionString()}!`);
+      await updateInformation(`Song info unavailable. Everyone ${this._getRandomActionString()}!`);
     }
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     
     await sleep(5000);
     await playSong();
@@ -273,20 +339,22 @@ class Game {
 
   async music_year() {
     await pauseSong();
-    updateInformation("What year was the song that just played released?");
+    await updateInformation("What year was the song that just played released?");
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(5000);
     
     try {
       const current = await getCurrentSong();
       if (current && current.data && current.data.release) {
         const year = current.data.release.substring(0, 4);
-        updateInformation(`The song was released in ${year}.\nClosest guess wins and may ${this._getRandomActionString()}.`);
+        await updateInformation(`The song was released in ${year}.\nClosest guess wins and may ${this._getRandomActionString()}.`);
       } else {
-        updateInformation(`Couldn't get release info. Everyone ${this._getRandomActionString()}!`);
+        await updateInformation(`Couldn't get release info. Everyone ${this._getRandomActionString()}!`);
       }
     } catch (error) {
-      updateInformation(`Release info unavailable. Everyone ${this._getRandomActionString()}!`);
+      await updateInformation(`Release info unavailable. Everyone ${this._getRandomActionString()}!`);
     }
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     
     await sleep(5000);
     await playSong();
@@ -294,31 +362,36 @@ class Game {
 
   async music_quiz() {
     await pauseSong();
-    updateInformation("Music Quiz Time!\nI'll play 3 songs. First to shout the artist or song name wins each round.");
+    await updateInformation("Music Quiz Time!\nI'll play 3 songs. First to shout the artist or song name wins each round.");
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(3000);
 
     for (let i = 1; i <= 3; i++) {
-      updateInformation(`Song ${i} of 3`);
+      await updateInformation(`Song ${i} of 3`);
+      while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
       
       try {
         const result = await queueRandomSongFromPlaylist("37i9dQZF1DXcBWIGoYBM5M"); // Top 50 Global
         if (result && result.queuedSong) {
           await skipSong();
-          await sleep(20000);
+          await sleep(20000); // Let song play
           await pauseSong();
-          updateInformation(`That was "${result.queuedSong.name}" by ${result.queuedSong.artist}`);
+          await updateInformation(`That was "${result.queuedSong.name}" by ${result.queuedSong.artist}`);
         } else {
-          updateInformation(`Song ${i} - couldn't queue track`);
+          await updateInformation(`Song ${i} - couldn't queue track`);
         }
+        while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
         await sleep(2000);
       } catch (error) {
         console.error("Music quiz error:", error);
-        updateInformation(`Song ${i} - couldn't load track info`);
+        await updateInformation(`Song ${i} - couldn't load track info`);
+        while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
         await sleep(2000);
       }
     }
 
-    updateInformation(`Quiz complete! Winners hand out ${this._getRandomAction()} sips each.`);
+    await updateInformation(`Quiz complete! Winners hand out ${this._getRandomAction()} sips each.`);
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(3000);
     await playSong();
   }
@@ -328,26 +401,33 @@ class Game {
     const category = this.categories[Math.floor(Math.random() * this.categories.length)];
     const starter = this._getRandomContestant();
     
-    updateInformation(`Category Game!\nCategory: ${category}\n${starter} starts. Keep going until someone fails.`);
+    await updateInformation(`Category Game!\nCategory: ${category}\n${starter} starts. Keep going until someone fails.`);
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await this._waitForClick(`Category: ${category}\n${starter} starts the category game!`);
-    updateInformation(`Game complete! The loser must ${this._getRandomActionString()}.`);
+    // _waitForClick handles its own speech waiting
+    await updateInformation(`Game complete! The loser must ${this._getRandomActionString()}.`);
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(2000);
     await playSong();
   }
 
   async most_likely() {
     await pauseSong();
-    updateInformation("Most Likely Game!\nI'll make statements. Vote if you think it's true.\nMajority rules!");
+    await updateInformation("Most Likely Game!\nI'll make statements. Vote if you think it's true.\nMajority rules!");
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(3000);
 
     for (let i = 0; i < 3; i++) {
       const person = this._getRandomContestant();
       const action = this.most_likely_to[Math.floor(Math.random() * this.most_likely_to.length)];
-      updateInformation(`${person} is most likely to ${action}.`);
+      await updateInformation(`${person} is most likely to ${action}.`);
+      while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
       await this._waitForClick("Vote now! Click when voting is complete.");
+      // _waitForClick handles its own speech waiting
     }
 
-    updateInformation("Voting complete! Majority winners hand out drinks, losers drink!");
+    await updateInformation("Voting complete! Majority winners hand out drinks, losers drink!");
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(3000);
     await playSong();
   }
@@ -355,11 +435,13 @@ class Game {
   async waterfall() {
     await pauseSong();
     const starter = this._getRandomContestant();
-    updateInformation(`Waterfall!\n${starter} starts drinking and chooses direction.\nNext person can't stop until the person before them stops.`);
+    await updateInformation(`Waterfall!\n${starter} starts drinking and chooses direction.\nNext person can't stop until the person before them stops.`);
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     
     if (this.rigged) {
-      await sleep(2000);
-      updateInformation(`Special rule: Start next to ${this.rigged} so it ends on them!`);
+      await sleep(2000); // Wait for initial message to finish before this one
+      await updateInformation(`Special rule: Start next to ${this.rigged} so it ends on them!`);
+      while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     }
     
     await sleep(5000);
@@ -368,15 +450,18 @@ class Game {
 
   async lyrical_master() {
     await pauseSong();
-    updateInformation("Lyrical Master!\nGuess the song from these lyrics:");
+    await updateInformation("Lyrical Master!\nGuess the song from these lyrics:");
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(2000);
     
     const randomLyric = this.lyrics[Math.floor(Math.random() * this.lyrics.length)];
     const [artist, song, text] = randomLyric;
     
-    updateInformation(text, { override: true });
+    await updateInformation(text, { override: true });
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(8000);
-    updateInformation(`The song was "${song}" by ${artist}.\nCorrect guessers may ${this._getRandomActionString()}.`);
+    await updateInformation(`The song was "${song}" by ${artist}.\nCorrect guessers may ${this._getRandomActionString()}.`);
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(3000);
     await playSong();
   }
@@ -386,20 +471,26 @@ class Game {
     const activities = ["dab", "stand up", "touch their nose", "raise their hand", "clap"];
     const activity = activities[Math.floor(Math.random() * activities.length)];
     
-    updateInformation(`Last person to ${activity}...`);
+    await updateInformation(`Last person to ${activity}...`);
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(3000);
-    updateInformation(`Must ${this._getRandomActionString()}!`);
+    await updateInformation(`Must ${this._getRandomActionString()}!`);
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(2000);
     await playSong();
   }
 
   async grimace() {
     await pauseSong();
-    updateInformation("Grimace contest! Make your best funny face!");
+    await updateInformation("Grimace contest! Make your best funny face!");
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(3000);
-    updateInformation("Point at the best grimace!");
+    await updateInformation("Point at the best grimace!");
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await this._waitForClick("Vote for the best grimace!");
-    updateInformation(`Winner may ${this._getRandomActionString()}!`);
+    // _waitForClick handles its own speech waiting
+    await updateInformation(`Winner may ${this._getRandomActionString()}!`);
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(2000);
     await playSong();
   }
@@ -407,14 +498,20 @@ class Game {
   async build() {
     await pauseSong();
     const time = [10, 15, 20, 25, 30][Math.floor(Math.random() * 5)];
-    updateInformation(`Build the highest tower with your empty cans!\nYou have ${time} seconds!`);
+    await updateInformation(`Build the highest tower with your empty cans!\nYou have ${time} seconds!`);
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     
     await this._waitForClick("Click when ready to start the timer!");
-    updateInformation(`GO! Building for ${time} seconds...`);
+    // _waitForClick handles its own speech waiting
+    await updateInformation(`GO! Building for ${time} seconds...`);
+    // No wait after "GO!" as it's an action trigger
     await sleep(time * 1000);
-    updateInformation("Time's up! Stop building!");
+    await updateInformation("Time's up! Stop building!");
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await this._waitForClick("Compare towers and determine the winner!");
-    updateInformation(`Winner may ${this._getRandomActionString()}!`);
+    // _waitForClick handles its own speech waiting
+    await updateInformation(`Winner may ${this._getRandomActionString()}!`);
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(2000);
     await playSong();
   }
@@ -422,9 +519,12 @@ class Game {
   async snacks() {
     await pauseSong();
     const starter = this._getRandomContestant();
-    updateInformation(`Snack toss!\n${starter} starts.\nFirst to catch a snack in their mouth wins!`);
+    await updateInformation(`Snack toss!\n${starter} starts.\nFirst to catch a snack in their mouth wins!`);
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await this._waitForClick("Play until someone successfully catches a snack!");
-    updateInformation(`Winner may ${this._getRandomActionString()}!`);
+    // _waitForClick handles its own speech waiting
+    await updateInformation(`Winner may ${this._getRandomActionString()}!`);
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(2000);
     await playSong();
   }
@@ -434,11 +534,15 @@ class Game {
     const person = this._getRandomContestant();
     const time = [15, 20, 25, 30][Math.floor(Math.random() * 4)];
     
-    updateInformation(`Mime time!\n${person}, you have ${time} seconds to act something out!`);
+    await updateInformation(`Mime time!\n${person}, you have ${time} seconds to act something out!`);
+    // No wait after this, as the timer starts immediately
     await sleep(time * 1000);
-    updateInformation("Time's up! Did everyone guess correctly?");
+    await updateInformation("Time's up! Did everyone guess correctly?");
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await this._waitForClick("Determine who guessed correctly!");
-    updateInformation("If nobody guessed, the mime drinks. Otherwise, wrong guessers drink!");
+    // _waitForClick handles its own speech waiting
+    await updateInformation("If nobody guessed, the mime drinks. Otherwise, wrong guessers drink!");
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(2000);
     await playSong();
   }
@@ -452,52 +556,61 @@ class Game {
     const name1 = typeof person1 === 'string' ? person1 : person1.name;
     const name2 = typeof person2 === 'string' ? person2 : person2.name;
     
-    updateInformation(`Thumb war!\n${name1} vs ${name2}!`);
+    await updateInformation(`Thumb war!\n${name1} vs ${name2}!`);
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await this._waitForClick("Battle it out! Click when the thumb war is finished.");
+    // _waitForClick handles its own speech waiting
     
     const winner = Math.random() < 0.5 ? "winner" : "loser";
-    updateInformation(`The ${winner} must ${this._getRandomActionString()}!`);
+    await updateInformation(`The ${winner} must ${this._getRandomActionString()}!`);
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(2000);
     await playSong();
   }
 
   async slap_the_mini() {
     await pauseSong();
-    updateInformation("Find the shortest person and give them a playful tap!");
+    await updateInformation("Find the shortest person and give them a playful tap!");
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(3000);
-    updateInformation(`The shortest person may ${this._getRandomActionString()}!`);
+    await updateInformation(`The shortest person may ${this._getRandomActionString()}!`);
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(2000);
     await playSong();
   }
 
   async karin_henter_x() {
     await pauseSong();
-    updateInformation("Beer run!\nKarin (or designated person) fetches drinks for everyone!");
+    await updateInformation("Beer run!\nKarin (or designated person) fetches drinks for everyone!");
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(5000);
-    updateInformation("Enjoy your drinks!");
+    await updateInformation("Enjoy your drinks!");
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(3000);
     await playSong();
   }
 
   async andreas_round_x() {
     await pauseSong();
-    updateInformation("Andreas' special round!\nWhat song is currently playing?");
+    await updateInformation("Andreas' special round!\nWhat song is currently playing?");
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     await sleep(2000);
-    await playSong();
-    await sleep(15000);
+    await playSong(); // Song starts playing
+    await sleep(15000); // Let song play
     await pauseSong();
     
     try {
       const current = await getCurrentSong();
       if (current && current.data) {
-        updateInformation(`It was "${current.data.name}" by ${current.data.artist}!`);
+        await updateInformation(`It was "${current.data.name}" by ${current.data.artist}!`);
       } else {
-        updateInformation("Song info unavailable!");
+        await updateInformation("Song info unavailable!");
       }
     } catch (error) {
       console.error("Andreas round error:", error);
-      updateInformation("Song info unavailable!");
+      await updateInformation("Song info unavailable!");
     }
+    while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
     
     await sleep(3000);
     await playSong();
@@ -506,11 +619,12 @@ class Game {
   async _waitForClick(message) {
     this.waitingForClick = true;
     if (typeof window !== 'undefined' && window.waitForClick) {
-      await window.waitForClick(message);
+      await window.waitForClick(message); // This will call updateInformation, which now handles speaking
     } else {
       // Fallback for when window.waitForClick is not available
-      updateInformation(message + "\n\nPress any key to continue...");
-      await sleep(5000);
+      await updateInformation(message + "\n\nPress any key to continue...");
+      while (this.isSpeaking && this.isRunning) { await sleep(100); } if (!this.isRunning) return;
+      await sleep(5000); // Additional wait if needed after speech
     }
     this.waitingForClick = false;
   }
