@@ -27,7 +27,7 @@ function updateDelay(delay) {
 }
 
 function loadDelay() {
-  return parseInt(sessionStorage.getItem("delay") || "3");
+  return parseInt(sessionStorage.getItem("delay") || "1");
 }
 
 function loadSettings() {
@@ -56,7 +56,7 @@ class Game {
   constructor(settings, delay) {
     this.contestants = settings.contestants;
     this.difficulty = settings.difficulty;
-    this.delayRange = [1, delay];
+    this.delayInMinutes = delay; // Delay is now in minutes
     this.isRunning = false;
     this.currentMode = null;
     this.waitingForClick = false;
@@ -179,13 +179,13 @@ class Game {
         
         if (!this.isRunning) break; // Check if game was paused during mode execution
         
-        const waitTime = Math.floor(Math.random() * (this.delayRange[1] - this.delayRange[0] + 1)) + this.delayRange[0];
-        console.log(`Waiting ${waitTime} seconds before next game...`);
+        const waitTimeInSeconds = this.delayInMinutes * 60;
+        console.log(`Waiting ${this.delayInMinutes} minute(s) (which is ${waitTimeInSeconds} seconds) before next game...`); // 즉 means "that is" or "in other words"
         
-        updateGameMode("Waiting", `Next game in ${waitTime} seconds...`);
+        updateGameMode("Waiting", `Next game in ${this.delayInMinutes} minute(s)...`);
         
         // Wait with periodic checks for pause and click interruption
-        for (let i = 0; i < waitTime && this.isRunning && !this.waitingForClick; i++) {
+        for (let i = 0; i < waitTimeInSeconds && this.isRunning && !this.waitingForClick; i++) {
           await sleep(1000);
         }
         
