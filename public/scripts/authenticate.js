@@ -21,12 +21,26 @@ async function generateCodeChallenge(codeVerifier) {
 // Initiate the authorization flow
 async function initiateSpotifyAuth(id) {
   try {
+    // If we are on localhost, we MUST switch to 127.0.0.1 to match the callback origin and preserve sessionStorage
+    if (window.location.hostname === 'localhost') {
+      console.log("Redirecting to 127.0.0.1 to ensure session consistency...");
+      const newUrl = new URL(window.location.href);
+      newUrl.hostname = '127.0.0.1';
+      window.location.href = newUrl.toString();
+      return;
+    }
     // Generate and store the code verifier in session storage
     const codeVerifier = generateCodeVerifier();
     sessionStorage.setItem("verifier", codeVerifier);
 
     const codeChallenge = await generateCodeChallenge(codeVerifier);
-    const redirectUri = `${window.location.origin}/callback`;
+    // Force 127.0.0.1:8080 for local development as per Spotify requirements (localhost is not allowed)
+    const origin = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? 'http://127.0.0.1:8080'
+      : window.location.origin;
+    const redirectUri = `${origin}/callback`;
+
+    console.log("Initiating Auth with Redirect URI:", redirectUri);
 
     const scope =
       "user-read-playback-state user-modify-playback-state user-read-private user-read-email";
@@ -60,7 +74,10 @@ async function exchangeCodeForToken(code, id) {
     }
 
     const tokenUrl = "https://accounts.spotify.com/api/token";
-    const redirectUri = `${window.location.origin}/callback`;
+    const origin = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? 'http://127.0.0.1:8080'
+      : window.location.origin;
+    const redirectUri = `${origin}/callback`;
 
     const body = new URLSearchParams({
       grant_type: "authorization_code",

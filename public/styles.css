@@ -17,14 +17,14 @@ body {
 
     background: black;
 
-    padding: var(--gap) calc(10 * var(--gap));
-
-    min-height: 95vh;
+    padding: var(--gap) calc(2 * var(--gap));
 }
+
 span,
 footer {
     text-align: justify;
 }
+
 footer {
     margin-top: auto;
 
@@ -34,11 +34,13 @@ footer {
 
     align-items: center;
 }
-footer hr {
+
+hr {
     width: 100%;
     border: none;
     height: var(--border);
-    background-color: gainsboro;
+    border-left: var(--border) solid gainsboro;
+    border-right: var(--border) solid gainsboro;
 }
 
 section {
@@ -51,14 +53,13 @@ section {
     align-items: center;
 
     padding: var(--gap);
-    border: var(--border) solid gainsboro;
-    border-radius: var(--gap);
 }
 
 img {
     width: calc(4 * var(--fontsize));
     height: calc(4 * var(--fontsize));
 }
+
 ul img {
     width: calc(2 * var(--fontsize));
     height: calc(2 * var(--fontsize));
@@ -80,6 +81,7 @@ button {
     border: none;
     background-color: transparent;
 }
+
 a:hover,
 button:hover,
 select:hover,
@@ -87,12 +89,14 @@ input:hover {
     cursor: pointer;
     color: orange;
 }
+
 a:active,
 button:active,
 select:active,
 input:active {
     color: darkslategray;
 }
+
 select,
 input {
     -webkit-appearance: none;
@@ -108,21 +112,26 @@ input {
     color: khaki;
     background: transparent;
 }
+
 input {
     width: 12.5em;
     text-decoration: underline;
 }
+
 input[type="range"] {
     border: none;
     padding: 0;
     margin: 0;
     height: 8px;
+
     border-radius: 5px;
-    background: gainsboro;
+    border-left: var(--border) solid khaki;
+    border-right: var(--border) solid khaki;
 
     -webkit-appearance: none;
     appearance: none;
 }
+
 input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
@@ -132,8 +141,13 @@ input[type="range"]::-webkit-slider-thumb {
     background: black;
     border-radius: 5px;
     cursor: pointer;
-    border: 2px solid gainsboro;
+    border: 2px solid khaki;
 }
+input[type="range"]:hover,
+input[type="range"]::-webkit-slider-thumb:hover {
+    border-color: orange;
+}
+
 input[type="range"]::-moz-range-thumb,
 input[type="range"]::-ms-thumb {
     width: 20px;
@@ -141,7 +155,7 @@ input[type="range"]::-ms-thumb {
     background: black;
     border-radius: 5px;
     cursor: pointer;
-    border: 2px solid gainsboro;
+    border: 2px solid khaki;
 }
 
 ul {
@@ -149,6 +163,7 @@ ul {
     gap: var(--gap);
     flex-direction: column;
 }
+
 ul li {
     display: flex;
     gap: var(--gap);
@@ -157,6 +172,7 @@ ul li {
     color: khaki;
     font-style: italic;
 }
+
 ul li:hover {
     cursor: pointer;
     color: darkslategray;

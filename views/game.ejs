@@ -1,26 +1,28 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>lek</title>
     <link rel="stylesheet" href="/styles.css">
 
     <script>
-    if (!sessionStorage.getItem('token')) {
-        window.location.href = '/spotify';
-    } else if (!sessionStorage.getItem('settings')) {
-        window.location.href = '/settings';
-    }
+        if (!sessionStorage.getItem('token')) {
+            window.location.href = '/spotify';
+        } else if (!sessionStorage.getItem('settings')) {
+            window.location.href = '/settings';
+        }
     </script>
     <script src="/scripts/spotify.js"></script>
     <script src="/scripts/authenticate.js"></script>
 </head>
+
 <body>
     <span id="star"></span>
     <script>
         const star = {
-          object: document.getElementById('star'),
-          frame: 1,
-          frames: 10
+            object: document.getElementById('star'),
+            frame: 1,
+            frames: 10
         };
 
         function updateStar() {
@@ -34,16 +36,22 @@
 
     <br>
 
+    <hr>
+
     <section>
         <span>lek</span>
         <div id="game-mode">yo-yo</div>
         <div id="game-description">yo</div>
     </section>
 
+    <hr>
+
     <section>
         <span>hva skjer?</span>
         <div id="game-information">yo</div>
     </section>
+
+    <hr>
 
     <section>
         <span>for kontrollfreaker:</span>
@@ -59,11 +67,11 @@
         <button id="explode" onclick="playExplosion()">Pang.</button>
         <script>
             let explosion = {
-              object: document.getElementById('explosion'),
-              frame: 1,
-              frames: 3,
-              playing: false,
-              interval: null
+                object: document.getElementById('explosion'),
+                frame: 1,
+                frames: 3,
+                playing: false,
+                interval: null
             };
 
             function playExplosion() {
@@ -97,8 +105,10 @@
 
         <span>
             Du kan også endre lydnivået ved å dra på
-            <input type="range" id="volumeSlider" min="0" max="100" value="50" onchange="updateVolume(this.value)" />, eller endre tidsintervall ved å dra på
-            <input type="range" id="delaySlider" min="1" max="8" value="2" onchange="updateDelay(this.value)" />. Jeg velger å ikke vise deg verdiene. Du får prøve deg litt frem.
+            <input type="range" id="volumeSlider" min="0" max="100" value="50" onchange="updateVolume(this.value)" />,
+            eller endre tidsintervall ved å dra på
+            <input type="range" id="delaySlider" min="1" max="8" value="2" onchange="updateDelay(this.value)" />. Jeg
+            velger å ikke vise deg verdiene. Du får prøve deg litt frem.
         </span>
 
         <hr>
@@ -110,6 +120,8 @@
             <a href="/spotify">spotify-innlogging</a>?
             Nåja. For noe styr.
         </span>
+
+        <hr>
     </footer>
 
     <script src="/scripts/game.js"></script>
@@ -219,7 +231,7 @@
         });
 
         // Global function to wait for click
-        window.waitForClick = function(message) {
+        window.waitForClick = function (message) {
             return new Promise((resolve) => {
                 waitingForClick = true;
                 if (gameInstance) gameInstance.waitingForClick = true;
@@ -257,4 +269,5 @@
         };
     </script>
 </body>
+
 </html>

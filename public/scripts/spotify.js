@@ -1,3 +1,5 @@
+let cachedDeviceId = null;
+
 async function isPlaying() {
   try {
     const response = await fetch("https://api.spotify.com/v1/me/player", {
@@ -9,13 +11,17 @@ async function isPlaying() {
     });
 
     if (!response.ok) {
-      window.location.href = "/spotify";
+      if (response.status === 401) {
+        window.location.href = "/spotify";
+      }
       return;
     } else if (response.status === 204) {
       // No active devices.
-      // In this case, try to find a computer device.
-      // If none, use the first available device.
-      // TODO: Handle error if no devices are available.
+      // Use cached ID if available
+      if (cachedDeviceId) {
+        await playSong(cachedDeviceId);
+        return false;
+      }
 
       const devicesResponse = await fetch("https://api.spotify.com/v1/me/player/devices", {
         method: "GET",
@@ -27,9 +33,16 @@ async function isPlaying() {
 
       const devices = await devicesResponse.json();
 
+      if (!devices.devices || devices.devices.length === 0) {
+        console.warn("No devices found");
+        return false;
+      }
+
       // Extract the id of the first "Computer" device. If none, use the first device.
       const computerDevice = devices.devices.find((device) => device.type === "Computer");
       const deviceId = computerDevice ? computerDevice.id : devices.devices[0].id;
+
+      cachedDeviceId = deviceId; // Cache it
 
       await playSong(deviceId);
 
@@ -38,10 +51,12 @@ async function isPlaying() {
     }
 
     const data = await response.json();
+    if (data.device && data.device.id) {
+      cachedDeviceId = data.device.id;
+    }
     return data.is_playing;
   } catch (error) {
     console.error(error);
-    window.location.href = "/spotify";
     return;
   }
 }
@@ -215,8 +230,15 @@ async function startShufflePlaylist(playlistId) {
   }
 }
 
+const playlistCache = {};
+
 async function getPlaylistTracks(playlistId) {
   try {
+    if (playlistCache[playlistId]) {
+      console.log(`Using cached tracks for playlist ${playlistId}`);
+      return playlistCache[playlistId];
+    }
+
     const response = await fetch(
       `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=200`,
       {
@@ -229,17 +251,23 @@ async function getPlaylistTracks(playlistId) {
     );
 
     if (!response.ok) {
-      window.location.href = "/spotify";
-      return;
+      if (response.status === 401) {
+        window.location.href = "/spotify";
+      }
+      return { success: false };
     }
 
     const data = await response.json();
-    return {
+    const result = {
       tracks: data.items.filter((item) => item.track).map((item) => item.track),
+      success: true
     };
+
+    playlistCache[playlistId] = result;
+    return result;
   } catch (error) {
-    window.location.href = "/spotify";
-    return;
+    console.error("Error fetching playlist tracks: ", error);
+    return { success: false };
   }
 }
 
