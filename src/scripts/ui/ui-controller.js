@@ -22,12 +22,6 @@ export function loadDelay() {
     return parseInt(sessionStorage.getItem("delay") || "3");
 }
 
-export function loadSettings() {
-    return (
-        JSON.parse(sessionStorage.getItem("settings")) || DEFAULT_SETTINGS
-    );
-}
-
 export function setupUI(gameInstance) {
     const continueButton = document.getElementById('continue-button');
     const volumeSlider = document.getElementById('volumeSlider');

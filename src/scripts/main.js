@@ -1,10 +1,10 @@
 // main.js
 import { Game } from './game/Game.js';
-import { loadSettings as getGameSettings, loadDelay, setupUI } from './ui/ui-controller.js';
+import { loadDelay, setupUI } from './ui/ui-controller.js';
 import { initializeSpeech } from './services/speech-service.js';
 import { initiateSpotifyAuth } from './services/auth-service.js';
 import { SPOTIFY_CLIENT_ID } from '../config.js';
-import { startShufflePlaylist } from './services/spotify-service.js';
+import { isPlaying, startShufflePlaylist } from './services/spotify-service.js';
 
 let contestants = [];
 
@@ -26,7 +26,7 @@ function startStarAnimation() {
 
     if (starInterval) clearInterval(starInterval);
     starInterval = setInterval(() => {
-        star.innerHTML = `<img src="/icons/animations/star/Star (${frame} of ${frames}).ico">`;
+        star.innerHTML = `<img src="/icons/animations/star/star-${frame}-of-${frames}.ico">`;
         frame = frame >= frames ? 1 : frame + 1;
     }, 200);
 }
@@ -39,7 +39,7 @@ function startKeyboardAnimation() {
 
     if (keyboardInterval) clearInterval(keyboardInterval);
     keyboardInterval = setInterval(() => {
-        keyboard.innerHTML = `<img src="/icons/animations/keyboard/MIDI keyboard (${frame} of ${frames}).ico">`;
+        keyboard.innerHTML = `<img src="/icons/animations/keyboard/keyboard-${frame}-of-${frames}.ico">`;
         frame = frame >= frames ? 1 : frame + 1;
     }, 1500);
 }
@@ -51,7 +51,7 @@ window.playExplosion = function () {
     const frames = 3;
     let explosionInterval = setInterval(() => {
         if (frame <= frames) {
-            explosion.innerHTML = `<img src="/icons/animations/explosion/Explosion (${frame} of ${frames}).ico">`;
+            explosion.innerHTML = `<img src="/icons/animations/explosion/explosion-${frame}-of-${frames}.ico">`;
             frame++;
         } else {
             clearInterval(explosionInterval);
@@ -92,7 +92,7 @@ function renderContestant(c) {
 
     // Icon
     const img = document.createElement("img");
-    img.src = "/icons/Smiley face.ico";
+    img.src = "/icons/smiley-face.ico";
     img.style.cursor = "pointer";
     if (isRigged) {
         img.style.filter = "invert(1) sepia(1) saturate(5) hue-rotate(-50deg)";
@@ -159,7 +159,7 @@ function saveSettings() {
 
 function updateSettingsUI() {
     const readySpan = document.getElementById("ready");
-    if (contestants.length > 0) {
+    if (contestants.length > 1) {
         readySpan.style.display = "inline";
     } else {
         readySpan.style.display = "none";
@@ -168,7 +168,9 @@ function updateSettingsUI() {
 
 async function startGame() {
     const playlist = document.getElementById("playlist").value;
-    await startShufflePlaylist(playlist);
+    if (!(await isPlaying())) {
+        await startShufflePlaylist(playlist);
+    }
 
     showView('view-game');
     initializeSpeech();
@@ -195,6 +197,11 @@ window.addEventListener('load', async () => {
     } else {
         showView('view-settings');
         loadSettings();
+    }
+
+    if (token && !(await isPlaying())) {
+        const playlistVal = document.getElementById("playlist")?.value;
+        if (playlistVal) await startShufflePlaylist(playlistVal);
     }
 
     const loginBtn = document.getElementById('login-button');
