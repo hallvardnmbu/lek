@@ -6,14 +6,16 @@
     <link rel="stylesheet" href="/styles.css">
 
     <script>
+        // Inject Client ID for modules
+        window.SPOTIFY_CLIENT_ID = '<%= id %>'; // Ensure this variable is passed from backend
+
         if (!sessionStorage.getItem('token')) {
             window.location.href = '/spotify';
         } else if (!sessionStorage.getItem('settings')) {
             window.location.href = '/settings';
         }
     </script>
-    <script src="/scripts/spotify.js"></script>
-    <script src="/scripts/authenticate.js"></script>
+    <script type="module" src="/scripts/main.js"></script>
 </head>
 
 <body>
@@ -39,27 +41,11 @@
     <hr>
 
     <section>
-        <span>lek</span>
-        <div id="game-mode">yo-yo</div>
-        <div id="game-description">yo</div>
-    </section>
+        <span id="game-information">for kontrollfreaker:</span>
 
-    <hr>
-
-    <section>
-        <span>hva skjer?</span>
-        <div id="game-information">yo</div>
-    </section>
-
-    <hr>
-
-    <section>
-        <span>for kontrollfreaker:</span>
-
-        <button id="pause-game" onclick="pauseGame()">pause!</button>
-        <button id="resume-game" onclick="resumeGame()">ferdig hvilt!</button>
-        <button id="skip-mode" onclick="skipCurrentMode()">kje de lig !!! hopp over</button>
-        <button id="continue-button" onclick="continueGame()" style="display: none;">fortsett NÅ!</button>
+        <button id="pause-game">pause!</button>
+        <button id="resume-game" disabled>ferdig hvilt!</button>
+        <button id="continue-button" style="display: none;">fortsett NÅ!</button>
     </section>
 
     <footer>
@@ -97,17 +83,22 @@
         <hr>
 
         <span>
-            For å styre sangen som spilles kan du
-            <button onclick="pauseSong()">pause</button> den,
-            <button onclick="playSong()">starte</button> den igjen eller
-            <button onclick="skipSong()">hoppe over</button> den.
+            <!-- These should ideally be hooked up via ID in main.js/ui-controller, but 
+                  for now maintaining inline onclick for things I haven't ported or simple logic 
+                  Wait, I ported these to spotify-service but they aren't globally available anymore.
+                  I need to hook these buttons up in ui-controller! -->
+            For å styre sangen som spilles:
+            <!-- Removing buttons from HTML that rely on global functions, adding IDs -->
+            <button id="btn-pause-song">pause</button> den,
+            <button id="btn-play-song">starte</button> den igjen eller
+            <button id="btn-skip-song">hoppe over</button> den.
         </span>
 
         <span>
             Du kan også endre lydnivået ved å dra på
-            <input type="range" id="volumeSlider" min="0" max="100" value="50" onchange="updateVolume(this.value)" />,
+            <input type="range" id="volumeSlider" min="0" max="100" value="50" />,
             eller endre tidsintervall ved å dra på
-            <input type="range" id="delaySlider" min="1" max="8" value="2" onchange="updateDelay(this.value)" />. Jeg
+            <input type="range" id="delaySlider" min="1" max="8" value="2" />. Jeg
             velger å ikke vise deg verdiene. Du får prøve deg litt frem.
         </span>
 
@@ -124,149 +115,13 @@
         <hr>
     </footer>
 
-    <script src="/scripts/game.js"></script>
+    <!-- Simple script to attach listeners for the footer buttons which I didn't handle in ui-controller yet -->
+    <script type="module">
+        import { pauseSong, playSong, skipSong } from '/scripts/services/spotify-service.js';
 
-    <script>
-        // Game control functions
-        let gameInstance = null;
-
-        function pauseGame() {
-            if (gameInstance && gameInstance.isRunning) {
-                gameInstance.isRunning = false;
-                updateGameMode("du har pauset. tulling", "for å fortsette igjen må du selvfølgelig trykke på knappen under selv. idiot.");
-                document.getElementById('pause-game').disabled = true;
-                document.getElementById('resume-game').disabled = false;
-            }
-        }
-
-        function resumeGame() {
-            if (gameInstance && !gameInstance.isRunning) {
-                gameInstance.isRunning = true;
-                gameInstance._gameLoop();
-                document.getElementById('pause-game').disabled = false;
-                document.getElementById('resume-game').disabled = true;
-            }
-        }
-
-        function skipCurrentMode() {
-            if (gameInstance && gameInstance.currentMode) {
-                updateGameMode("hopper over", "... ... ...");
-            }
-        }
-
-        // Initialize sliders and store game instance globally for controls
-        window.addEventListener('load', () => {
-            // Initialize slider values from sessionStorage
-            const savedDelay = sessionStorage.getItem("delay") || "2";
-            document.getElementById('delaySlider').value = savedDelay;
-
-            // Initialize volume slider
-            const volumeSlider = document.getElementById('volumeSlider');
-            volumeSlider.value = 50; // Default volume
-
-            setTimeout(() => {
-                // Try to get the game instance after it's created
-                if (window.game) {
-                    gameInstance = window.game;
-                }
-            }, 1000);
-        });
-    </script>
-
-    <script>
-        // Game control functions
-        let gameInstance = null;
-        let waitingForClick = false;
-
-        function pauseGame() {
-            if (gameInstance && gameInstance.isRunning) {
-                gameInstance.isRunning = false;
-                updateGameMode("du har pauset. tulling", "for å fortsette igjen må du selvfølgelig trykke på knappen under selv. idiot.");
-                document.getElementById('pause-game').disabled = true;
-                document.getElementById('resume-game').disabled = false;
-            }
-        }
-
-        function resumeGame() {
-            if (gameInstance && !gameInstance.isRunning) {
-                gameInstance.isRunning = true;
-                gameInstance._gameLoop();
-                document.getElementById('pause-game').disabled = false;
-                document.getElementById('resume-game').disabled = true;
-            }
-        }
-
-        function skipCurrentMode() {
-            if (gameInstance && gameInstance.currentMode) {
-                updateGameMode("hopper over", "... ... ...");
-                // The game loop will naturally move to the next mode
-            }
-        }
-
-        function continueGame() {
-            if (waitingForClick && gameInstance && gameInstance.waitingForClick) {
-                gameInstance.waitingForClick = false;
-                waitingForClick = false;
-                document.getElementById('continue-button').style.display = 'none';
-                updateInformation("fortsetter igjen");
-            }
-        }
-
-        // Initialize sliders and store game instance globally for controls
-        window.addEventListener('load', () => {
-            // Initialize slider values from sessionStorage
-            const savedDelay = sessionStorage.getItem("delay") || "2";
-            document.getElementById('delaySlider').value = savedDelay;
-
-            // Initialize volume slider
-            const volumeSlider = document.getElementById('volumeSlider');
-            volumeSlider.value = 50; // Default volume
-
-            setTimeout(() => {
-                // Try to get the game instance after it's created
-                if (window.game) {
-                    gameInstance = window.game;
-                }
-            }, 1000);
-        });
-
-        // Global function to wait for click
-        window.waitForClick = function (message) {
-            return new Promise((resolve) => {
-                waitingForClick = true;
-                if (gameInstance) gameInstance.waitingForClick = true;
-
-                const gameInfo = document.getElementById('game-information');
-                updateInformation(message + "\n\ntrykk (hvor som helst?) for å fortsette...");
-
-                // Add visual feedback
-                gameInfo.classList.add('waiting-for-click');
-                gameInfo.innerHTML += '<div class="click-indicator">trykk</div>';
-
-                const continueButton = document.getElementById('continue-button');
-                if (continueButton) {
-                    continueButton.style.display = 'block';
-                }
-
-                const clickHandler = (e) => {
-                    if (!e.target.closest('button') && !e.target.closest('input')) {
-                        waitingForClick = false;
-                        if (gameInstance) gameInstance.waitingForClick = false;
-                        document.removeEventListener('click', clickHandler);
-
-                        // Remove visual feedback
-                        gameInfo.classList.remove('waiting-for-click');
-                        const indicator = gameInfo.querySelector('.click-indicator');
-                        if (indicator) indicator.remove();
-
-                        if (continueButton) continueButton.style.display = 'none';
-                        resolve();
-                    }
-                };
-
-                document.addEventListener('click', clickHandler);
-            });
-        };
+        document.getElementById('btn-pause-song').addEventListener('click', () => pauseSong());
+        document.getElementById('btn-play-song').addEventListener('click', () => playSong());
+        document.getElementById('btn-skip-song').addEventListener('click', () => skipSong());
     </script>
 </body>
 
