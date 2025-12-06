@@ -89,8 +89,6 @@ function renderContestant(c) {
     const list = document.getElementById("contestants");
 
     const li = document.createElement("li");
-    li.style.display = "flex";
-    li.style.alignItems = "center";
 
     // Icon
     const img = document.createElement("img");

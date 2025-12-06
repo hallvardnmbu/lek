@@ -1,6 +1,6 @@
-// ui/ui-controller.js
 import * as SpeechService from '../services/speech-service.js';
 import { pauseSong, playSong, skipSong, updateVolume } from '../services/spotify-service.js';
+import { DEFAULT_SETTINGS } from '../constants.js';
 
 let waitingForClickResolve = null;
 
@@ -24,11 +24,7 @@ export function loadDelay() {
 
 export function loadSettings() {
     return (
-        JSON.parse(sessionStorage.getItem("settings")) || {
-            difficulty: "medium",
-            playlist: "6TutgaHFfkThmrrobwA2y9",
-            contestants: [],
-        }
+        JSON.parse(sessionStorage.getItem("settings")) || DEFAULT_SETTINGS
     );
 }
 

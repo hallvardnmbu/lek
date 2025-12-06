@@ -5,15 +5,6 @@
     <title>lek</title>
     <link rel="stylesheet" href="/styles.css">
     <script type="module" src="/scripts/main.js"></script>
-    <style>
-        .view {
-            display: none;
-        }
-
-        .view.active {
-            display: block;
-        }
-    </style>
 </head>
 
 <body>
@@ -21,12 +12,6 @@
     <!-- LOGIN VIEW -->
     <div id="view-login" class="view">
         <span id="keyboard"></span>
-        <script>
-            // Inline animation scripts modified to not pollute global scope if possible, 
-            // but for simplicity keeping them as self-contained blocks or we can move to main.js.
-            // Keeping simple for now, but will likely need to be initialized by main.js to avoid errors when elements aren't visible?
-            // Actually, elements exist, just hidden.
-        </script>
 
         <br>
         <span>
@@ -76,7 +61,6 @@
     <div id="view-game" class="view">
         <span id="star"></span>
         <br>
-        <hr>
         <section>
             <span id="game-information">for kontrollfreaker:</span>
             <button id="pause-game">pause!</button>
@@ -86,7 +70,6 @@
         <footer>
             <span id="explosion" style="height: calc(4 * var(--fontsize));"></span>
             <button id="explode">Pang.</button>
-            <hr>
             <span>
                 For å styre sangen som spilles:
                 <button id="btn-pause-song">pause</button> den,
@@ -100,7 +83,6 @@
                 <input type="range" id="delaySlider" min="1" max="8" value="2" />. Jeg
                 velger å ikke vise deg verdiene. Du får prøve deg litt frem.
             </span>
-            <hr>
             <span>
                 Hallo! Jeg er dum og har gjort noe feil. Send meg tilbake til
                 <button id="reset-settings-btn">innstillinger</button>
@@ -108,7 +90,6 @@
                 <button id="logout-btn">spotify-innlogging</button>?
                 Nåja. For noe styr.
             </span>
-            <hr>
         </footer>
     </div>
 

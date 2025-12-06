@@ -1,8 +1,8 @@
-// game/Game.js
 import { TimeManager } from './TimeManager.js';
 import { GameModes } from './GameModes.js';
 import { updateInformation, updateGameMode, waitForClick } from '../ui/ui-controller.js';
 import { pauseSong, playSong } from '../services/spotify-service.js';
+import { GAME_MODES } from '../constants.js';
 
 export class Game {
     constructor(settings, delay) {
@@ -40,7 +40,6 @@ export class Game {
     }
 
     startLoop() {
-        // Ensure loop is requested
         requestAnimationFrame(this._loop);
     }
 
@@ -55,13 +54,11 @@ export class Game {
         return this.time.wait(ms);
     }
 
-    // Proxy to UI waitForClick to allow GameModes to use it AND share game context if needed
     async waitForClick(message) {
         return waitForClick(message);
     }
 
     _getAvailableModes() {
-        // Get methods from GameModes instance
         const prototype = Object.getPrototypeOf(this.gameModes);
         const methodNames = Object.getOwnPropertyNames(prototype)
             .filter(method =>
@@ -72,7 +69,6 @@ export class Game {
 
         const modes = {};
         for (const method of methodNames) {
-            // Simple description mapping could be moved to GameModes or kept here
             modes[method] = {
                 func: this.gameModes[method].bind(this.gameModes),
                 description: this._getMethodDescription(method)
@@ -82,26 +78,7 @@ export class Game {
     }
 
     _getMethodDescription(method) {
-        const descriptions = {
-            drink_bitch: "Drikk-bitsj. Tilfeldig spiller må drikke.",
-            music_length: "Gjett lengden på sangen.",
-            music_year: "Gjett året denne sangen er fra.",
-            music_quiz: "Identifiser sang og artist.",
-            categories: "Nevn ting i en kategori til noen feiler.",
-            most_likely: "Stem på hvem som er mest sannsynlig til å...",
-            waterfall: "Fossefall. Alle drikker i rekkefølge.",
-            lyrical_master: "Gjett sangen fra teksten.",
-            last_to: "Siste person til å gjøre en handling taper.",
-            grimace: "Lag den beste grimasen.",
-            build: "Bygg det høyeste tårnet med tomme bokser.",
-            snacks: "Kast snacks i munnen.",
-            mime: "Mimelek uten ord.",
-            thumb_war: "Episk tommelkrig.",
-            slap_the_mini: "Slap den korteste personen.",
-            karin_henter_x: "Spesiell øl-runde",
-            andreas_round_x: "Musikkquiz-utfordring"
-        };
-        return descriptions[method] || "Huh?? Noe gikk galt...";
+        return GAME_MODES[method] || "Huh?? Noe gikk galt...";
     }
 
     async start() {

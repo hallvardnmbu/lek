@@ -19,13 +19,13 @@ const lek = express();
 //     contentSecurityPolicy: {
 //       directives: {
 //         defaultSrc: ["'self'"],
-//         scriptSrc: ["'self'", "'unsafe-inline'", "https://accounts.spotify.com"], // added unsafe-inline for the animation scripts I left in HTML. Ideally remove those.
+//         scriptSrc: ["'self'", "https://accounts.spotify.com"],
 //         connectSrc: ["'self'", "https://api.spotify.com", "https://accounts.spotify.com"],
-//         imgSrc: ["'self'", "data:", "https://i.scdn.co"], // Spotify images
-//         styleSrc: ["'self'", "'unsafe-inline'"],
+//         imgSrc: ["'self'", "data:", "https://i.scdn.co"],
+//         styleSrc: ["'self'", "'unsafe-inline'"], // Re-enabled for style attributes/JS style usage
 //       },
 //     },
-//     hsts: false, // Disable HSTS to avoid SSL errors on localhost (HTTP)
+//     hsts: false,
 //   })
 // );
 
