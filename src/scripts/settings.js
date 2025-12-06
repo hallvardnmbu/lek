@@ -38,7 +38,10 @@ window.addEventListener('load', () => {
 
     // Attach update listeners
     document.getElementById("difficulty").addEventListener('change', updateSettings);
-    document.getElementById("playlist").addEventListener('change', updateSettings);
+    document.getElementById("playlist").addEventListener('change', async () => {
+        updateSettings();
+        await startShufflePlaylist(document.getElementById("playlist").value);
+    });
 
     // Initial update
     updateSettings();
@@ -93,7 +96,6 @@ export function updateSettings() {
     if (startLink) {
         startLink.onclick = async (e) => {
             e.preventDefault();
-            await startShufflePlaylist(playlist);
             window.location.href = '/';
         };
     }

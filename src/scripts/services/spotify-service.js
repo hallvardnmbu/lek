@@ -1,11 +1,12 @@
 // services/spotify-service.js
 import { getValidAccessToken } from './auth-service.js';
+import { SPOTIFY_CLIENT_ID } from '../../config.js';
 
 let cachedDeviceId = null;
 
-// Helper to get client ID from window (injected by EJS)
+// Helper to get client ID
 function getClientId() {
-    return window.SPOTIFY_CLIENT_ID;
+    return SPOTIFY_CLIENT_ID;
 }
 
 /**
@@ -206,16 +207,11 @@ export async function getCurrentSong() {
 }
 
 /**
- * Fetches a random track from a playlist (uses album API in original code? The url says albums/${playlistId}, interesting variable naming there).
- * Wait, `https://api.spotify.com/v1/albums/${playlistId}/tracks` means it treats the ID as an Album ID, not a Playlist ID.
- * The function name `queueRandomSongFromAlbum` implies Album. `startShufflePlaylist` implies Playlist.
- * Let's assume the parameter is an Album ID for `queueRandomSongFromAlbum`.
+ * Fetches a random track from an Album.
  */
 async function getRandomTrackFromAlbum(albumId) {
     try {
-        const offset = Math.floor(Math.random() * 15); // limit random scope for simplicity or original logic? Original was 100.
-        // Original code: albums/${playlistId}/tracks?offset=${offset}&limit=1
-        // Note: Albums usually don't have 100 tracks. 15 is safer.
+        const offset = Math.floor(Math.random() * 15);
 
         const url = `https://api.spotify.com/v1/albums/${albumId}/tracks?offset=${offset}&limit=1`;
 
@@ -230,10 +226,9 @@ async function getRandomTrackFromAlbum(albumId) {
         }
 
         const data = await response.json();
-        // data.items for albums/tracks endpoint
 
         return {
-            tracks: data.items, // list of simple track objects
+            tracks: data.items,
             success: true
         };
     } catch (e) {
@@ -252,7 +247,6 @@ export async function queueRandomSongFromAlbum(albumId) {
     try {
         await playSong();
 
-        // In original code this was `getRandomTrack(playlistId)` but url was album.
         const result = await getRandomTrackFromAlbum(albumId);
 
         if (!result.success || !result.tracks || result.tracks.length === 0) {
@@ -320,17 +314,20 @@ export async function updateVolume(volume) {
  */
 export async function startShufflePlaylist(playlistId) {
     try {
-        // If not playing, start playing (is this needed if we play context?)
-        // await playSong(); 
+        // Ensure we have an active device or try to wake one up
+        await isPlaying();
 
-        // Trying to enable shuffle mode before starting playlist
-        let shuffleResponse = await fetch("https://api.spotify.com/v1/me/player/shuffle?state=true", {
+        const deviceId = cachedDeviceId;
+        const query = deviceId ? `?device_id=${deviceId}` : "";
+
+        // Enable shuffle
+        let shuffleResponse = await fetch(`https://api.spotify.com/v1/me/player/shuffle?state=true${query.replace('?', '&')}`, {
             method: "PUT",
             headers: await getAuthHeaders(),
         });
 
-        // Then start playing the playlist
-        const playResponse = await fetch("https://api.spotify.com/v1/me/player/play", {
+        // Start playing the playlist
+        const playResponse = await fetch(`https://api.spotify.com/v1/me/player/play${query}`, {
             method: "PUT",
             headers: await getAuthHeaders(),
             body: JSON.stringify({
@@ -339,20 +336,21 @@ export async function startShufflePlaylist(playlistId) {
         });
 
         if (!playResponse.ok && playResponse.status !== 204) {
-            if (playResponse.status === 401) throw new Error("Unauthorized");
-            console.error("Failed to start playing the playlist");
+            // If 404, it often means no device found even after isPlaying check?
+            if (playResponse.status === 404) {
+                console.warn("Spotify Device not found (404).");
+            } else if (playResponse.status === 401) {
+                throw new Error("Unauthorized");
+            }
+            console.error("Failed to start playing the playlist", playResponse.status);
         }
 
-        // If shuffle mode is not enabled, try again
+        // Retry shuffle if needed (sometimes fails if context wasn't active yet)
         if (!shuffleResponse.ok && shuffleResponse.status !== 204) {
-            shuffleResponse = await fetch("https://api.spotify.com/v1/me/player/shuffle?state=true", {
+            await fetch(`https://api.spotify.com/v1/me/player/shuffle?state=true${query.replace('?', '&')}`, {
                 method: "PUT",
                 headers: await getAuthHeaders(),
             });
-        }
-
-        if (!shuffleResponse.ok && shuffleResponse.status !== 204) {
-            console.warn("Failed to enable shuffle mode :-(");
         }
 
     } catch (error) {

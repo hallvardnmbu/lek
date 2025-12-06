@@ -148,6 +148,9 @@ export class Game {
 
                 if (!this._isRunning) break;
 
+                // Resume music for the wait period
+                await playSong();
+
                 // Random wait
                 const minWait = 0.5;
                 const maxWait = Math.max(minWait, this.delay);

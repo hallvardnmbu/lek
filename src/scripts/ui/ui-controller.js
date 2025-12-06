@@ -1,20 +1,10 @@
 // ui/ui-controller.js
 import * as SpeechService from '../services/speech-service.js';
+import { pauseSong, playSong, skipSong, updateVolume } from '../services/spotify-service.js';
 
 let waitingForClickResolve = null;
 
-// DOM Elements
-const gameInfoElement = document.getElementById('game-information');
-const continueButton = document.getElementById('continue-button');
-const pauseButton = document.getElementById('pause-game');
-const resumeButton = document.getElementById('resume-game');
-const volumeSlider = document.getElementById('volumeSlider');
-const delaySlider = document.getElementById('delaySlider');
-
-// Functions exported for use in game logic (avoiding direct DOM manipulation there if possible)
-
 export async function updateInformation(content, options = {}) {
-    // Strip HTML tags for speech
     const textToSpeak = content.replace(/<[^>]*>?/gm, '');
     await SpeechService.speak(textToSpeak);
 }
@@ -42,8 +32,11 @@ export function loadSettings() {
     );
 }
 
-// Global waitForClick replacement
 export function setupUI(gameInstance) {
+    const continueButton = document.getElementById('continue-button');
+    const volumeSlider = document.getElementById('volumeSlider');
+    const delaySlider = document.getElementById('delaySlider');
+
     // Buttons
     if (document.getElementById('pause-game')) {
         document.getElementById('pause-game').addEventListener('click', () => {
@@ -67,6 +60,17 @@ export function setupUI(gameInstance) {
         });
     }
 
+    // Spotify Controls
+    document.getElementById('btn-pause-song')?.addEventListener('click', () => pauseSong());
+    document.getElementById('btn-play-song')?.addEventListener('click', () => playSong());
+    document.getElementById('btn-skip-song')?.addEventListener('click', () => skipSong());
+
+    if (document.getElementById('explode')) {
+        document.getElementById('explode').addEventListener('click', () => {
+            if (window.playExplosion) window.playExplosion();
+        });
+    }
+
     if (continueButton) {
         continueButton.addEventListener('click', () => {
             // Signal continue
@@ -81,7 +85,7 @@ export function setupUI(gameInstance) {
     // Sliders
     if (volumeSlider) {
         volumeSlider.addEventListener('change', (e) => {
-            import('../services/spotify-service.js').then(s => s.updateVolume(e.target.value));
+            updateVolume(e.target.value);
         });
     }
 
@@ -97,6 +101,8 @@ export function setupUI(gameInstance) {
 
 function onWaitForClickFinished() {
     const gameInfo = document.getElementById('game-information');
+    const continueButton = document.getElementById('continue-button');
+
     if (gameInfo) {
         gameInfo.classList.remove('waiting-for-click');
         const indicator = gameInfo.querySelector('.click-indicator');
@@ -111,6 +117,8 @@ function onWaitForClickFinished() {
  */
 export async function waitForClick(message) {
     const gameInfo = document.getElementById('game-information');
+    const continueButton = document.getElementById('continue-button');
+
     await updateInformation(message + "\n\ntrykk (hvor som helst?) for å fortsette...");
 
     // Add visual feedback
