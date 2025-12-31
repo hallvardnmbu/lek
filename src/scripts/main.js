@@ -187,23 +187,7 @@ async function startGame() {
 }
 
 window.addEventListener('load', async () => {
-    const token = sessionStorage.getItem('token');
-
-    if (!token) {
-        showView('view-login');
-    } else if (!sessionStorage.getItem('settings')) {
-        showView('view-settings');
-        loadSettings();
-    } else {
-        showView('view-settings');
-        loadSettings();
-    }
-
-    if (token && !(await isPlaying())) {
-        const playlistVal = document.getElementById("playlist")?.value;
-        if (playlistVal) await startShufflePlaylist(playlistVal);
-    }
-
+    // Attach listeners first, so they work regardless of auth status failures
     const loginBtn = document.getElementById('login-button');
     if (loginBtn) {
         loginBtn.addEventListener('click', () => {
@@ -237,13 +221,41 @@ window.addEventListener('load', async () => {
         startBtn.addEventListener('click', startGame);
     }
 
-    document.getElementById('reset-settings-btn').addEventListener('click', () => {
-        sessionStorage.removeItem('settings');
-        window.location.reload();
-    });
+    const resetBtn = document.getElementById('reset-settings-btn');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            sessionStorage.removeItem('settings');
+            window.location.reload();
+        });
+    }
 
-    document.getElementById('logout-btn').addEventListener('click', () => {
-        sessionStorage.clear();
-        window.location.reload();
-    });
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            sessionStorage.clear();
+            window.location.reload();
+        });
+    }
+
+    // Now do the auth check and view switching
+    try {
+        const response = await fetch('/auth/status');
+        const status = await response.json();
+
+        if (!status.isAuthenticated) {
+            showView('view-login');
+        } else {
+            showView('view-settings');
+            loadSettings();
+            
+            // Initial playlist shuffle if needed
+            if (!(await isPlaying())) {
+                const playlistVal = document.getElementById("playlist")?.value;
+                if (playlistVal) await startShufflePlaylist(playlistVal);
+            }
+        }
+    } catch (error) {
+        console.error("Auth check failed:", error);
+        showView('view-login');
+    }
 });

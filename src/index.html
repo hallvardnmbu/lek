@@ -1,99 +1,133 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
+    <head>
+        <title>lek</title>
+    <link rel="icon" type="image/png" href="icons/task-manager.ico" />
+    <link rel="stylesheet" href="styles.css" />
+    <script type="module" src="scripts/main.js"></script>
+    </head>
 
-<head>
-    <title>lek</title>
-    <link rel="icon" type="image/png" href="/icons/task-manager.ico" />
-    <link rel="stylesheet" href="/styles.css">
-    <script type="module" src="/scripts/main.js"></script>
-</head>
+    <body>
+        <!-- LOGIN VIEW -->
+        <div id="view-login" class="view">
+            <span id="keyboard"
+                ><img src="icons/animations/keyboard/keyboard-1-of-2.ico"
+            /></span>
 
-<body>
-
-    <!-- LOGIN VIEW -->
-    <div id="view-login" class="view">
-        <span id="keyboard"><img src="/icons/animations/keyboard/keyboard-1-of-2.ico"></span>
-
-        <br>
-        <span>
-            Hei. Før du fortsetter må du tillate at nettsiden kan styre musikken. Trykk på knappen under for å gjøre
-            dette.
-            Spotify sender da en kode til nettsiden, som slettes når du lukker siden.
-        </span>
-        <button id="login-button">Send meg til Spotify og så tilbake!</button>
-        <span>
-            <i>N.b.</i>: Applikasjonen under utvikling og det er derfor ikke mulig for hvem som helst å kople til
-            Spotify.
-            Du må være lagt til i en spesialgruppe for å få tilgang. Ta kontakt med <a
-                href="tel:+4792339982">Hallvard</a>
-            for å få tilgang.
-        </span>
-    </div>
-
-    <!-- SETTINGS VIEW -->
-    <div id="view-settings" class="view">
-        <img src="/icons/task-manager.ico">
-        <br>
-        <span>Hei. Det ser ut som du har klart å logge inn på Spotify. Bra jobbet! Før du kan spille må du velge
-            vanskelighetsgrad, spilleliste og deltakere. Vanskelighetsgraden er <select name="difficulty"
-                id="difficulty">
-                <option value="low">Bruh</option>
-                <option value="medium">OK??</option>
-                <option value="high">Hard</option>
-            </select>, og spillelisten er <select name="playlist" id="playlist">
-                <option value="6TutgaHFfkThmrrobwA2y9">Den vanlige</option>
-                <option value="37i9dQZF1DX6xOPeSOGone">Heismusikk?</option>
-                <option value="37i9dQZF1DX9qNs32fujYe">Tungmetall!</option>
-                <option value="3b3kSFIjetuBb4OHx8APc4">Sol og sour</option>
-                <option value="5B3gb8HbvFm02ccQVH33IO">Disco-disco</option>
-                <option value="0UZZ621jxVtzR09zxufSKX">Jente-disco</option>
-                <option value="0XH1JLrIyQn2p9XWqNFAcC">Wowawe rock</option>
-            </select>. Og i og med at jeg ikke er synsk, så må du dessverre fylle inn navnene på døm som skal være med.
-            Det
-            gjør du én og én, ved å fylle inn <input type="text" id="contestant" placeholder="navnet på deltakeren"> og
-            så
-            <button id="add-player-btn">trykke her</button> (eller enter).</span>
-
-        <ul id="contestants"></ul>
-        <span id="ready" style="display: none;">Nok mas! Vi vil <button id="start-game-btn">starte</button>!</span>
-    </div>
-
-    <!-- GAME VIEW -->
-    <div id="view-game" class="view">
-        <span id="star"><img src="/icons/animations/star/star-1-of-10.ico"></span>
-        <br>
-        <section>
-            <span id="game-information">for kontrollfreaker:</span>
-            <button id="pause-game">pause!</button>
-            <button id="resume-game" disabled>ferdig hvilt!</button>
-            <button id="continue-button" style="display: none;">fortsett NÅ!</button>
-        </section>
-        <footer>
-            <span id="explosion" style="height: calc(4 * var(--fontsize));"></span>
-            <button id="explode">Pang.</button>
+            <br />
             <span>
-                For å styre sangen som spilles:
-                <button id="btn-pause-song">pause</button> den,
-                <button id="btn-play-song">starte</button> den igjen eller
-                <button id="btn-skip-song">hoppe over</button> den.
+                Hei. Før du fortsetter må du tillate at nettsiden kan styre
+                musikken. Trykk på knappen under for å gjøre dette. Spotify
+                sender da en kode til nettsiden, som slettes når du lukker
+                siden.
             </span>
+            <button id="login-button">
+                Send meg til Spotify og så tilbake!
+            </button>
             <span>
-                Du kan også endre lydnivået ved å dra på
-                <input type="range" id="volumeSlider" min="0" max="100" value="50" />,
-                eller endre tidsintervall ved å dra på
-                <input type="range" id="delaySlider" min="1" max="8" value="2" />. Jeg
-                velger å ikke vise deg verdiene. Du får prøve deg litt frem.
+                <i>N.b.</i>: Applikasjonen under utvikling og det er derfor ikke
+                mulig for hvem som helst å kople til Spotify. Du må være lagt
+                til i en spesialgruppe for å få tilgang. Ta kontakt med
+                <a href="tel:+4792339982">Hallvard</a>
+                for å få tilgang.
             </span>
-            <span>
-                Hallo! Jeg er dum og har gjort noe feil. Send meg tilbake til
-                <button id="reset-settings-btn">innstillinger</button>
-                for å fikse det. Eller vil du kanskje helt tilbake til
-                <button id="logout-btn">spotify-innlogging</button>?
-                Nåja. For noe styr.
-            </span>
-        </footer>
-    </div>
+        </div>
 
-</body>
+        <!-- SETTINGS VIEW -->
+        <div id="view-settings" class="view">
+            <img src="icons/task-manager.ico" />
+            <br />
+            <span
+                >Hei. Det ser ut som du har klart å logge inn på Spotify. Bra
+                jobbet! Før du kan spille må du velge vanskelighetsgrad,
+                spilleliste og deltakere. Vanskelighetsgraden er
+                <select name="difficulty" id="difficulty">
+                    <option value="low">Bruh</option>
+                    <option value="medium">OK??</option>
+                    <option value="high">Hard</option></select
+                >, og spillelisten er
+                <select name="playlist" id="playlist">
+                    <option value="6TutgaHFfkThmrrobwA2y9">Den vanlige</option>
+                    <option value="37i9dQZF1DX6xOPeSOGone">Heismusikk?</option>
+                    <option value="37i9dQZF1DX9qNs32fujYe">Tungmetall!</option>
+                    <option value="3b3kSFIjetuBb4OHx8APc4">Sol og sour</option>
+                    <option value="5B3gb8HbvFm02ccQVH33IO">Disco-disco</option>
+                    <option value="0UZZ621jxVtzR09zxufSKX">Jente-disco</option>
+                    <option value="0XH1JLrIyQn2p9XWqNFAcC">
+                        Wowawe rock
+                    </option></select
+                >. Og i og med at jeg ikke er synsk, så må du dessverre fylle
+                inn navnene på døm som skal være med. Det gjør du én og én, ved
+                å fylle inn
+                <input
+                    type="text"
+                    id="contestant"
+                    placeholder="navnet på deltakeren"
+                />
+                og så <button id="add-player-btn">trykke her</button> (eller
+                enter).</span
+            >
 
+            <ul id="contestants"></ul>
+            <span id="ready" style="display: none"
+                >Nok mas! Vi vil
+                <button id="start-game-btn">starte</button>!</span
+            >
+        </div>
+
+        <!-- GAME VIEW -->
+        <div id="view-game" class="view">
+            <span id="star"
+                ><img src="icons/animations/star/star-1-of-10.ico"
+            /></span>
+            <br />
+            <section>
+                <span id="game-information">for kontrollfreaker:</span>
+                <button id="pause-game">pause!</button>
+                <button id="resume-game" disabled>ferdig hvilt!</button>
+                <button id="continue-button" style="display: none">
+                    fortsett NÅ!
+                </button>
+            </section>
+            <footer>
+                <span
+                    id="explosion"
+                    style="height: calc(4 * var(--fontsize))"
+                ></span>
+                <button id="explode">Pang.</button>
+                <span>
+                    For å styre sangen som spilles:
+                    <button id="btn-pause-song">pause</button> den,
+                    <button id="btn-play-song">starte</button> den igjen eller
+                    <button id="btn-skip-song">hoppe over</button> den.
+                </span>
+                <span>
+                    Du kan også endre lydnivået ved å dra på
+                    <input
+                        type="range"
+                        id="volumeSlider"
+                        min="0"
+                        max="100"
+                        value="50"
+                    />, eller endre tidsintervall ved å dra på
+                    <input
+                        type="range"
+                        id="delaySlider"
+                        min="1"
+                        max="8"
+                        value="2"
+                    />. Jeg velger å ikke vise deg verdiene. Du får prøve deg
+                    litt frem.
+                </span>
+                <span>
+                    Hallo! Jeg er dum og har gjort noe feil. Send meg tilbake
+                    til
+                    <button id="reset-settings-btn">innstillinger</button>
+                    for å fikse det. Eller vil du kanskje helt tilbake til
+                    <button id="logout-btn">spotify-innlogging</button>? Nåja.
+                    For noe styr.
+                </span>
+            </footer>
+        </div>
+    </body>
 </html>
