@@ -1,4 +1,4 @@
-import crypto from 'node:crypto';
+import crypto from "node:crypto";
 
 /**
  * Secure Cookie Manager for handling Spotify authentication tokens
@@ -7,15 +7,15 @@ import crypto from 'node:crypto';
 class CookieManager {
   constructor() {
     this.encryptionKey = this.getEncryptionKey();
-    this.algorithm = 'aes-256-gcm';
-    
+    this.algorithm = "aes-256-gcm";
+
     // Cookie configuration based on environment
     this.cookieConfig = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: process.env.ENVIRONMENT === "production",
+      sameSite: "lax",
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      path: '/'
+      path: "/",
     };
   }
 
@@ -25,17 +25,19 @@ class CookieManager {
    */
   getEncryptionKey() {
     const keyString = process.env.COOKIE_ENCRYPTION_KEY;
-    
+
     if (!keyString) {
-      throw new Error('COOKIE_ENCRYPTION_KEY environment variable is required');
+      throw new Error("COOKIE_ENCRYPTION_KEY environment variable is required");
     }
-    
+
     // Ensure key is 32 bytes for AES-256
-    const key = Buffer.from(keyString, 'hex');
+    const key = Buffer.from(keyString, "hex");
     if (key.length !== 32) {
-      throw new Error('COOKIE_ENCRYPTION_KEY must be 32 bytes (64 hex characters)');
+      throw new Error(
+        "COOKIE_ENCRYPTION_KEY must be 32 bytes (64 hex characters)",
+      );
     }
-    
+
     return key;
   }
 
@@ -47,16 +49,22 @@ class CookieManager {
   encrypt(text) {
     try {
       const iv = crypto.randomBytes(16);
-      const cipher = crypto.createCipheriv(this.algorithm, this.encryptionKey, iv);
-      cipher.setAAD(Buffer.from('spotify-auth', 'utf8'));
-      
-      let encrypted = cipher.update(text, 'utf8', 'hex');
-      encrypted += cipher.final('hex');
-      
+      const cipher = crypto.createCipheriv(
+        this.algorithm,
+        this.encryptionKey,
+        iv,
+      );
+      cipher.setAAD(Buffer.from("spotify-auth", "utf8"));
+
+      let encrypted = cipher.update(text, "utf8", "hex");
+      encrypted += cipher.final("hex");
+
       const authTag = cipher.getAuthTag();
-      
+
       // Combine IV, auth tag, and encrypted data
-      return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
+      return (
+        iv.toString("hex") + ":" + authTag.toString("hex") + ":" + encrypted
+      );
     } catch (error) {
       throw new Error(`Encryption failed: ${error.message}`);
     }
@@ -69,22 +77,26 @@ class CookieManager {
    */
   decrypt(encryptedData) {
     try {
-      const parts = encryptedData.split(':');
+      const parts = encryptedData.split(":");
       if (parts.length !== 3) {
-        throw new Error('Invalid encrypted data format');
+        throw new Error("Invalid encrypted data format");
       }
-      
-      const iv = Buffer.from(parts[0], 'hex');
-      const authTag = Buffer.from(parts[1], 'hex');
+
+      const iv = Buffer.from(parts[0], "hex");
+      const authTag = Buffer.from(parts[1], "hex");
       const encrypted = parts[2];
-      
-      const decipher = crypto.createDecipheriv(this.algorithm, this.encryptionKey, iv);
-      decipher.setAAD(Buffer.from('spotify-auth', 'utf8'));
+
+      const decipher = crypto.createDecipheriv(
+        this.algorithm,
+        this.encryptionKey,
+        iv,
+      );
+      decipher.setAAD(Buffer.from("spotify-auth", "utf8"));
       decipher.setAuthTag(authTag);
-      
-      let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-      decrypted += decipher.final('utf8');
-      
+
+      let decrypted = decipher.update(encrypted, "hex", "utf8");
+      decrypted += decipher.final("utf8");
+
       return decrypted;
     } catch (error) {
       throw new Error(`Decryption failed: ${error.message}`);
@@ -100,38 +112,37 @@ class CookieManager {
    */
   setTokens(cookie, accessToken, refreshToken, expiresIn) {
     try {
-      const expiryTime = Date.now() + (expiresIn * 1000);
-      
+      const expiryTime = Date.now() + expiresIn * 1000;
+
       // Encrypt sensitive tokens
       const encryptedAccessToken = this.encrypt(accessToken);
       const encryptedRefreshToken = this.encrypt(refreshToken);
-      
+
       // Set cookies with security flags using Elysia's API
       cookie.spotify_access_token.set({
         ...this.cookieConfig,
         value: encryptedAccessToken,
-        maxAge: expiresIn
+        maxAge: expiresIn,
       });
-      
+
       cookie.spotify_refresh_token.set({
         ...this.cookieConfig,
         value: encryptedRefreshToken,
-        maxAge: 30 * 24 * 60 * 60
+        maxAge: 30 * 24 * 60 * 60,
       });
-      
+
       cookie.spotify_token_expiry.set({
         ...this.cookieConfig,
         value: expiryTime.toString(),
-        maxAge: expiresIn
+        maxAge: expiresIn,
       });
-      
+
       // Store token type and scope (less sensitive)
       cookie.spotify_token_type.set({
         ...this.cookieConfig,
-        value: 'Bearer',
-        maxAge: expiresIn
+        value: "Bearer",
+        maxAge: expiresIn,
       });
-      
     } catch (error) {
       throw new Error(`Failed to set tokens: ${error.message}`);
     }
@@ -148,10 +159,10 @@ class CookieManager {
       if (!encryptedToken) {
         return null;
       }
-      
+
       return this.decrypt(encryptedToken);
     } catch (error) {
-      console.error('Failed to decrypt access token:', error.message);
+      console.error("Failed to decrypt access token:", error.message);
       return null;
     }
   }
@@ -167,10 +178,10 @@ class CookieManager {
       if (!encryptedToken) {
         return null;
       }
-      
+
       return this.decrypt(encryptedToken);
     } catch (error) {
-      console.error('Failed to decrypt refresh token:', error.message);
+      console.error("Failed to decrypt refresh token:", error.message);
       return null;
     }
   }
@@ -185,7 +196,7 @@ class CookieManager {
     if (!expiryString) {
       return null;
     }
-    
+
     const expiry = parseInt(expiryString, 10);
     return isNaN(expiry) ? null : expiry;
   }
@@ -196,7 +207,7 @@ class CookieManager {
    * @returns {string} Token type (default: 'Bearer')
    */
   getTokenType(cookie) {
-    return cookie.spotify_token_type?.value || 'Bearer';
+    return cookie.spotify_token_type?.value || "Bearer";
   }
 
   /**
@@ -208,13 +219,13 @@ class CookieManager {
   isTokenValid(cookie, bufferMinutes = 5) {
     const accessToken = this.getAccessToken(cookie);
     const expiry = this.getTokenExpiry(cookie);
-    
+
     if (!accessToken || !expiry) {
       return false;
     }
-    
+
     const bufferMs = bufferMinutes * 60 * 1000;
-    return Date.now() < (expiry - bufferMs);
+    return Date.now() < expiry - bufferMs;
   }
 
   /**
@@ -223,13 +234,13 @@ class CookieManager {
    */
   clearTokens(cookie) {
     const cookieNames = [
-      'spotify_access_token',
-      'spotify_refresh_token',
-      'spotify_token_expiry',
-      'spotify_token_type'
+      "spotify_access_token",
+      "spotify_refresh_token",
+      "spotify_token_expiry",
+      "spotify_token_type",
     ];
-    
-    cookieNames.forEach(name => {
+
+    cookieNames.forEach((name) => {
       if (cookie[name]) {
         cookie[name].remove();
       }
@@ -246,17 +257,17 @@ class CookieManager {
     const refreshToken = this.getRefreshToken(cookie);
     const expiry = this.getTokenExpiry(cookie);
     const tokenType = this.getTokenType(cookie);
-    
+
     if (!accessToken || !refreshToken || !expiry) {
       return null;
     }
-    
+
     return {
       accessToken,
       refreshToken,
       expiresAt: expiry,
       tokenType,
-      isValid: this.isTokenValid(cookie)
+      isValid: this.isTokenValid(cookie),
     };
   }
 
@@ -268,21 +279,20 @@ class CookieManager {
    */
   updateAccessToken(cookie, accessToken, expiresIn) {
     try {
-      const expiryTime = Date.now() + (expiresIn * 1000);
+      const expiryTime = Date.now() + expiresIn * 1000;
       const encryptedAccessToken = this.encrypt(accessToken);
-      
+
       cookie.spotify_access_token.set({
         ...this.cookieConfig,
         value: encryptedAccessToken,
-        maxAge: expiresIn
+        maxAge: expiresIn,
       });
-      
+
       cookie.spotify_token_expiry.set({
         ...this.cookieConfig,
         value: expiryTime.toString(),
-        maxAge: expiresIn
+        maxAge: expiresIn,
       });
-      
     } catch (error) {
       throw new Error(`Failed to update access token: ${error.message}`);
     }
