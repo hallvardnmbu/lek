@@ -39,7 +39,7 @@ try {
 // Log security configuration
 securityConfig.logConfiguration();
 
-const lekApp = new Elysia()
+const lek = new Elysia()
   .onRequest(({ set }) => {
     if (_PRODUCTION) {
       const headers = securityConfig.getSecurityHeaders();
@@ -48,8 +48,12 @@ const lekApp = new Elysia()
   })
   // Serve static assets with robust wildcard routes to avoid Bun resolution errors
   .get("/styles.css", () => Bun.file(join(__dirname, "src/styles.css")))
-  .get("/scripts/*", ({ params }) => Bun.file(join(__dirname, "src/scripts", params["*"])))
-  .get("/icons/*", ({ params }) => Bun.file(join(__dirname, "src/icons", params["*"])))
+  .get("/scripts/*", ({ params }) =>
+    Bun.file(join(__dirname, "src/scripts", params["*"])),
+  )
+  .get("/icons/*", ({ params }) =>
+    Bun.file(join(__dirname, "src/icons", params["*"])),
+  )
   // Fallback static plugin for anything else
   .use(
     staticPlugin({
@@ -63,24 +67,26 @@ const lekApp = new Elysia()
       const tokenData = cookieManager.getAllTokenData(cookie);
 
       if (!tokenData) {
-          // Debugging log to see which cookie is missing
-          const hasAccessToken = !!cookie.spotify_access_token?.value;
-          const hasRefreshToken = !!cookie.spotify_refresh_token?.value;
-          const hasExpiry = !!cookie.spotify_token_expiry?.value;
-          if (hasAccessToken || hasRefreshToken || hasExpiry) {
-               // console.log("Partial auth state detected:", { hasAccessToken, hasRefreshToken, hasExpiry });
-          }
+        // Debugging log to see which cookie is missing
+        const hasAccessToken = !!cookie.spotify_access_token?.value;
+        const hasRefreshToken = !!cookie.spotify_refresh_token?.value;
+        const hasExpiry = !!cookie.spotify_token_expiry?.value;
+        if (hasAccessToken || hasRefreshToken || hasExpiry) {
+          // console.log("Partial auth state detected:", { hasAccessToken, hasRefreshToken, hasExpiry });
+        }
       }
 
       return {
         spotifyAuth: {
           isAuthenticated: !!tokenData && tokenData.isValid,
           tokenData: tokenData,
-          needsRefresh: tokenData ? !cookieManager.isTokenValid(cookie, 5) : false,
-        }
+          needsRefresh: tokenData
+            ? !cookieManager.isTokenValid(cookie, 5)
+            : false,
+        },
       };
     } catch (error) {
-       console.error("Authentication derivation error:", error);
+      console.error("Authentication derivation error:", error);
       // Clear potentially corrupted cookies
       cookieManager.clearTokens(cookie);
       return {
@@ -89,11 +95,11 @@ const lekApp = new Elysia()
           tokenData: null,
           needsRefresh: false,
           error: "Authentication validation failed: " + error.message,
-        }
+        },
       };
     }
   })
-  .group("/auth", (app) => 
+  .group("/auth", (app) =>
     app
       .onRequest(({ set, request }) => {
         const corsConfig = securityConfig.getCorsConfig();
@@ -110,8 +116,10 @@ const lekApp = new Elysia()
         }
 
         set.headers["Access-Control-Allow-Credentials"] = "true";
-        set.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS";
-        set.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization";
+        set.headers["Access-Control-Allow-Methods"] =
+          "GET, POST, PUT, DELETE, OPTIONS";
+        set.headers["Access-Control-Allow-Headers"] =
+          "Content-Type, Authorization";
       })
       .options("/*", () => "")
       .post("/exchange", async ({ body, cookie, set }) => {
@@ -373,7 +381,7 @@ const lekApp = new Elysia()
             action: "reauthenticate",
           };
         }
-      })
+      }),
   )
   .group("/api/spotify", (app) =>
     app
@@ -407,7 +415,8 @@ const lekApp = new Elysia()
       })
       .put("/player/play", async ({ body, cookie, set }) => {
         try {
-          const { context_uri, uris, offset, position_ms, device_id } = body || {};
+          const { context_uri, uris, offset, position_ms, device_id } =
+            body || {};
 
           let targetDeviceId = device_id;
           if (!targetDeviceId) {
@@ -478,7 +487,11 @@ const lekApp = new Elysia()
           if (uris && Array.isArray(uris)) {
             return await queueManager.queueTracks(cookie, uris, device_id);
           } else if (uri) {
-            const success = await queueManager.queueTrack(cookie, uri, device_id);
+            const success = await queueManager.queueTrack(
+              cookie,
+              uri,
+              device_id,
+            );
             if (success) {
               set.status = 204;
             } else {
@@ -499,7 +512,7 @@ const lekApp = new Elysia()
           return await spotifyClient.request(
             `/playlists/${id}/tracks?limit=100`,
             { method: "GET" },
-            cookie
+            cookie,
           );
         } catch (error) {
           return { error: error.message };
@@ -511,7 +524,7 @@ const lekApp = new Elysia()
           return await spotifyClient.request(
             `/albums/${id}/tracks?limit=50`,
             { method: "GET" },
-            cookie
+            cookie,
           );
         } catch (error) {
           return { error: error.message };
@@ -528,7 +541,7 @@ const lekApp = new Elysia()
         } catch (error) {
           return { error: error.message };
         }
-      })
+      }),
   )
   .get("/spotify", () => Bun.file(join(__dirname, "src/index.html")))
   .get("/callback", ({ query }) => {
@@ -549,11 +562,9 @@ const lekApp = new Elysia()
   })
   .get("/", () => Bun.file(join(__dirname, "src/index.html")));
 
-export default lekApp;
+export default lek;
 
 if (import.meta.main) {
-  lekApp.listen(8080);
-  console.log(
-    `Running at http://${lekApp.server?.hostname}:${lekApp.server?.port}`,
-  );
+  lek.listen(8080);
+  console.log(`Running at http://${lek.server?.hostname}:${lek.server?.port}`);
 }
