@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import crypto from "crypto";
 
 /**
  * Security Configuration for Cookie Management
@@ -6,9 +6,10 @@ import crypto from 'crypto';
  */
 class SecurityConfig {
   constructor() {
-    this.environment = process.env.NODE_ENV || 'development';
-    this.isProduction = this.environment === 'production';
-    this.isDevelopment = this.environment === 'development';
+    this.environment = process.env.ENVIRONMENT.trim() || "development";
+    console.log(this.environment);
+    this.isProduction = this.environment === "production";
+    this.isDevelopment = this.environment === "development";
   }
 
   /**
@@ -18,9 +19,9 @@ class SecurityConfig {
   getCookieConfig() {
     const baseConfig = {
       httpOnly: true,
-      sameSite: 'strict',
-      path: '/',
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours default
+      sameSite: "strict",
+      path: "/",
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours default
     };
 
     // Production-specific security settings
@@ -28,8 +29,8 @@ class SecurityConfig {
       return {
         ...baseConfig,
         secure: true, // Require HTTPS in production
-        sameSite: 'strict', // Strict SameSite for production
-        domain: process.env.COOKIE_DOMAIN || undefined // Allow domain specification
+        sameSite: "strict", // Strict SameSite for production
+        domain: process.env.COOKIE_DOMAIN || undefined, // Allow domain specification
       };
     }
 
@@ -37,7 +38,7 @@ class SecurityConfig {
     return {
       ...baseConfig,
       secure: false, // Allow HTTP in development
-      sameSite: 'lax' // More permissive for development
+      sameSite: "lax", // More permissive for development
     };
   }
 
@@ -50,8 +51,8 @@ class SecurityConfig {
       secret: process.env.SESSION_SECRET || this.generateFallbackSecret(),
       resave: false,
       saveUninitialized: false, // Don't save empty sessions
-      name: 'spotify.sid', // Custom session name
-      cookie: this.getCookieConfig()
+      name: "spotify.sid", // Custom session name
+      cookie: this.getCookieConfig(),
     };
 
     if (this.isProduction) {
@@ -60,8 +61,8 @@ class SecurityConfig {
         cookie: {
           ...baseConfig.cookie,
           maxAge: 24 * 60 * 60 * 1000, // 24 hours in production
-          secure: true
-        }
+          secure: true,
+        },
       };
     }
 
@@ -70,8 +71,8 @@ class SecurityConfig {
       cookie: {
         ...baseConfig.cookie,
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in development for convenience
-        secure: false
-      }
+        secure: false,
+      },
     };
   }
 
@@ -81,21 +82,25 @@ class SecurityConfig {
    */
   validateEnvironment() {
     const required = [
-      'SPOTIFY_CLIENT_ID',
-      'SESSION_SECRET',
-      'COOKIE_ENCRYPTION_KEY'
+      "SPOTIFY_CLIENT_ID",
+      "SESSION_SECRET",
+      "COOKIE_ENCRYPTION_KEY",
     ];
 
-    const missing = required.filter(key => !process.env[key]);
-    
+    const missing = required.filter((key) => !process.env[key]);
+
     if (missing.length > 0) {
-      throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+      throw new Error(
+        `Missing required environment variables: ${missing.join(", ")}`,
+      );
     }
 
     // Validate encryption key format
     const encryptionKey = process.env.COOKIE_ENCRYPTION_KEY;
-    if (encryptionKey && Buffer.from(encryptionKey, 'hex').length !== 32) {
-      throw new Error('COOKIE_ENCRYPTION_KEY must be 32 bytes (64 hex characters)');
+    if (encryptionKey && Buffer.from(encryptionKey, "hex").length !== 32) {
+      throw new Error(
+        "COOKIE_ENCRYPTION_KEY must be 32 bytes (64 hex characters)",
+      );
     }
   }
 
@@ -105,11 +110,15 @@ class SecurityConfig {
    */
   generateFallbackSecret() {
     if (this.isProduction) {
-      throw new Error('SESSION_SECRET environment variable is required in production');
+      throw new Error(
+        "SESSION_SECRET environment variable is required in production",
+      );
     }
-    
-    console.warn('⚠️  Using generated session secret for development. Set SESSION_SECRET environment variable.');
-    return 'dev-secret-' + Math.random().toString(36).substring(2, 15);
+
+    console.warn(
+      "⚠️  Using generated session secret for development. Set SESSION_SECRET environment variable.",
+    );
+    return "dev-secret-" + Math.random().toString(36).substring(2, 15);
   }
 
   /**
@@ -117,7 +126,7 @@ class SecurityConfig {
    * @returns {string} Generated encryption key (hex)
    */
   static generateEncryptionKey() {
-    return crypto.randomBytes(32).toString('hex');
+    return crypto.randomBytes(32).toString("hex");
   }
 
   /**
@@ -127,17 +136,17 @@ class SecurityConfig {
   getCorsConfig() {
     if (this.isProduction) {
       return {
-        origin: process.env.ALLOWED_ORIGINS?.split(',') || false,
+        origin: process.env.ALLOWED_ORIGINS?.split(",") || false,
         credentials: true,
-        optionsSuccessStatus: 200
+        optionsSuccessStatus: 200,
       };
     }
 
     // Development CORS (more permissive)
     return {
-      origin: ['http://localhost:8080', 'http://127.0.0.1:8080'],
+      origin: ["http://localhost:8080", "http://127.0.0.1:8080"],
       credentials: true,
-      optionsSuccessStatus: 200
+      optionsSuccessStatus: 200,
     };
   }
 
@@ -147,14 +156,15 @@ class SecurityConfig {
    */
   getSecurityHeaders() {
     const headers = {
-      'X-Content-Type-Options': 'nosniff',
-      'X-Frame-Options': 'DENY',
-      'X-XSS-Protection': '1; mode=block',
-      'Referrer-Policy': 'strict-origin-when-cross-origin'
+      "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
+      "X-XSS-Protection": "1; mode=block",
+      "Referrer-Policy": "strict-origin-when-cross-origin",
     };
 
     if (this.isProduction) {
-      headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains';
+      headers["Strict-Transport-Security"] =
+        "max-age=31536000; includeSubDomains";
     }
 
     return headers;
@@ -164,14 +174,14 @@ class SecurityConfig {
    * Log security configuration (without sensitive data)
    */
   logConfiguration() {
-    console.log('🔒 Security Configuration:');
+    console.log("🔒 Security Configuration:");
     console.log(`   Environment: ${this.environment}`);
     console.log(`   Secure Cookies: ${this.getCookieConfig().secure}`);
     console.log(`   SameSite: ${this.getCookieConfig().sameSite}`);
     console.log(`   HTTP Only: ${this.getCookieConfig().httpOnly}`);
-    
+
     if (this.isDevelopment) {
-      console.log('⚠️  Development mode - some security features are relaxed');
+      console.log("⚠️  Development mode - some security features are relaxed");
     }
   }
 }
