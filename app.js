@@ -15,7 +15,7 @@ __dirname =
     ? __dirname.replace(/^\/([A-Z]):/, "$1:\\").replace(/\//g, "\\")
     : __dirname;
 
-const _PRODUCTION = process.env.NODE_ENV === "production";
+const _PRODUCTION = process.env.ENVIRONMENT === "production";
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
 
 // Initialize security configuration and cookie manager
