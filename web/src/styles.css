@@ -7,7 +7,6 @@
   --text: #d4d4d8;
   --muted: #8b8b94;
   --accent: #f59e0b;
-  --accent-hover: #d97706;
   --accent-soft: rgba(245, 158, 11, 0.14);
   --on-accent: #09090b;
   --success: #10b981;
@@ -42,7 +41,8 @@ body,
   align-items: center;
   justify-content: center;
   gap: 0.25rem;
-  border: 1px solid transparent;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
   border-radius: 12px;
   padding: 0.9rem 1.5rem;
   font-size: 1rem;
@@ -53,6 +53,11 @@ body,
     transform 0.12s ease,
     background 0.15s ease,
     border-color 0.15s ease;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--accent);
 }
 
 .btn:active:not(:disabled) {
@@ -67,44 +72,6 @@ body,
 .btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-
-.btn-primary {
-  background: var(--accent);
-  color: var(--on-accent);
-}
-.btn-primary:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-.btn-primary .btn-sub {
-  color: rgba(9, 9, 11, 0.72);
-}
-
-.btn-secondary {
-  background: var(--surface-2);
-  border-color: var(--border-strong);
-}
-.btn-secondary:hover:not(:disabled) {
-  background: var(--surface-hover);
-  border-color: var(--accent);
-}
-
-.btn-danger {
-  background: var(--danger);
-  color: var(--text);
-}
-.btn-danger:hover:not(:disabled) {
-  background: #dc2626;
-}
-
-.btn-ghost {
-  background: transparent;
-  color: var(--muted);
-  margin-top: 0.75rem;
-}
-.btn-ghost:hover:not(:disabled) {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.05);
 }
 
 .btn-block {
@@ -164,26 +131,11 @@ body,
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
 }
 
-.brand-badge {
-  display: inline-block;
-  padding: 0.3rem 0.75rem;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-}
-
 .brand-title {
   font-size: 3rem;
-  margin: 0.75rem 0 0.5rem;
+  line-height: 1.1;
+  margin: 0 0 1.75rem;
   letter-spacing: -0.02em;
-}
-
-.brand-subtitle {
-  color: var(--muted);
-  margin-bottom: 2rem;
 }
 
 .home-actions {
@@ -755,16 +707,9 @@ body,
 }
 
 .btn-vote {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
   text-align: left;
   align-items: flex-start;
   padding: 1rem 1.1rem;
-}
-
-.btn-vote:hover:not(:disabled) {
-  border-color: var(--accent);
-  background: var(--surface-hover);
 }
 
 .own-tag {
@@ -795,31 +740,10 @@ body,
 }
 
 .game-card {
-  display: flex;
-  flex-direction: column;
   align-items: flex-start;
   text-align: left;
   gap: 0.6rem;
   padding: 1.75rem;
-  border-radius: 18px;
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  color: var(--text);
-  cursor: pointer;
-  transition:
-    transform 0.12s ease,
-    border-color 0.15s ease,
-    background 0.15s ease;
-}
-
-.game-card:hover:not(:disabled) {
-  border-color: var(--accent);
-  background: var(--surface-2);
-}
-
-.game-card:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 
 .game-card-title {
@@ -848,16 +772,9 @@ body,
 }
 
 .mobile-game-btn {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
   text-align: left;
   align-items: flex-start;
   padding: 1rem 1.1rem;
-}
-
-.mobile-game-btn:hover:not(:disabled) {
-  border-color: var(--accent);
-  background: var(--surface-hover);
 }
 
 .mobile-game-desc {

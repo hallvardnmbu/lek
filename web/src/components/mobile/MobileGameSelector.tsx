@@ -11,12 +11,11 @@ interface MobileGameSelectorProps {
 export function MobileGameSelector(props: MobileGameSelectorProps) {
   return (
     <div class="mobile-card">
-      <p class="eyebrow">GAME SELECTOR</p>
       <h2>Pick a Game</h2>
       <Show
         when={props.isVip}
         fallback={
-          <p class="wait-note">Waiting for VIP or TV to select a game...</p>
+          <p class="wait-note">Waiting for host...</p>
         }
       >
         <div class="mobile-game-list">
@@ -43,7 +42,11 @@ export function MobileGameSelector(props: MobileGameSelectorProps) {
           </For>
         </div>
 
-        <button class="btn btn-ghost btn-block" onClick={props.onReturnToLobby}>
+        <button
+          class="btn btn-block"
+          style={{ 'margin-top': '0.85rem' }}
+          onClick={props.onReturnToLobby}
+        >
           Back to Lobby
         </button>
       </Show>

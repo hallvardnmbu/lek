@@ -11,11 +11,7 @@ export function TvGameSelector(props: TvGameSelectorProps) {
   return (
     <div class="game-selector-stage">
       <div class="selector-header">
-        <p class="eyebrow">GAME SELECTOR</p>
         <h1 class="tv-hero-title">Pick a Game</h1>
-        <p class="tv-hero-sub">
-          {props.state.players.length} player(s) ready in room {props.state.code}
-        </p>
       </div>
 
       <div class="game-grid">
@@ -24,7 +20,7 @@ export function TvGameSelector(props: TvGameSelectorProps) {
             const tooFew = () => props.state.players.length < game.minPlayers;
             return (
               <button
-                class="game-card"
+                class="btn game-card"
                 disabled={tooFew()}
                 onClick={() => props.onStartGame(game.id)}
               >
@@ -43,7 +39,7 @@ export function TvGameSelector(props: TvGameSelectorProps) {
       </div>
 
       <div class="tv-action-bar">
-        <button class="btn btn-secondary" onClick={props.onReturnToLobby}>
+        <button class="btn" onClick={props.onReturnToLobby}>
           Back to Lobby
         </button>
       </div>

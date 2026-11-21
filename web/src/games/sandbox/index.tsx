@@ -8,11 +8,10 @@ function SandboxTvView(props: TvGameViewProps<SandboxGameState>) {
 
   return (
     <div class="tv-phase-center">
-      <p class="eyebrow">SANDBOX TEMPLATE</p>
-      <h1 class="tv-hero-title">Connected &amp; Ready</h1>
+      <h1 class="tv-hero-title">Sandbox</h1>
 
       <div class="sandbox-tv-card">
-        <div class="sandbox-stat">Actions received: {hostState()?.actionCount ?? 0}</div>
+        <div class="sandbox-stat">Actions: {hostState()?.actionCount ?? 0}</div>
         <Show
           when={hostState()?.lastAction}
           fallback={<div class="sandbox-last-action">Tap a button on any phone to test.</div>}
@@ -37,7 +36,7 @@ function SandboxTvView(props: TvGameViewProps<SandboxGameState>) {
       </div>
 
       <div class="tv-action-bar">
-        <button class="btn btn-secondary" onClick={props.endGame}>
+        <button class="btn" onClick={props.endGame}>
           End Game
         </button>
       </div>
@@ -50,14 +49,13 @@ function SandboxMobileView(props: MobileGameViewProps<SandboxPlayerView>) {
 
   return (
     <div class="mobile-card">
-      <p class="eyebrow">SANDBOX CONTROLLER</p>
-      <h2>Test Controller</h2>
+      <h2>Sandbox</h2>
       <p class="muted">
-        Total room actions: <strong>{playerState()?.actionCount ?? 0}</strong>
+        Actions: <strong>{playerState()?.actionCount ?? 0}</strong>
       </p>
 
       <button
-        class="btn btn-primary btn-block"
+        class="btn btn-block"
         onClick={() => props.sendAction({ type: 'ping_action', payload: { ts: Date.now() } })}
       >
         Send Test Action

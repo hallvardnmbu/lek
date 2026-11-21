@@ -14,10 +14,7 @@ export function TvEnded(props: TvEndedProps) {
 
   return (
     <div class="tv-phase-center">
-      <p class="eyebrow">FINAL STANDINGS</p>
-      <h1 class="tv-hero-title">
-        {sortedPlayers()[0]?.name ?? 'Game'} Complete
-      </h1>
+      <h1 class="tv-hero-title">Game Over</h1>
 
       <div class="podium-list">
         <For each={sortedPlayers()}>
@@ -35,10 +32,10 @@ export function TvEnded(props: TvEndedProps) {
         class="tv-action-bar"
         style={{ display: 'flex', gap: '1rem', 'justify-content': 'center' }}
       >
-        <button class="btn btn-primary btn-tv" onClick={props.onChooseAnotherGame}>
-          Choose Another Game
+        <button class="btn btn-tv" onClick={props.onChooseAnotherGame}>
+          Choose Game
         </button>
-        <button class="btn btn-secondary" onClick={props.onReturnToLobby}>
+        <button class="btn btn-tv" onClick={props.onReturnToLobby}>
           Back to Lobby
         </button>
       </div>

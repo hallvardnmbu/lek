@@ -11,13 +11,13 @@ export function TvExitModal(props: TvExitModalProps) {
         <h2>Leave Room?</h2>
         <p>Current room session will be paused if you exit.</p>
         <div class="modal-actions">
-          <button class="btn btn-primary" onClick={props.onKeepPlaying}>
+          <button class="btn" onClick={props.onKeepPlaying}>
             Keep Playing
           </button>
-          <button class="btn btn-secondary" onClick={props.onReload}>
+          <button class="btn" onClick={props.onReload}>
             Reload
           </button>
-          <button class="btn btn-danger" onClick={props.onExit}>
+          <button class="btn" onClick={props.onExit}>
             Exit App
           </button>
         </div>

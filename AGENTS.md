@@ -30,7 +30,7 @@ Stack: **Bun**, **TypeScript**, **SolidJS**, **WebSockets**, **Tizen 8 (`.wgt`)*
 
 - `bun run dev:server` — Start Bun server (`--watch`)
 - `bun run dev:web` — Start Vite dev server
-- `bun run build:web` — Build `web/dist`
+- `bun run build:web` — Build `web/dist` (do not run directly; builds are done through Podman)
 - `bun test` — Run `server/roomManager.test.ts`
 - `bun run build:wgt` — Package `tizen/partygame.wgt`
 
@@ -44,4 +44,5 @@ Stack: **Bun**, **TypeScript**, **SolidJS**, **WebSockets**, **Tizen 8 (`.wgt`)*
 - **Consistent style:** Match existing TypeScript, SolidJS, and CSS conventions across files.
 - **GPU-weak Tizen TV target:** Keep TV UI and CSS lightweight—no heavy animations, blurs, shadows, or fancy visual effects. Ensure TV views work with D-pad navigation (`createDpadNav`).
 - **Avoid updating the Tizen build (`tizen/` / `build:wgt`):** Only modify or rebuild it when absolutely necessary, and give a short, clear explanation of why.
+- **Do not run `bun run build` / `bun run build:web`:** Builds are handled through Podman.
 - **Minimal, functional tests:** Test real behavior and state transitions only where necessary (e.g., room/game lifecycle, actions, webhooks), not trivial UI/string presence checks.

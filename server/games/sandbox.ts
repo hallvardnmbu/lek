@@ -12,7 +12,7 @@ export const sandboxGame: GameDefinition<
 > = {
   id: 'sandbox',
   name: 'Sandbox',
-  description: 'Minimal foundation template for testing TV & phone connectivity.',
+  description: 'Test TV & phone connectivity.',
   minPlayers: 1,
   maxPlayers: 12,
 

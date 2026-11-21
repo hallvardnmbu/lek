@@ -199,7 +199,7 @@ async function serveStatic(pathname: string): Promise<Response> {
   const cleanPath = pathname === '/' ? '/index.html' : pathname;
   const candidate = resolve(WEB_DIST_DIR, `.${cleanPath}`);
 
-  if (candidate.startsWith(WEB_DIST_DIR)) {
+  if (cleanPath !== '/index.html' && candidate.startsWith(WEB_DIST_DIR)) {
     const file = Bun.file(candidate);
     if (await file.exists()) {
       return new Response(file);

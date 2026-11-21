@@ -11,7 +11,6 @@ export function MobileJoinForm(props: MobileJoinFormProps) {
   return (
     <form class="join-form" onSubmit={props.onSubmit}>
       <h1>Join Room</h1>
-      <p class="muted">Enter the 4-letter code shown on the TV.</p>
 
       <label class="field">
         <span>Room Code</span>
@@ -41,7 +40,7 @@ export function MobileJoinForm(props: MobileJoinFormProps) {
 
       <button
         type="submit"
-        class="btn btn-primary btn-block"
+        class="btn btn-block"
         disabled={!props.connected}
       >
         {props.connected ? 'Join Room' : 'Connecting...'}

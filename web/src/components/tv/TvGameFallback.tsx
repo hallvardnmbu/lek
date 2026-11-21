@@ -11,12 +11,7 @@ interface TvGameFallbackProps {
 export function TvGameFallback(props: TvGameFallbackProps) {
   return (
     <div class="tv-phase-center">
-      <p class="eyebrow">GAME IN PROGRESS</p>
       <h1 class="tv-hero-title">{props.gameInfo?.name ?? 'Active Game'}</h1>
-      <p class="tv-hero-sub">
-        Players are connected on their phones. Register a custom TV view in{' '}
-        <code>web/src/games/index.ts</code>.
-      </p>
 
       <div class="status-pills-grid">
         <For each={props.state.players}>
@@ -38,7 +33,7 @@ export function TvGameFallback(props: TvGameFallbackProps) {
       </Show>
 
       <div class="tv-action-bar">
-        <button class="btn btn-secondary" onClick={props.onEndGame}>
+        <button class="btn" onClick={props.onEndGame}>
           End Game
         </button>
       </div>

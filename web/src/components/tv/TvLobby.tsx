@@ -13,7 +13,7 @@ export function TvLobby(props: TvLobbyProps) {
   return (
     <div class="tv-lobby-grid">
       <section class="tv-join-panel">
-        <p class="eyebrow">SCAN TO JOIN ON YOUR PHONE</p>
+        <p class="eyebrow">SCAN TO JOIN</p>
         <div class="qr-frame">
           <QrCode value={props.joinUrl} size={280} />
         </div>
@@ -26,9 +26,6 @@ export function TvLobby(props: TvLobbyProps) {
           <h2>
             Players ({props.state.players.length}/{props.state.maxPlayers})
           </h2>
-          <span class="hint">
-            Need at least {props.state.minPlayers} player(s) to continue
-          </span>
         </div>
 
         <div class="player-grid">
@@ -49,12 +46,12 @@ export function TvLobby(props: TvLobbyProps) {
 
         <div class="tv-action-bar">
           <button
-            class="btn btn-primary btn-tv"
+            class="btn btn-tv"
             disabled={!props.canEnterSelector}
             onClick={props.onOpenSelector}
           >
             {props.canEnterSelector
-              ? 'Choose Game (Enter)'
+              ? 'Choose Game'
               : `Waiting for ${Math.max(0, props.state.minPlayers - props.state.players.length)} more...`}
           </button>
         </div>
