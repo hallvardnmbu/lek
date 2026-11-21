@@ -1,0 +1,19 @@
+.sandbox-tv-card {
+  margin: 1.5rem auto;
+  padding: 1.25rem 1.75rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  max-width: 560px;
+}
+
+.sandbox-stat {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.sandbox-last-action {
+  margin-top: 0.5rem;
+  color: var(--muted, #94a3b8);
+  font-size: 0.95rem;
+}

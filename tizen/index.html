@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Party</title>
+        <style>
+            html,
+            body,
+            iframe {
+                margin: 0;
+                padding: 0;
+                width: 100%;
+                height: 100%;
+                border: 0;
+                overflow: hidden;
+                background: #09090b;
+            }
+            body {
+                color: #d4d4d8;
+                font-family: system-ui, sans-serif;
+            }
+        </style>
+    </head>
+    <body>
+        <iframe id="app-frame" allow="autoplay; fullscreen"></iframe>
+        <script>
+            var HOSTED_APP_URL = "https://party.apati.no";
+            var HOSTED_ORIGIN = new URL(HOSTED_APP_URL).origin;
+
+            function exitApp() {
+                try {
+                    if (window.tizen && window.tizen.application) {
+                        window.tizen.application.getCurrentApplication().exit();
+                    }
+                } catch (e) {
+                    // Ignore if application API is unavailable
+                }
+            }
+
+            try {
+                if (window.tizen && window.tizen.power) {
+                    window.tizen.power.request("SCREEN", "SCREEN_NORMAL");
+                }
+                if (window.tizen && window.tizen.tvinputdevice) {
+                    window.tizen.tvinputdevice.registerKey("Return");
+                }
+            } catch (e) {
+                // Ignore if Tizen APIs are unavailable
+            }
+
+            window.addEventListener("message", function (event) {
+                if (event.origin !== HOSTED_ORIGIN) return;
+                if (event.data && event.data.type === "tizen-exit") {
+                    exitApp();
+                }
+            });
+
+            // Fallback if Return is pressed before the iframe loads/focuses
+            window.addEventListener("keydown", function (e) {
+                if (e.keyCode === 10009 || e.key === "Escape" || e.keyCode === 27) {
+                    e.preventDefault();
+                    exitApp();
+                }
+            });
+
+            var frame = document.getElementById("app-frame");
+            frame.addEventListener("load", function () {
+                try {
+                    frame.focus();
+                    if (frame.contentWindow) {
+                        frame.contentWindow.focus();
+                    }
+                } catch (e) {
+                    // Ignore cross-origin focus errors
+                }
+            });
+            frame.src = HOSTED_APP_URL.replace(/\/$/, "") + "/tv";
+        </script>
+    </body>
+</html>

@@ -1,0 +1,802 @@
+import type {
+  GameAction,
+  PlayerSummary,
+  RoomPhase,
+  RoomState,
+} from '../shared/protocol';
+import {
+  GameRegistry,
+  type GameContext,
+  type GameDefinition,
+  type GamePlayer,
+} from './game';
+import { createGameRegistry } from './games';
+import { WebhookManager } from './webhooks';
+
+export interface RoomBroadcaster {
+  sendToHost(roomCode: string, message: unknown): void;
+  sendToPlayer(roomCode: string, playerId: string, message: unknown): void;
+  broadcastAll(roomCode: string, message: unknown): void;
+}
+
+export interface InternalRoom {
+  code: string;
+  hostToken: string;
+  phase: RoomPhase;
+  gameId: string | null;
+  gameState: unknown;
+  roundId: string;
+  stateVersion: number;
+  phaseEndsAt: number | null;
+  lastActivityAt: number;
+  players: Map<string, GamePlayer>;
+  phaseTimer?: ReturnType<typeof setTimeout>;
+  tickInterval?: ReturnType<typeof setInterval>;
+}
+
+export interface RoomManagerOptions {
+  minPlayers?: number;
+  maxPlayers?: number;
+  enableTickInterval?: boolean;
+  /** Idle room TTL in ms (0 disables automatic cleanup). Defaults to 4 hours. */
+  roomTtlMs?: number;
+  /** Interval for pruning idle rooms in ms. Defaults to 15 minutes. */
+  cleanupIntervalMs?: number;
+  registry?: GameRegistry;
+  webhooks?: WebhookManager;
+}
+
+export type ActionResult<T = Record<never, never>> =
+  | ({ ok: true } & T)
+  | { ok: false; code: string; message: string };
+
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+export class RoomManager {
+  private rooms = new Map<string, InternalRoom>();
+  private readonly defaultMinPlayers: number;
+  private readonly defaultMaxPlayers: number;
+  private readonly enableTickInterval: boolean;
+  private readonly roomTtlMs: number;
+  private cleanupTimer?: ReturnType<typeof setInterval>;
+  readonly registry: GameRegistry;
+  readonly webhooks: WebhookManager;
+
+  constructor(
+    private broadcaster: RoomBroadcaster,
+    options: RoomManagerOptions = {}
+  ) {
+    this.defaultMinPlayers = options.minPlayers ?? 1;
+    this.defaultMaxPlayers = options.maxPlayers ?? 12;
+    this.enableTickInterval = options.enableTickInterval ?? true;
+    this.roomTtlMs = options.roomTtlMs ?? 4 * 60 * 60 * 1000;
+    this.webhooks = options.webhooks ?? new WebhookManager();
+
+    if (options.registry) {
+      this.registry = options.registry;
+    } else {
+      this.registry = createGameRegistry();
+    }
+
+    if (this.roomTtlMs > 0) {
+      const intervalMs = options.cleanupIntervalMs ?? 15 * 60 * 1000;
+      this.cleanupTimer = setInterval(() => {
+        this.pruneIdleRooms();
+      }, intervalMs);
+      this.cleanupTimer.unref?.();
+    }
+  }
+
+  createRoom(
+    existingHostToken?: string,
+    preferredGameId?: string
+  ): { room: InternalRoom; hostToken: string; reused: boolean } {
+    if (existingHostToken) {
+      for (const room of this.rooms.values()) {
+        if (room.hostToken === existingHostToken) {
+          room.lastActivityAt = Date.now();
+          return { room, hostToken: existingHostToken, reused: true };
+        }
+      }
+    }
+
+    const code = this.generateRoomCode();
+    const hostToken = crypto.randomUUID();
+    const gameId =
+      preferredGameId && this.registry.get(preferredGameId)
+        ? preferredGameId
+        : this.registry.defaultGameId();
+
+    const room: InternalRoom = {
+      code,
+      hostToken,
+      phase: 'LOBBY',
+      gameId,
+      gameState: null,
+      roundId: crypto.randomUUID(),
+      stateVersion: 1,
+      phaseEndsAt: null,
+      lastActivityAt: Date.now(),
+      players: new Map(),
+    };
+
+    this.rooms.set(code, room);
+    this.emitWebhook('room.created', code, { gameId });
+    return { room, hostToken, reused: false };
+  }
+
+  getRoom(code: string): InternalRoom | undefined {
+    return this.rooms.get(code.trim().toUpperCase());
+  }
+
+  isValidHostToken(code: string, token: string | null | undefined): boolean {
+    if (!token) return false;
+    const room = this.getRoom(code);
+    return Boolean(room && room.hostToken === token);
+  }
+
+  joinRoom(
+    rawCode: string,
+    rawName: string,
+    existingPlayerId?: string
+  ): ActionResult<{ room: InternalRoom; player: GamePlayer }> {
+    const code = rawCode.trim().toUpperCase();
+    const name = rawName.trim().slice(0, 16);
+
+    const room = this.rooms.get(code);
+    if (!room) {
+      return { ok: false, code: 'ROOM_NOT_FOUND', message: `Room "${code}" was not found.` };
+    }
+
+    if (!name) {
+      return { ok: false, code: 'INVALID_NAME', message: 'Please enter a player name.' };
+    }
+
+    if (existingPlayerId && room.players.has(existingPlayerId)) {
+      const existing = room.players.get(existingPlayerId)!;
+      existing.name = name;
+      this.handlePlayerReconnect(room, existing);
+      return { ok: true, room, player: existing };
+    }
+
+    const { maxPlayers } = this.getLimits(room);
+    if (room.players.size >= maxPlayers) {
+      return {
+        ok: false,
+        code: 'ROOM_FULL',
+        message: `Room is full (max ${maxPlayers} players).`,
+      };
+    }
+
+    const duplicate = Array.from(room.players.values()).some(
+      (p) => p.name.toLowerCase() === name.toLowerCase()
+    );
+    if (duplicate) {
+      return {
+        ok: false,
+        code: 'NAME_TAKEN',
+        message: `The name "${name}" is already taken in this room.`,
+      };
+    }
+
+    const playerId = existingPlayerId || crypto.randomUUID();
+    const isVip = room.players.size === 0;
+    const player: GamePlayer = {
+      id: playerId,
+      name,
+      score: 0,
+      connected: true,
+      isVip,
+      meta: {},
+    };
+
+    room.players.set(playerId, player);
+    room.lastActivityAt = Date.now();
+
+    if (room.phase === 'PLAYING') {
+      this.invokeGameHook(room, (game, ctx) =>
+        game.onPlayerJoin?.(ctx, room.gameState, playerId)
+      );
+    }
+
+    this.broadcastState(room);
+    this.emitWebhook('player.joined', room.code, {
+      playerId: player.id,
+      name: player.name,
+      isVip: player.isVip,
+    });
+    return { ok: true, room, player };
+  }
+
+  reconnectPlayer(
+    rawCode: string,
+    playerId: string
+  ): ActionResult<{ room: InternalRoom; player: GamePlayer }> {
+    const code = rawCode.trim().toUpperCase();
+    const room = this.rooms.get(code);
+    if (!room) {
+      return { ok: false, code: 'ROOM_NOT_FOUND', message: `Room "${code}" no longer exists.` };
+    }
+    const player = room.players.get(playerId);
+    if (!player) {
+      return { ok: false, code: 'PLAYER_NOT_FOUND', message: 'Session expired. Please rejoin the room.' };
+    }
+
+    this.handlePlayerReconnect(room, player);
+    return { ok: true, room, player };
+  }
+
+  leaveRoom(rawCode: string, playerId: string): ActionResult {
+    const room = this.getRoom(rawCode);
+    if (!room) {
+      return { ok: false, code: 'ROOM_NOT_FOUND', message: 'Room not found.' };
+    }
+    const player = room.players.get(playerId);
+    if (!player) {
+      return { ok: false, code: 'PLAYER_NOT_FOUND', message: 'Player not found.' };
+    }
+
+    if (room.phase === 'PLAYING') {
+      this.invokeGameHook(room, (game, ctx) =>
+        game.onPlayerLeave?.(ctx, room.gameState, playerId)
+      );
+    }
+
+    room.lastActivityAt = Date.now();
+    const wasVip = player.isVip;
+    room.players.delete(playerId);
+
+    if (wasVip && room.players.size > 0) {
+      const nextVip =
+        Array.from(room.players.values()).find((p) => p.connected) ??
+        room.players.values().next().value;
+      if (nextVip) {
+        nextVip.isVip = true;
+      }
+    }
+
+    this.broadcastState(room);
+    this.emitWebhook('player.left', room.code, { playerId, name: player.name });
+    return { ok: true };
+  }
+
+  markPlayerDisconnected(code: string, playerId: string): void {
+    const room = this.getRoom(code);
+    if (!room) return;
+    const player = room.players.get(playerId);
+    if (!player) return;
+
+    player.connected = false;
+    if (room.phase === 'PLAYING') {
+      this.invokeGameHook(room, (game, ctx) =>
+        game.onPlayerDisconnect?.(ctx, room.gameState, playerId)
+      );
+    }
+
+    this.broadcastState(room);
+    this.emitWebhook('player.disconnected', room.code, {
+      playerId: player.id,
+      name: player.name,
+    });
+  }
+
+  openGameSelector(
+    rawCode: string,
+    actor: { playerId?: string; hostToken?: string }
+  ): ActionResult<{ room: InternalRoom }> {
+    const auth = this.requireAuthorizedRoom(
+      rawCode,
+      actor,
+      'Only the VIP player or TV host can open the game selector.'
+    );
+    if (!auth.ok) return auth;
+    const { room } = auth;
+
+    if (room.phase === 'PLAYING') {
+      return {
+        ok: false,
+        code: 'INVALID_PHASE',
+        message: 'Cannot open game selector while a game is in progress.',
+      };
+    }
+
+    this.clearTimers(room);
+    room.lastActivityAt = Date.now();
+    room.phase = 'GAME_SELECT';
+    room.roundId = crypto.randomUUID();
+    room.phaseEndsAt = null;
+    room.gameState = null;
+
+    this.broadcastState(room);
+    return { ok: true, room };
+  }
+
+  startGame(
+    rawCode: string,
+    actor: { playerId?: string; hostToken?: string },
+    options?: { gameId?: string; config?: Record<string, unknown> }
+  ): ActionResult<{ room: InternalRoom }> {
+    const auth = this.requireAuthorizedRoom(
+      rawCode,
+      actor,
+      'Only the VIP player or TV host can start the game.'
+    );
+    if (!auth.ok) return auth;
+    const { room } = auth;
+
+    if (room.phase !== 'LOBBY' && room.phase !== 'GAME_SELECT') {
+      return { ok: false, code: 'INVALID_PHASE', message: 'Game has already started.' };
+    }
+
+    const targetGameId = options?.gameId ?? room.gameId ?? this.registry.defaultGameId();
+    const game = targetGameId ? this.registry.get(targetGameId) : undefined;
+    if (!game) {
+      return { ok: false, code: 'NO_GAME', message: 'No game is registered or selected.' };
+    }
+
+    const minPlayers = game.minPlayers ?? this.defaultMinPlayers;
+    if (room.players.size < minPlayers) {
+      return {
+        ok: false,
+        code: 'NOT_ENOUGH_PLAYERS',
+        message: `Need at least ${minPlayers} player(s) to start.`,
+      };
+    }
+
+    this.clearTimers(room);
+    for (const p of room.players.values()) {
+      p.score = 0;
+      p.meta = {};
+    }
+
+    room.lastActivityAt = Date.now();
+    room.gameId = game.id;
+    room.phase = 'PLAYING';
+    room.roundId = crypto.randomUUID();
+    room.phaseEndsAt = null;
+
+    const ctx = this.createGameContext(room);
+    room.gameState = game.onStart(ctx, options?.config);
+
+    this.broadcastState(room);
+    this.emitWebhook('game.started', room.code, {
+      gameId: game.id,
+      playerCount: room.players.size,
+      config: options?.config,
+    });
+    return { ok: true, room };
+  }
+
+  handleAction(
+    rawCode: string,
+    actor: { playerId?: string; hostToken?: string },
+    action: GameAction,
+    expectedRoundId?: string
+  ): ActionResult {
+    const room = this.getRoom(rawCode);
+    if (!room) {
+      return { ok: false, code: 'ROOM_NOT_FOUND', message: 'Room not found.' };
+    }
+    if (room.phase !== 'PLAYING') {
+      return { ok: false, code: 'INVALID_PHASE', message: 'No active game in progress.' };
+    }
+    if (expectedRoundId && room.roundId !== expectedRoundId) {
+      return { ok: false, code: 'STALE_ROUND', message: 'That round has already ended.' };
+    }
+
+    const game = this.getActiveGame(room);
+    if (!game) {
+      return { ok: false, code: 'NO_GAME', message: 'Active game definition not found.' };
+    }
+
+    const isHost = Boolean(actor.hostToken && actor.hostToken === room.hostToken);
+    if (isHost) {
+      if (!game.onHostAction) {
+        return { ok: false, code: 'UNSUPPORTED_ACTION', message: 'Host actions are not supported by this game.' };
+      }
+      room.lastActivityAt = Date.now();
+      const ctx = this.createGameContext(room);
+      const nextState = game.onHostAction(ctx, room.gameState, action);
+      if (nextState !== undefined) {
+        room.gameState = nextState;
+      }
+      this.broadcastState(room);
+      this.emitWebhook('game.action', room.code, {
+        actor: 'host',
+        gameId: game.id,
+        action,
+      });
+      return { ok: true };
+    }
+
+    if (!actor.playerId || !room.players.has(actor.playerId)) {
+      return { ok: false, code: 'PLAYER_NOT_FOUND', message: 'Player not found in room.' };
+    }
+
+    room.lastActivityAt = Date.now();
+    const ctx = this.createGameContext(room);
+    const nextState = game.onPlayerAction(ctx, room.gameState, actor.playerId, action);
+    if (nextState !== undefined) {
+      room.gameState = nextState;
+    }
+
+    this.broadcastState(room);
+    this.emitWebhook('game.action', room.code, {
+      actor: 'player',
+      playerId: actor.playerId,
+      gameId: game.id,
+      action,
+    });
+    return { ok: true };
+  }
+
+  handleExternalEvent(
+    rawCode: string,
+    event: string,
+    payload?: unknown
+  ): ActionResult {
+    const room = this.getRoom(rawCode);
+    if (!room) {
+      return { ok: false, code: 'ROOM_NOT_FOUND', message: 'Room not found.' };
+    }
+
+    room.lastActivityAt = Date.now();
+    if (room.phase === 'PLAYING') {
+      const game = this.getActiveGame(room);
+      if (game?.onExternalEvent) {
+        const ctx = this.createGameContext(room);
+        const nextState = game.onExternalEvent(ctx, room.gameState, event, payload);
+        if (nextState !== undefined) {
+          room.gameState = nextState;
+        }
+        this.broadcastState(room);
+        return { ok: true };
+      }
+    }
+
+    this.broadcaster.broadcastAll(room.code, {
+      type: 'game_event',
+      payload: { event, payload },
+    });
+    return { ok: true };
+  }
+
+  endGame(
+    rawCode: string,
+    actor: { playerId?: string; hostToken?: string }
+  ): ActionResult {
+    const auth = this.requireAuthorizedRoom(
+      rawCode,
+      actor,
+      'Only VIP or TV host can end the game.'
+    );
+    if (!auth.ok) return auth;
+    const { room } = auth;
+
+    if (room.phase !== 'PLAYING') {
+      return { ok: true };
+    }
+
+    room.lastActivityAt = Date.now();
+    this.transitionToEnded(room);
+    return { ok: true };
+  }
+
+  returnToLobby(
+    rawCode: string,
+    actor: { playerId?: string; hostToken?: string }
+  ): ActionResult {
+    const auth = this.requireAuthorizedRoom(
+      rawCode,
+      actor,
+      'Only VIP or TV host can return to lobby.'
+    );
+    if (!auth.ok) return auth;
+    const { room } = auth;
+
+    this.clearTimers(room);
+    room.lastActivityAt = Date.now();
+    room.phase = 'LOBBY';
+    room.roundId = crypto.randomUUID();
+    room.phaseEndsAt = null;
+    room.gameState = null;
+
+    for (const p of room.players.values()) {
+      p.score = 0;
+      p.meta = {};
+    }
+
+    this.broadcastState(room);
+    this.emitWebhook('room.lobby', room.code, { gameId: room.gameId });
+    return { ok: true };
+  }
+
+  buildStateForClient(room: InternalRoom, playerId?: string): RoomState {
+    const players: PlayerSummary[] = Array.from(room.players.values()).map((p) => ({
+      id: p.id,
+      name: p.name,
+      score: p.score,
+      connected: p.connected,
+      isVip: p.isVip,
+      meta: p.meta,
+    }));
+
+    const { minPlayers, maxPlayers } = this.getLimits(room);
+    const game = this.getActiveGame(room);
+    const ctx = this.createGameContext(room);
+
+    let hostState: unknown = undefined;
+    let playerState: unknown = undefined;
+
+    if (game && room.gameState !== null && (room.phase === 'PLAYING' || room.phase === 'ENDED')) {
+      if (playerId) {
+        playerState = game.getPlayerView(room.gameState, playerId, ctx);
+      } else {
+        hostState = game.getHostView(room.gameState, ctx);
+      }
+    }
+
+    return {
+      code: room.code,
+      phase: room.phase,
+      gameId: room.gameId,
+      roundId: room.roundId,
+      stateVersion: room.stateVersion,
+      phaseEndsAt: room.phaseEndsAt,
+      players,
+      minPlayers,
+      maxPlayers,
+      games: this.registry.list(),
+      hostState,
+      playerState,
+    };
+  }
+
+  disposeRoom(code: string): void {
+    const room = this.getRoom(code);
+    if (!room) return;
+    this.clearTimers(room);
+    this.rooms.delete(room.code);
+    this.emitWebhook('room.disposed', room.code, {});
+  }
+
+  pruneIdleRooms(now = Date.now()): number {
+    if (this.roomTtlMs <= 0) return 0;
+    let disposed = 0;
+    for (const room of Array.from(this.rooms.values())) {
+      if (now - room.lastActivityAt >= this.roomTtlMs) {
+        this.disposeRoom(room.code);
+        disposed += 1;
+      }
+    }
+    return disposed;
+  }
+
+  dispose(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = undefined;
+    }
+    for (const room of Array.from(this.rooms.values())) {
+      this.clearTimers(room);
+    }
+    this.rooms.clear();
+  }
+
+  private requireAuthorizedRoom(
+    rawCode: string,
+    actor: { playerId?: string; hostToken?: string },
+    unauthorizedMessage: string
+  ): ActionResult<{ room: InternalRoom }> {
+    const room = this.getRoom(rawCode);
+    if (!room) {
+      return { ok: false, code: 'ROOM_NOT_FOUND', message: 'Room not found.' };
+    }
+    if (!this.isAuthorizedController(room, actor)) {
+      return { ok: false, code: 'UNAUTHORIZED', message: unauthorizedMessage };
+    }
+    return { ok: true, room };
+  }
+
+  private handlePlayerReconnect(room: InternalRoom, player: GamePlayer): void {
+    player.connected = true;
+    room.lastActivityAt = Date.now();
+    if (room.phase === 'PLAYING') {
+      this.invokeGameHook(room, (game, ctx) =>
+        game.onPlayerReconnect?.(ctx, room.gameState, player.id)
+      );
+    }
+    this.broadcastState(room);
+    this.emitWebhook('player.reconnected', room.code, {
+      playerId: player.id,
+      name: player.name,
+    });
+  }
+
+  private transitionToEnded(room: InternalRoom): void {
+    this.clearTimers(room);
+    const game = this.getActiveGame(room);
+    if (game?.onEnd && room.gameState !== null) {
+      game.onEnd(this.createGameContext(room), room.gameState);
+    }
+
+    room.phase = 'ENDED';
+    room.roundId = crypto.randomUUID();
+    room.phaseEndsAt = null;
+    this.broadcastState(room);
+
+    const standings = Array.from(room.players.values())
+      .map((p) => ({ id: p.id, name: p.name, score: p.score }))
+      .sort((a, b) => b.score - a.score);
+
+    this.emitWebhook('game.ended', room.code, {
+      gameId: room.gameId,
+      standings,
+    });
+  }
+
+  private getActiveGame(room: InternalRoom): GameDefinition<any, any, any, any> | undefined {
+    return room.gameId ? this.registry.get(room.gameId) : undefined;
+  }
+
+  private getLimits(room: InternalRoom): { minPlayers: number; maxPlayers: number } {
+    const game = this.getActiveGame(room);
+    return {
+      minPlayers: game?.minPlayers ?? this.defaultMinPlayers,
+      maxPlayers: game?.maxPlayers ?? this.defaultMaxPlayers,
+    };
+  }
+
+  private invokeGameHook(
+    room: InternalRoom,
+    fn: (game: GameDefinition<any, any, any, any>, ctx: GameContext) => unknown
+  ): void {
+    const game = this.getActiveGame(room);
+    if (!game || room.gameState === null) return;
+    const next = fn(game, this.createGameContext(room));
+    if (next !== undefined) {
+      room.gameState = next;
+    }
+  }
+
+  private createGameContext(room: InternalRoom): GameContext {
+    return {
+      roomCode: room.code,
+      getPlayers: () => Array.from(room.players.values()),
+      getPlayer: (playerId) => room.players.get(playerId),
+      setPlayerScore: (playerId, score) => {
+        const p = room.players.get(playerId);
+        if (p) p.score = score;
+      },
+      addPlayerScore: (playerId, delta) => {
+        const p = room.players.get(playerId);
+        if (p) p.score += delta;
+      },
+      setPlayerMeta: (playerId, meta) => {
+        const p = room.players.get(playerId);
+        if (p) p.meta = { ...p.meta, ...meta };
+      },
+      setTimer: (durationMs) => {
+        this.clearTimers(room);
+        room.phaseEndsAt = Date.now() + durationMs;
+        this.scheduleTimer(room, durationMs);
+      },
+      clearTimer: () => {
+        this.clearTimers(room);
+        room.phaseEndsAt = null;
+      },
+      broadcastEvent: (event, payload) => {
+        this.broadcaster.broadcastAll(room.code, {
+          type: 'game_event',
+          payload: { event, payload },
+        });
+      },
+      sendEventToHost: (event, payload) => {
+        this.broadcaster.sendToHost(room.code, {
+          type: 'game_event',
+          payload: { event, payload },
+        });
+      },
+      sendEventToPlayer: (playerId, event, payload) => {
+        this.broadcaster.sendToPlayer(room.code, playerId, {
+          type: 'game_event',
+          payload: { event, payload },
+        });
+      },
+      emitWebhook: (event, data) => {
+        this.emitWebhook(event, room.code, data);
+      },
+      endGame: () => {
+        if (room.phase === 'PLAYING') {
+          this.transitionToEnded(room);
+        }
+      },
+    };
+  }
+
+  private isAuthorizedController(
+    room: InternalRoom,
+    actor: { playerId?: string; hostToken?: string }
+  ): boolean {
+    if (actor.hostToken && actor.hostToken === room.hostToken) {
+      return true;
+    }
+    if (actor.playerId) {
+      const player = room.players.get(actor.playerId);
+      if (player?.isVip) return true;
+      const vipConnected = Array.from(room.players.values()).some((p) => p.isVip && p.connected);
+      if (!vipConnected && player?.connected) return true;
+    }
+    return false;
+  }
+
+  private broadcastState(room: InternalRoom): void {
+    room.stateVersion += 1;
+
+    this.broadcaster.sendToHost(room.code, {
+      type: 'room_state',
+      payload: this.buildStateForClient(room),
+    });
+
+    for (const playerId of room.players.keys()) {
+      this.broadcaster.sendToPlayer(room.code, playerId, {
+        type: 'room_state',
+        payload: this.buildStateForClient(room, playerId),
+      });
+    }
+  }
+
+  private scheduleTimer(room: InternalRoom, durationMs: number): void {
+    room.phaseTimer = setTimeout(() => {
+      room.phaseEndsAt = null;
+      this.clearTimers(room);
+      if (room.phase !== 'PLAYING') return;
+
+      this.invokeGameHook(room, (game, ctx) =>
+        game.onTimerExpired?.(ctx, room.gameState)
+      );
+      if (room.phase === 'PLAYING') {
+        this.broadcastState(room);
+      }
+    }, durationMs);
+
+    if (this.enableTickInterval) {
+      room.tickInterval = setInterval(() => {
+        if (room.phaseEndsAt === null) return;
+        const remainingMs = Math.max(0, room.phaseEndsAt - Date.now());
+        this.broadcaster.broadcastAll(room.code, {
+          type: 'tick',
+          payload: { remainingMs, phaseEndsAt: room.phaseEndsAt },
+        });
+      }, 1000);
+    }
+  }
+
+  private clearTimers(room: InternalRoom): void {
+    if (room.phaseTimer) {
+      clearTimeout(room.phaseTimer);
+      room.phaseTimer = undefined;
+    }
+    if (room.tickInterval) {
+      clearInterval(room.tickInterval);
+      room.tickInterval = undefined;
+    }
+  }
+
+  private emitWebhook(event: string, roomCode: string, data: unknown): void {
+    void this.webhooks.emit(event, roomCode, data);
+  }
+
+  private generateRoomCode(): string {
+    for (let attempt = 0; attempt < 100; attempt++) {
+      let code = '';
+      for (let i = 0; i < 4; i++) {
+        code += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+      }
+      if (!this.rooms.has(code)) {
+        return code;
+      }
+    }
+    throw new Error('Unable to generate unique room code');
+  }
+}

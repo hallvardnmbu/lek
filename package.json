@@ -1,0 +1,18 @@
+{
+    "name": "tizen-party-game",
+    "version": "1.0.0",
+    "private": true,
+    "workspaces": [
+        "server",
+        "web"
+    ],
+    "scripts": {
+        "install:all": "bun install",
+        "dev:server": "bun --watch server/index.ts",
+        "dev:web": "bun run --cwd web dev",
+        "build:web": "bun run --cwd web build",
+        "start": "NODE_ENV=production bun server/index.ts",
+        "test": "bun test server/roomManager.test.ts",
+        "build:wgt": "./tizen/build.sh"
+    }
+}
