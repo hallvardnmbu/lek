@@ -6,6 +6,7 @@ import { TvGameFallback } from '../components/tv/TvGameFallback';
 import { TvGameSelector } from '../components/tv/TvGameSelector';
 import { TvLobby } from '../components/tv/TvLobby';
 import { getGameUi } from '../games';
+import { createLobbyMusic } from '../lib/audio';
 import { createDpadNav } from '../lib/dpad';
 import { exitTizenApp, initTizenTv } from '../lib/tizen';
 import { createGameSocket, loadHostToken, saveHostToken } from '../lib/ws';
@@ -107,6 +108,11 @@ export function TvHost() {
     onReturn: () => setShowExitModal((prev) => !prev),
   });
 
+  const lobbyMusic = createLobbyMusic('/lobby.mp3', () => {
+    const phase = state()?.phase;
+    return phase === 'LOBBY' || phase === 'GAME_SELECT';
+  });
+
   return (
     <div class="tv-viewport">
       <div class="tv-canvas" ref={canvasRef}>
@@ -121,6 +127,12 @@ export function TvHost() {
           <Show when={state()}>
             {(s) => (
               <div class="tv-room-strip">
+                <button
+                  class={`audio-pill ${lobbyMusic.muted() ? 'muted' : ''}`}
+                  onClick={lobbyMusic.toggleMute}
+                >
+                  {lobbyMusic.muted() ? 'Sound: Off' : 'Sound: On'}
+                </button>
                 <Show when={secondsLeft() !== null}>
                   <div class={`timer-pill ${(secondsLeft() ?? 99) <= 5 ? 'urgent' : ''}`}>
                     {secondsLeft()}s

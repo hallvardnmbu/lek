@@ -205,13 +205,23 @@ body,
 
 .round-pill,
 .timer-pill,
-.room-code-badge {
+.room-code-badge,
+.audio-pill {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 0.6rem 1.2rem;
   font-size: 1.25rem;
   font-weight: 700;
+}
+
+.audio-pill {
+  color: var(--text);
+  cursor: pointer;
+}
+
+.audio-pill.muted {
+  color: var(--muted);
 }
 
 .timer-pill.urgent {
