@@ -1,4 +1,4 @@
-import { createEffect, createSignal, onCleanup } from 'solid-js';
+import { createEffect, createSignal, onSettled } from 'solid-js';
 
 export function createLobbyMusic(src: string, isActive: () => boolean) {
   const [muted, setMuted] = createSignal(false);
@@ -32,20 +32,23 @@ export function createLobbyMusic(src: string, isActive: () => boolean) {
     syncPlayback();
   };
 
-  window.addEventListener('pointerdown', handleFirstGesture);
-  window.addEventListener('keydown', handleFirstGesture);
+  createEffect(
+    () => isActive() && !muted(),
+    () => {
+      syncPlayback();
+    }
+  );
 
-  createEffect(() => {
-    isActive();
-    muted();
-    syncPlayback();
-  });
+  onSettled(() => {
+    window.addEventListener('pointerdown', handleFirstGesture);
+    window.addEventListener('keydown', handleFirstGesture);
 
-  onCleanup(() => {
-    window.removeEventListener('pointerdown', handleFirstGesture);
-    window.removeEventListener('keydown', handleFirstGesture);
-    audio.pause();
-    audio.src = '';
+    return () => {
+      window.removeEventListener('pointerdown', handleFirstGesture);
+      window.removeEventListener('keydown', handleFirstGesture);
+      audio.pause();
+      audio.src = '';
+    };
   });
 
   const toggleMute = () => {

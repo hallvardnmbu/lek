@@ -1,4 +1,4 @@
-import type { JSX } from 'solid-js';
+import type { JSX } from '@solidjs/web';
 import type { GameAction, RoomState } from '../../../shared/protocol';
 
 export interface TvGameViewProps<THostState = unknown> {
@@ -35,8 +35,4 @@ export function registerGameUi<THostState, TPlayerState>(
 export function getGameUi(id: string | null | undefined): GameUiDefinition | undefined {
   if (!id) return undefined;
   return uiRegistry.get(id);
-}
-
-export function listGameUis(): GameUiDefinition[] {
-  return Array.from(uiRegistry.values());
 }

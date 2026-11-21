@@ -1,4 +1,4 @@
-import { onCleanup, onMount } from 'solid-js';
+import { onSettled } from 'solid-js';
 import { isTizenReturnKey } from './tizen';
 
 const FOCUSABLE_SELECTOR = 'button:not(:disabled), [data-dpad]:not([disabled])';
@@ -47,7 +47,7 @@ export function createDpadNav(
     }
   };
 
-  onMount(() => {
+  onSettled(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (isTizenReturnKey(e)) {
         e.preventDefault();
@@ -94,10 +94,10 @@ export function createDpadNav(
     syncFocus();
     window.addEventListener('keydown', onKeyDown);
 
-    onCleanup(() => {
+    return () => {
       observer.disconnect();
       window.removeEventListener('keydown', onKeyDown);
       applyFocus(null);
-    });
+    };
   });
 }

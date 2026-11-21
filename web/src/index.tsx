@@ -1,5 +1,5 @@
-import { Match, Switch, createSignal, onCleanup, onMount } from 'solid-js';
-import { render } from 'solid-js/web';
+import { Match, Switch, createSignal, onSettled } from 'solid-js';
+import { render } from '@solidjs/web';
 import { Home } from './pages/Home';
 import { MobilePlay } from './pages/MobilePlay';
 import { TvHost } from './pages/TvHost';
@@ -8,10 +8,10 @@ import './styles.css';
 function App() {
   const [pathname, setPathname] = createSignal(window.location.pathname);
 
-  onMount(() => {
+  onSettled(() => {
     const onPopState = () => setPathname(window.location.pathname);
     window.addEventListener('popstate', onPopState);
-    onCleanup(() => window.removeEventListener('popstate', onPopState));
+    return () => window.removeEventListener('popstate', onPopState);
   });
 
   const playCodeMatch = () => {

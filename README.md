@@ -7,7 +7,8 @@ Generalized Tizen TV + Phone WebSocket & Webhook foundation for building arbitra
 ## Architecture
 
 - [`shared/protocol.ts`](shared/protocol.ts) — Shared room, player, action, WebSocket, and webhook types.
-- [`server/game.ts`](server/game.ts) — `GameDefinition` contract, `GameContext`, `GameRegistry`, and the minimal `sandbox` template.
+- [`server/game.ts`](server/game.ts) — `GameDefinition` contract, `GameContext`, and `GameRegistry`.
+- [`server/games/sandbox.ts`](server/games/sandbox.ts) — Minimal built-in `sandbox` template game (registered in [`server/games/index.ts`](server/games/index.ts)).
 - [`server/webhooks.ts`](server/webhooks.ts) — `WebhookManager` with HMAC-SHA256 signing (`WEBHOOK_URLS`, `WEBHOOK_SECRET`).
 - [`server/roomManager.ts`](server/roomManager.ts) — Game-agnostic room lifecycle, VIP failover, timers, state versioning, and webhook emission.
 - [`server/index.ts`](server/index.ts) — Bun HTTP/WebSocket server, static SPA host, and `/api/rooms/:code/events` inbound webhook endpoint.
@@ -16,8 +17,9 @@ Generalized Tizen TV + Phone WebSocket & Webhook foundation for building arbitra
 
 ## Adding a Game
 
-1. Implement a `GameDefinition` and register it with `roomManager.registry.register(myGame)` on the server.
-2. Register its `TvView` and `MobileView` with `registerGameUi(...)` in `web/src/games/registry.ts`.
+1. Add shared types in `shared/games/<id>.ts`.
+2. Implement a `GameDefinition` in `server/games/<id>.ts` and register it in [`server/games/index.ts`](server/games/index.ts).
+3. Implement `TvView` and `MobileView` in `web/src/games/<id>/` and register them in [`web/src/games/index.ts`](web/src/games/index.ts).
 
 ## Webhooks
 

@@ -1,5 +1,4 @@
-import { Show, createMemo, createSignal, onMount } from 'solid-js';
-import { Dynamic } from 'solid-js/web';
+import { Show, createMemo, createSignal, dynamicComponent, onSettled } from 'solid-js';
 import { TvEnded } from '../components/tv/TvEnded';
 import { TvExitModal } from '../components/tv/TvExitModal';
 import { TvGameFallback } from '../components/tv/TvGameFallback';
@@ -8,7 +7,7 @@ import { TvLobby } from '../components/tv/TvLobby';
 import { getGameUi } from '../games';
 import { createLobbyMusic } from '../lib/audio';
 import { createDpadNav } from '../lib/dpad';
-import { exitTizenApp, initTizenTv } from '../lib/tizen';
+import { exitTizenApp, initTizenTv, reloadApp } from '../lib/tizen';
 import { createGameSocket, loadHostToken, saveHostToken } from '../lib/ws';
 
 export function TvHost() {
@@ -96,13 +95,11 @@ export function TvHost() {
     });
   };
 
-  const handleReload = () => {
-    window.location.reload();
-  };
-
-  onMount(() => {
+  onSettled(() => {
     initTizenTv();
   });
+
+  const ActiveTvView = dynamicComponent(() => activeGameUi()?.TvView);
 
   createDpadNav(() => canvasRef, {
     onReturn: () => setShowExitModal((prev) => !prev),
@@ -115,7 +112,7 @@ export function TvHost() {
 
   return (
     <div class="tv-viewport">
-      <div class="tv-canvas" ref={canvasRef}>
+      <div class="tv-canvas" ref={(el) => (canvasRef = el)}>
         <header class="tv-header">
           <div class="tv-brand">
             <span class="tv-logo">Party</span>
@@ -190,18 +187,15 @@ export function TvHost() {
                     />
                   }
                 >
-                  {(ui) => (
-                    <Dynamic
-                      component={ui().TvView}
-                      state={s()}
-                      remainingMs={socket.remainingMs()}
-                      lastEvent={socket.lastEvent()}
-                      sendAction={(action) =>
-                        socket.sendAction(action, { hostToken: hostToken() })
-                      }
-                      endGame={handleEndGame}
-                    />
-                  )}
+                  <ActiveTvView
+                    state={s()}
+                    remainingMs={socket.remainingMs()}
+                    lastEvent={socket.lastEvent()}
+                    sendAction={(action) =>
+                      socket.sendAction(action, { hostToken: hostToken() })
+                    }
+                    endGame={handleEndGame}
+                  />
                 </Show>
               </Show>
 
@@ -219,7 +213,7 @@ export function TvHost() {
         <Show when={showExitModal()}>
           <TvExitModal
             onKeepPlaying={() => setShowExitModal(false)}
-            onReload={handleReload}
+            onReload={reloadApp}
             onExit={() => exitTizenApp('/')}
           />
         </Show>

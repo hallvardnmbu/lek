@@ -1,5 +1,4 @@
-import { Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
-import { Dynamic } from 'solid-js/web';
+import { Show, createMemo, createSignal, dynamicComponent, onSettled } from 'solid-js';
 import { MobileEnded } from '../components/mobile/MobileEnded';
 import { MobileGameFallback } from '../components/mobile/MobileGameFallback';
 import { MobileGameSelector } from '../components/mobile/MobileGameSelector';
@@ -18,7 +17,7 @@ interface MobilePlayProps {
 }
 
 export function MobilePlay(props: MobilePlayProps) {
-  onMount(() => {
+  onSettled(() => {
     const preventGesture = (e: Event) => e.preventDefault();
     const preventPinch = (e: TouchEvent) => {
       if (e.touches.length > 1) {
@@ -31,16 +30,16 @@ export function MobilePlay(props: MobilePlayProps) {
     document.addEventListener('gestureend', preventGesture, { passive: false });
     document.addEventListener('touchmove', preventPinch, { passive: false });
 
-    onCleanup(() => {
+    return () => {
       document.removeEventListener('gesturestart', preventGesture);
       document.removeEventListener('gesturechange', preventGesture);
       document.removeEventListener('gestureend', preventGesture);
       document.removeEventListener('touchmove', preventPinch);
-    });
+    };
   });
 
   const existing = loadPlayerSession();
-  const [codeInput, setCodeInput] = createSignal(
+  const [codeInput, setCodeInput] = createSignal(() =>
     (props.initialCode || existing?.code || '').toUpperCase()
   );
   const [nameInput, setNameInput] = createSignal(existing?.name || '');
@@ -98,6 +97,7 @@ export function MobilePlay(props: MobilePlayProps) {
   });
 
   const activeGameUi = createMemo(() => getGameUi(state()?.gameId));
+  const ActiveMobileView = dynamicComponent(() => activeGameUi()?.MobileView);
   const activeGameInfo = createMemo(() => {
     const s = state();
     if (!s || !s.gameId) return null;
@@ -226,18 +226,15 @@ export function MobilePlay(props: MobilePlayProps) {
                   />
                 }
               >
-                {(ui) => (
-                  <Dynamic
-                    component={ui().MobileView}
-                    state={s()}
-                    playerId={playerId()!}
-                    remainingMs={socket.remainingMs()}
-                    lastEvent={socket.lastEvent()}
-                    sendAction={(action) =>
-                      socket.sendAction(action, { playerId: playerId() ?? undefined })
-                    }
-                  />
-                )}
+                <ActiveMobileView
+                  state={s()}
+                  playerId={playerId()!}
+                  remainingMs={socket.remainingMs()}
+                  lastEvent={socket.lastEvent()}
+                  sendAction={(action) =>
+                    socket.sendAction(action, { playerId: playerId() ?? undefined })
+                  }
+                />
               </Show>
             </Show>
 

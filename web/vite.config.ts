@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite';
-import solidPlugin from 'vite-plugin-solid';
+import solid from '@solidjs/vite-plugin';
 
 export default defineConfig({
-  plugins: [solidPlugin()],
+  plugins: [solid()],
   build: {
     target: 'es2022',
     outDir: 'dist',

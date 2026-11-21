@@ -17,6 +17,7 @@ export interface RoomBroadcaster {
   sendToHost(roomCode: string, message: unknown): void;
   sendToPlayer(roomCode: string, playerId: string, message: unknown): void;
   broadcastAll(roomCode: string, message: unknown): void;
+  onRoomDisposed?(roomCode: string): void;
 }
 
 export interface InternalRoom {
@@ -557,6 +558,7 @@ export class RoomManager {
     if (!room) return;
     this.clearTimers(room);
     this.rooms.delete(room.code);
+    this.broadcaster.onRoomDisposed?.(room.code);
     this.emitWebhook('room.disposed', room.code, {});
   }
 

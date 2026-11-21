@@ -12,7 +12,12 @@
         "dev:web": "bun run --cwd web dev",
         "build:web": "bun run --cwd web build",
         "start": "NODE_ENV=production bun server/index.ts",
-        "test": "bun test server/roomManager.test.ts",
+        "test": "bun test",
+        "lint": "bun ./node_modules/.bin/oxlint server shared web/src",
+        "typecheck": "bun ./server/node_modules/.bin/tsc -p server/tsconfig.json --noEmit && bun ./web/node_modules/.bin/tsc -p web/tsconfig.json --noEmit",
         "build:wgt": "./tizen/build.sh"
+    },
+    "devDependencies": {
+        "oxlint": "^1.94.0"
     }
 }

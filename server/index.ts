@@ -1,4 +1,4 @@
-import { join, resolve } from 'path';
+import { join, resolve, sep } from 'path';
 import type { ServerWebSocket } from 'bun';
 import type { ClientMessage, ServerMessage } from '../shared/protocol';
 import { RoomManager, type RoomBroadcaster } from './roomManager';
@@ -62,6 +62,10 @@ function resolveActor(
     return { ok: true, actor: { playerId: ws.data.playerId, hostToken } };
   }
 
+  if (ws.data.role === 'host') {
+    return { ok: true, actor: { hostToken } };
+  }
+
   return { ok: true, actor: { playerId: payloadPlayerId, hostToken } };
 }
 
@@ -86,6 +90,10 @@ const broadcaster: RoomBroadcaster = {
     for (const ws of players.values()) {
       safeSend(ws, message as ServerMessage);
     }
+  },
+  onRoomDisposed(roomCode) {
+    hostSockets.delete(roomCode);
+    playerSockets.delete(roomCode);
   },
 };
 
@@ -118,12 +126,17 @@ function registerPlayerSocket(
   map.set(playerId, ws);
 }
 
-function unregisterPlayerSocket(roomCode: string, playerId: string, ws?: ServerWebSocket<SocketData>): void {
+function unregisterPlayerSocket(roomCode: string, playerId: string, ws?: ServerWebSocket<SocketData>): boolean {
   const map = playerSockets.get(roomCode);
-  if (!map) return;
+  if (!map) return false;
   if (!ws || map.get(playerId) === ws) {
-    map.delete(playerId);
+    const deleted = map.delete(playerId);
+    if (map.size === 0) {
+      playerSockets.delete(roomCode);
+    }
+    return deleted;
   }
+  return false;
 }
 
 async function handleApiRequest(req: Request, url: URL): Promise<Response | null> {
@@ -199,7 +212,7 @@ async function serveStatic(pathname: string): Promise<Response> {
   const cleanPath = pathname === '/' ? '/index.html' : pathname;
   const candidate = resolve(WEB_DIST_DIR, `.${cleanPath}`);
 
-  if (cleanPath !== '/index.html' && candidate.startsWith(WEB_DIST_DIR)) {
+  if (cleanPath !== '/index.html' && candidate.startsWith(WEB_DIST_DIR + sep)) {
     const file = Bun.file(candidate);
     if (await file.exists()) {
       return new Response(file);
@@ -461,11 +474,15 @@ const server = Bun.serve<SocketData>({
       if (!roomCode) return;
 
       if (role === 'host') {
-        hostSockets.get(roomCode)?.delete(ws);
+        const set = hostSockets.get(roomCode);
+        if (set) {
+          set.delete(ws);
+          if (set.size === 0) {
+            hostSockets.delete(roomCode);
+          }
+        }
       } else if (role === 'player' && playerId) {
-        const map = playerSockets.get(roomCode);
-        if (map?.get(playerId) === ws) {
-          map.delete(playerId);
+        if (unregisterPlayerSocket(roomCode, playerId, ws)) {
           roomManager.markPlayerDisconnected(roomCode, playerId);
         }
       }

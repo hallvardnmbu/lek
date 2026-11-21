@@ -3,4 +3,4 @@ import { sandboxGameUi } from './sandbox';
 
 registerGameUi(sandboxGameUi);
 
-export { getGameUi, listGameUis, registerGameUi } from './registry';
+export { getGameUi, registerGameUi } from './registry';

@@ -31,7 +31,9 @@ Stack: **Bun**, **TypeScript**, **SolidJS**, **WebSockets**, **Tizen 8 (`.wgt`)*
 - `bun run dev:server` — Start Bun server (`--watch`)
 - `bun run dev:web` — Start Vite dev server
 - `bun run build:web` — Build `web/dist` (do not run directly; builds are done through Podman)
-- `bun test` — Run `server/roomManager.test.ts`
+- `bun run test` — Run all `*.test.ts` tests
+- `bun run lint` — Lint `server/`, `shared/`, and `web/src/` (`oxlint`)
+- `bun run typecheck` — Typecheck `server/` and `web/` (`tsc --noEmit`)
 - `bun run build:wgt` — Package `tizen/partygame.wgt`
 
 ## Engineering Principles
@@ -46,3 +48,12 @@ Stack: **Bun**, **TypeScript**, **SolidJS**, **WebSockets**, **Tizen 8 (`.wgt`)*
 - **Avoid updating the Tizen build (`tizen/` / `build:wgt`):** Only modify or rebuild it when absolutely necessary, and give a short, clear explanation of why.
 - **Do not run `bun run build` / `bun run build:web`:** Builds are handled through Podman.
 - **Minimal, functional tests:** Test real behavior and state transitions only where necessary (e.g., room/game lifecycle, actions, webhooks), not trivial UI/string presence checks.
+- **No new dependencies:** Do not install new packages (`bun add` / `npm install`) unless explicitly asked.
+- **Keep game changes isolated:** Implement games inside `shared/games/<id>.ts`, `server/games/<id>.ts`, and `web/src/games/<id>/` (plus
+  registry entries). Do not alter core files (`roomManager.ts`, `protocol.ts`, `TvHost.tsx`, `MobilePlay.tsx`) unless the task requires
+  platform-level changes.
+- **No unrequested features:** Build only what was asked for—do not add extra settings, persistence, or polish unless requested. Ask if
+  requirements are ambiguous.
+- **Idiomatic SolidJS:** Do not destructure component `props` or use React patterns. Keep game-specific styles out of `web/src/styles.css` where
+  practical.
+- **Verify before finishing:** Run `bun run test`, `bun run lint`, and `bun run typecheck` after edits.

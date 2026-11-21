@@ -16,7 +16,7 @@ export function MobileJoinForm(props: MobileJoinFormProps) {
         <span>Room Code</span>
         <input
           type="text"
-          maxLength={4}
+          maxlength={4}
           autocomplete="off"
           autocapitalize="characters"
           placeholder="ABCD"
@@ -30,7 +30,7 @@ export function MobileJoinForm(props: MobileJoinFormProps) {
         <span>Your Name</span>
         <input
           type="text"
-          maxLength={16}
+          maxlength={16}
           placeholder="Olaug"
           value={props.nameInput}
           onInput={(e) => props.onNameInput(e.currentTarget.value)}

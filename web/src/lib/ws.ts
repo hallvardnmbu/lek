@@ -1,4 +1,4 @@
-import { createSignal, onCleanup } from 'solid-js';
+import { createSignal, onSettled } from 'solid-js';
 import type { ClientMessage, GameAction, RoomState, ServerMessage } from '../../../shared/protocol';
 
 const SESSION_KEY_PLAYER = 'party_player_session';
@@ -161,15 +161,17 @@ export function createGameSocket(options: {
     }
   };
 
-  document.addEventListener('visibilitychange', onVisibilityChange);
-  connect();
+  onSettled(() => {
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    connect();
 
-  onCleanup(() => {
-    disposed = true;
-    document.removeEventListener('visibilitychange', onVisibilityChange);
-    clearInterval(pingTimer);
-    clearTimeout(reconnectTimer);
-    ws?.close();
+    return () => {
+      disposed = true;
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      clearInterval(pingTimer);
+      clearTimeout(reconnectTimer);
+      ws?.close();
+    };
   });
 
   return {
