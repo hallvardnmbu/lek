@@ -1,0 +1,188 @@
+.cat-generating {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.cat-ai-tag {
+  margin-left: 0.9rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  vertical-align: middle;
+}
+
+.cat-tv-category {
+  font-size: 3.4rem;
+  line-height: 1.15;
+  max-width: 1100px;
+  margin: 0.5rem 0 1.5rem;
+}
+
+.cat-vote-progress {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.cat-next-hint {
+  margin-top: 1.5rem;
+  font-size: 1.15rem;
+  color: var(--muted);
+}
+
+.cat-tv-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.cat-tally {
+  width: 100%;
+  max-width: 760px;
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.cat-tally-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.4rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.75rem 1.1rem;
+  font-weight: 700;
+  overflow: hidden;
+}
+
+.cat-tally-row.cat-failed {
+  border-color: var(--danger);
+}
+
+.cat-tally-name {
+  position: relative;
+  z-index: 1;
+}
+
+.cat-failed-badge {
+  position: relative;
+  z-index: 1;
+  justify-self: start;
+  grid-column: 1;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  padding: 0.12rem 0.5rem;
+  border-radius: 6px;
+}
+
+.cat-tally-votes {
+  position: relative;
+  z-index: 1;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.cat-tally-bar {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.cat-tally-fill {
+  height: 100%;
+  background: var(--surface-2);
+}
+
+.cat-tally-row.cat-failed .cat-tally-fill {
+  background: rgba(239, 68, 68, 0.16);
+}
+
+.cat-tally-compact .cat-tally-row {
+  padding: 0.55rem 0.9rem;
+  font-size: 0.95rem;
+}
+
+.cat-mobile-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 800;
+  color: var(--muted);
+  margin-bottom: 1rem;
+}
+
+.cat-score-count {
+  color: var(--accent);
+}
+
+.cat-waiting {
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.cat-mobile-eyebrow {
+  margin: 0 0 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+}
+
+.cat-mobile-category {
+  margin: 0 0 1.25rem;
+  font-size: 1.5rem;
+  line-height: 1.25;
+}
+
+.cat-vote-hint {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+}
+
+.cat-candidates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.cat-candidate.cat-voted,
+.cat-continue-btn.cat-voted {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.cat-continue-btn {
+  margin-top: 1rem;
+}
+
+.cat-vote-tally {
+  margin: 0.9rem 0 0;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+.cat-result-safe {
+  margin: 0 0 0.75rem;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--success);
+}
+
+.cat-result-fail {
+  margin: 0 0 0.75rem;
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: var(--danger);
+}
