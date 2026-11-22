@@ -32,12 +32,7 @@ export const TANK_WALLS: TankWall[] = [
   { x: 910, y: 344, w: 140, h: 32 },
 ];
 
-export interface TankSpawn {
-  x: number;
-  y: number;
-}
-
-export const TANK_SPAWNS: TankSpawn[] = [
+export const TANK_SPAWNS: readonly { x: number; y: number }[] = [
   { x: 70, y: 70 },
   { x: 1210, y: 70 },
   { x: 70, y: 650 },
@@ -127,7 +122,3 @@ export interface TankGamePlayerView {
   timeLeftMs: number;
   cooldownMs: number;
 }
-
-export type TankGameAction =
-  | { type: 'input'; payload: { x: number; y: number } }
-  | { type: 'fire' };

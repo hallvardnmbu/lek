@@ -5,17 +5,17 @@ const [quizCatalog, setQuizCatalog] = createSignal<MusicQuizSong[]>(MUSIC_QUIZ_C
 
 let loaded = false;
 
-export function loadQuizCatalog(): void {
+export async function loadQuizCatalog(): Promise<void> {
   if (loaded) return;
   loaded = true;
-  fetch('/api/musicquiz/songs')
-    .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`catalog request failed (${res.status})`))))
-    .then((body: { songs?: unknown }) => {
-      if (Array.isArray(body.songs) && body.songs.length > 0) {
-        setQuizCatalog(body.songs as MusicQuizSong[]);
-      }
-    })
-    .catch(() => {});
+  try {
+    const res = await fetch('/api/musicquiz/songs');
+    if (!res.ok) return;
+    const body = (await res.json()) as { songs?: unknown };
+    if (Array.isArray(body.songs) && body.songs.length > 0) {
+      setQuizCatalog(body.songs as MusicQuizSong[]);
+    }
+  } catch {}
 }
 
 export { quizCatalog };

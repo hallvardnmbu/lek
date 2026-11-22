@@ -32,6 +32,10 @@ export function registerGameUi<THostState, TPlayerState>(
   uiRegistry.set(def.id, def);
 }
 
+export function secondsLeft(remainingMs: number | null): number {
+  return Math.ceil((remainingMs ?? 0) / 1000);
+}
+
 export function getGameUi(id: string | null | undefined): GameUiDefinition | undefined {
   if (!id) return undefined;
   return uiRegistry.get(id);

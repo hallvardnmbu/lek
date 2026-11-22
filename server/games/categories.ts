@@ -3,10 +3,16 @@ import type {
   CategoriesHostView,
   CategoriesPlayerView,
   CategoriesState,
-  CategoriesTallyEntry,
 } from '../../shared/games/categories';
 import { cortiAgent, type PromptGenerator } from '../cortiModels';
 import type { GameContext, GameDefinition } from '../game';
+import {
+  buildVoteTally,
+  connectedPlayers,
+  createRoomHistory,
+  parseRounds,
+  takeUnusedPrompt,
+} from './helpers';
 
 const SYSTEM_PROMPT = [
   'You generate categories for the spoken party game "Categories".',
@@ -28,8 +34,6 @@ const POLL_MS = 500;
 const MIN_ROUNDS = 1;
 const MAX_ROUNDS = 20;
 const DEFAULT_ROUNDS = 3;
-const AVOID_WINDOW = 30;
-const MAX_HISTORY_ROOMS = 100;
 
 const FALLBACK_CATEGORIES = [
   'Pizza toppings',
@@ -58,91 +62,13 @@ const FALLBACK_CATEGORIES = [
   'Things you lose often',
 ];
 
-const roomCategoryHistory = new Map<string, string[]>();
-
-function shuffle<T>(items: T[]): T[] {
-  const copy = [...items];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
-
-function rememberCategory(roomCode: string, category: string): void {
-  if (!roomCategoryHistory.has(roomCode) && roomCategoryHistory.size >= MAX_HISTORY_ROOMS) {
-    const oldest = roomCategoryHistory.keys().next().value;
-    if (oldest !== undefined) roomCategoryHistory.delete(oldest);
-  }
-  const used = roomCategoryHistory.get(roomCode) ?? [];
-  used.push(category.toLowerCase());
-  roomCategoryHistory.set(roomCode, used);
-}
-
-function isCategoryUsed(roomCode: string, category: string): boolean {
-  return (roomCategoryHistory.get(roomCode) ?? []).includes(category.toLowerCase());
-}
-
-function recentAvoidList(roomCode: string): string[] {
-  return (roomCategoryHistory.get(roomCode) ?? []).slice(-AVOID_WINDOW);
-}
-
-function connectedPlayers(ctx: GameContext) {
-  return ctx.getPlayers().filter((p) => p.connected);
-}
-
-function takeCategory(
-  roomCode: string,
-  state: CategoriesState
-): { category: string; isAi: boolean } {
-  const aiCategories = state.aiInbox.categories;
-  if (aiCategories) {
-    while (aiCategories.length > 0) {
-      const candidate = aiCategories.shift()!;
-      if (!isCategoryUsed(roomCode, candidate)) {
-        return { category: candidate, isAi: true };
-      }
-    }
-  }
-
-  for (let attempt = 0; attempt < FALLBACK_CATEGORIES.length; attempt++) {
-    if (!state.fallbackCategories || state.fallbackCategories.length === 0) {
-      state.fallbackCategories = shuffle(FALLBACK_CATEGORIES);
-    }
-    const candidate = state.fallbackCategories.pop()!;
-    if (!isCategoryUsed(roomCode, candidate)) {
-      return { category: candidate, isAi: false };
-    }
-  }
-
-  return {
-    category: FALLBACK_CATEGORIES[Math.floor(Math.random() * FALLBACK_CATEGORIES.length)],
-    isAi: false,
-  };
-}
-
-function buildTally(ctx: GameContext, votes: Record<string, string>): CategoriesTallyEntry[] {
-  const counts = new Map<string, number>();
-  for (const targetId of Object.values(votes)) {
-    counts.set(targetId, (counts.get(targetId) ?? 0) + 1);
-  }
-
-  return ctx
-    .getPlayers()
-    .map((p) => ({
-      playerId: p.id,
-      name: p.name,
-      votes: counts.get(p.id) ?? 0,
-      isFailed: false,
-    }))
-    .sort((a, b) => b.votes - a.votes || a.name.localeCompare(b.name));
-}
+const categoryHistory = createRoomHistory();
 
 function reveal(ctx: GameContext, state: CategoriesState): CategoriesState {
-  const tally = buildTally(ctx, state.votes);
-  const maxVotes = tally[0]?.votes ?? 0;
+  const baseTally = buildVoteTally(ctx, state.votes);
+  const maxVotes = baseTally[0]?.votes ?? 0;
   const failedIds =
-    maxVotes > 0 ? tally.filter((t) => t.votes === maxVotes).map((t) => t.playerId) : [];
+    maxVotes > 0 ? baseTally.filter((t) => t.votes === maxVotes).map((t) => t.playerId) : [];
   const failedSet = new Set(failedIds);
 
   if (failedIds.length > 0) {
@@ -154,7 +80,7 @@ function reveal(ctx: GameContext, state: CategoriesState): CategoriesState {
   }
 
   state.phase = 'REVEAL';
-  state.tally = tally.map((t) => ({ ...t, isFailed: failedSet.has(t.playerId) }));
+  state.tally = baseTally.map((t) => ({ ...t, isFailed: failedSet.has(t.playerId) }));
   state.failedIds = failedIds;
   state.continueVotes = {};
 
@@ -167,8 +93,16 @@ function reveal(ctx: GameContext, state: CategoriesState): CategoriesState {
 }
 
 function startRound(ctx: GameContext, state: CategoriesState): CategoriesState {
-  const { category, isAi } = takeCategory(ctx.roomCode, state);
-  rememberCategory(ctx.roomCode, category);
+  const fallbackRef = { current: state.fallbackCategories };
+  const { text: category, isAi } = takeUnusedPrompt(
+    ctx.roomCode,
+    categoryHistory,
+    state.aiInbox.categories,
+    fallbackRef,
+    FALLBACK_CATEGORIES
+  );
+  state.fallbackCategories = fallbackRef.current;
+  categoryHistory.remember(ctx.roomCode, category);
 
   state.phase = 'PLAYING';
   state.round += 1;
@@ -189,33 +123,23 @@ function nextRound(ctx: GameContext, state: CategoriesState): CategoriesState {
   return startRound(ctx, state);
 }
 
-function connectedVotedCount(ctx: GameContext, state: CategoriesState): number {
-  return connectedPlayers(ctx).filter((p) => state.votes[p.id] !== undefined).length;
+function viewCounts(ctx: GameContext, state: CategoriesState) {
+  const connected = connectedPlayers(ctx);
+  return {
+    votedCount: connected.filter((p) => state.votes[p.id] !== undefined).length,
+    continueCount: connected.filter((p) => state.continueVotes[p.id] === true).length,
+    connectedCount: connected.length,
+  };
 }
 
-function connectedContinueCount(ctx: GameContext, state: CategoriesState): number {
-  return connectedPlayers(ctx).filter((p) => state.continueVotes[p.id] === true).length;
-}
-
-function maybeReveal(ctx: GameContext, state: CategoriesState): CategoriesState {
+function advanceIfReady(ctx: GameContext, state: CategoriesState): CategoriesState {
   const players = connectedPlayers(ctx);
-  if (
-    state.phase === 'PLAYING' &&
-    players.length > 0 &&
-    players.every((p) => state.votes[p.id] !== undefined)
-  ) {
+  if (players.length === 0) return state;
+
+  if (state.phase === 'PLAYING' && players.every((p) => state.votes[p.id] !== undefined)) {
     return reveal(ctx, state);
   }
-  return state;
-}
-
-function maybeContinue(ctx: GameContext, state: CategoriesState): CategoriesState {
-  const players = connectedPlayers(ctx);
-  if (
-    state.phase === 'REVEAL' &&
-    players.length > 0 &&
-    players.every((p) => state.continueVotes[p.id] === true)
-  ) {
+  if (state.phase === 'REVEAL' && players.every((p) => state.continueVotes[p.id] === true)) {
     return nextRound(ctx, state);
   }
   return state;
@@ -232,10 +156,7 @@ export function createCategoriesGame(
     maxPlayers: 12,
 
     onStart(ctx, config) {
-      const requested = Number(config?.rounds);
-      const totalRounds = Number.isFinite(requested)
-        ? Math.min(MAX_ROUNDS, Math.max(MIN_ROUNDS, Math.round(requested)))
-        : DEFAULT_ROUNDS;
+      const totalRounds = parseRounds(config, MIN_ROUNDS, MAX_ROUNDS, DEFAULT_ROUNDS);
 
       const state: CategoriesState = {
         phase: 'GENERATING',
@@ -251,7 +172,7 @@ export function createCategoriesGame(
         fallbackCategories: null,
       };
 
-      void generateCategories(totalRounds, recentAvoidList(ctx.roomCode)).then((categories) => {
+      void generateCategories(totalRounds, categoryHistory.recent(ctx.roomCode)).then((categories) => {
         state.aiInbox.categories = categories;
       });
 
@@ -260,13 +181,11 @@ export function createCategoriesGame(
     },
 
     onTimerExpired(ctx, state) {
-      if (state.phase === 'GENERATING') {
-        if (state.aiInbox.categories !== null) {
-          return startRound(ctx, state);
-        }
-        ctx.setTimer(POLL_MS);
-        return state;
+      if (state.phase !== 'GENERATING') return state;
+      if (state.aiInbox.categories !== null) {
+        return startRound(ctx, state);
       }
+      ctx.setTimer(POLL_MS);
       return state;
     },
 
@@ -277,12 +196,12 @@ export function createCategoriesGame(
           return state;
         }
         state.votes = { ...state.votes, [playerId]: targetId };
-        return maybeReveal(ctx, state);
+        return advanceIfReady(ctx, state);
       }
 
       if (state.phase === 'REVEAL' && action.type === 'continue') {
         state.continueVotes = { ...state.continueVotes, [playerId]: true };
-        return maybeContinue(ctx, state);
+        return advanceIfReady(ctx, state);
       }
 
       return state;
@@ -301,16 +220,12 @@ export function createCategoriesGame(
       return state;
     },
 
-    onPlayerDisconnect(ctx, state, _playerId) {
-      if (state.phase === 'PLAYING') return maybeReveal(ctx, state);
-      if (state.phase === 'REVEAL') return maybeContinue(ctx, state);
-      return state;
+    onPlayerDisconnect(ctx, state) {
+      return advanceIfReady(ctx, state);
     },
 
-    onPlayerReconnect(ctx, state, _playerId) {
-      if (state.phase === 'PLAYING') return maybeReveal(ctx, state);
-      if (state.phase === 'REVEAL') return maybeContinue(ctx, state);
-      return state;
+    onPlayerReconnect(ctx, state) {
+      return advanceIfReady(ctx, state);
     },
 
     onPlayerLeave(ctx, state, playerId) {
@@ -318,9 +233,7 @@ export function createCategoriesGame(
       const { [playerId]: _removedContinue, ...continueVotes } = state.continueVotes;
       state.votes = votes;
       state.continueVotes = continueVotes;
-      if (state.phase === 'PLAYING') return maybeReveal(ctx, state);
-      if (state.phase === 'REVEAL') return maybeContinue(ctx, state);
-      return state;
+      return advanceIfReady(ctx, state);
     },
 
     getHostView(state, ctx): CategoriesHostView {
@@ -330,13 +243,8 @@ export function createCategoriesGame(
         totalRounds: state.totalRounds,
         category: state.category,
         categoryIsAi: state.categoryIsAi,
-        votedCount: connectedVotedCount(ctx, state),
-        continueCount: connectedContinueCount(ctx, state),
-        connectedCount: connectedPlayers(ctx).length,
+        ...viewCounts(ctx, state),
         tally: state.tally,
-        failedNames: state.failedIds
-          .map((id) => ctx.getPlayer(id)?.name)
-          .filter((name): name is string => Boolean(name)),
       };
     },
 
@@ -354,9 +262,7 @@ export function createCategoriesGame(
         myContinueVote: state.continueVotes[playerId] === true,
         candidates,
         myScore: ctx.getPlayer(playerId)?.score ?? 0,
-        votedCount: connectedVotedCount(ctx, state),
-        continueCount: connectedContinueCount(ctx, state),
-        connectedCount: connectedPlayers(ctx).length,
+        ...viewCounts(ctx, state),
         tally: state.tally,
         iFailed: state.failedIds.includes(playerId),
       };

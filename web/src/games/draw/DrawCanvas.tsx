@@ -20,7 +20,7 @@ const SIZES = [
   { label: 'L', size: 14 },
 ];
 
-export interface DrawCanvasProps {
+interface DrawCanvasProps {
   onSync: (imageData: string) => void;
   onSubmit: (imageData: string) => void;
 }

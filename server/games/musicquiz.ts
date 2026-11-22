@@ -6,6 +6,7 @@ import {
   type MusicQuizState,
 } from '../../shared/games/musicquiz';
 import type { GameContext, GameDefinition } from '../game';
+import { connectedPlayers, createRoomHistory, parseRounds, shuffle } from './helpers';
 import { getMusicQuizCatalog, previewUrlFor, refreshPreviews } from './musicquizCatalog';
 
 const INTRO_MS = 4_000;
@@ -16,55 +17,40 @@ const MAX_ROUNDS = 20;
 const DEFAULT_ROUNDS = 5;
 const CORRECT_POINTS = 100;
 const MAX_SPEED_BONUS = 100;
-const MAX_HISTORY_ROOMS = 100;
 
-function shuffle<T>(items: T[]): T[] {
-  const copy = [...items];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
-
-const roomSongHistory = new Map<string, string[]>();
-
-function rememberSongs(roomCode: string, songs: MusicQuizSong[]): void {
-  if (!roomSongHistory.has(roomCode) && roomSongHistory.size >= MAX_HISTORY_ROOMS) {
-    const oldest = roomSongHistory.keys().next().value;
-    if (oldest !== undefined) roomSongHistory.delete(oldest);
-  }
-  const used = roomSongHistory.get(roomCode) ?? [];
-  for (const song of songs) {
-    used.push(song.id);
-  }
-  roomSongHistory.set(roomCode, used);
-}
+const songHistory = createRoomHistory();
 
 function pickSongs(roomCode: string, catalog: MusicQuizSong[], count: number): MusicQuizSong[] {
-  const used = roomSongHistory.get(roomCode) ?? [];
-  const unused = catalog.filter((song) => !used.includes(song.id));
+  const unused = catalog.filter((song) => !songHistory.isUsed(roomCode, song.id));
   const pool = unused.length >= count ? unused : catalog;
   const chosen = shuffle(pool).slice(0, count);
-  rememberSongs(roomCode, chosen);
+  for (const song of chosen) {
+    songHistory.remember(roomCode, song.id);
+  }
   return chosen;
-}
-
-function connectedPlayers(ctx: GameContext) {
-  return ctx.getPlayers().filter((p) => p.connected);
 }
 
 function currentSong(state: MusicQuizState): MusicQuizSong {
   return state.songs[state.round - 1];
 }
 
-function guessedCount(ctx: GameContext, state: MusicQuizState): number {
-  return connectedPlayers(ctx).filter((p) => state.guesses[p.id] !== undefined).length;
-}
-
 function allConnectedGuessed(ctx: GameContext, state: MusicQuizState): boolean {
   const players = connectedPlayers(ctx);
   return players.length > 0 && players.every((p) => state.guesses[p.id] !== undefined);
+}
+
+function sharedView(ctx: GameContext, state: MusicQuizState) {
+  const song = currentSong(state);
+  const connected = connectedPlayers(ctx);
+  return {
+    phase: state.phase,
+    round: state.round,
+    totalRounds: state.totalRounds,
+    song: state.phase === 'REVEAL' ? { title: song.title, artist: song.artist } : null,
+    guessedCount: connected.filter((p) => state.guesses[p.id] !== undefined).length,
+    connectedCount: connected.length,
+    results: state.lastResults,
+  };
 }
 
 function speedBonus(state: MusicQuizState, guessedAt: number): number {
@@ -138,11 +124,7 @@ export function createMusicQuizGame(
 
     onStart(ctx, config) {
       const catalog = getCatalog();
-      const requested = Number(config?.rounds);
-      const rounds = Number.isFinite(requested)
-        ? Math.min(MAX_ROUNDS, Math.max(MIN_ROUNDS, Math.round(requested)))
-        : DEFAULT_ROUNDS;
-      const totalRounds = Math.min(rounds, catalog.length);
+      const totalRounds = Math.min(parseRounds(config, MIN_ROUNDS, MAX_ROUNDS, DEFAULT_ROUNDS), catalog.length);
 
       const state: MusicQuizState = {
         phase: 'INTRO',
@@ -202,32 +184,17 @@ export function createMusicQuizGame(
     },
 
     getHostView(state, ctx) {
-      const song = currentSong(state);
-      const guessing = state.phase === 'GUESSING';
       return {
-        phase: state.phase,
-        round: state.round,
-        totalRounds: state.totalRounds,
-        audioUrl: guessing ? previewUrlFor(song) : null,
-        song: state.phase === 'REVEAL' ? { title: song.title, artist: song.artist } : null,
-        guessedCount: guessedCount(ctx, state),
-        connectedCount: connectedPlayers(ctx).length,
-        results: state.lastResults,
+        ...sharedView(ctx, state),
+        audioUrl: state.phase === 'GUESSING' ? previewUrlFor(currentSong(state)) : null,
       };
     },
 
     getPlayerView(state, playerId, ctx) {
-      const song = currentSong(state);
       return {
-        phase: state.phase,
-        round: state.round,
-        totalRounds: state.totalRounds,
+        ...sharedView(ctx, state),
         myGuessSongId: state.guesses[playerId]?.songId ?? null,
-        guessedCount: guessedCount(ctx, state),
-        connectedCount: connectedPlayers(ctx).length,
-        song: state.phase === 'REVEAL' ? { title: song.title, artist: song.artist } : null,
         myResult: state.lastResults.find((r) => r.playerId === playerId) ?? null,
-        results: state.lastResults,
       };
     },
   };

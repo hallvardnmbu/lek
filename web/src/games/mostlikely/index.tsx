@@ -2,38 +2,18 @@ import { For, Show } from 'solid-js';
 import type {
   MostLikelyHostView,
   MostLikelyPlayerView,
-  MostLikelyTallyEntry,
 } from '../../../../shared/games/mostlikely';
-import type { GameUiDefinition, MobileGameViewProps, TvGameViewProps } from '../registry';
+import { TallyList } from '../../components/TallyList';
+import { secondsLeft, type GameUiDefinition, type MobileGameViewProps, type TvGameViewProps } from '../registry';
 import './mostlikely.css';
 
-function secondsLeft(props: { remainingMs: number | null }): number {
-  return Math.ceil((props.remainingMs ?? 0) / 1000);
-}
-
-function TallyList(props: { tally: MostLikelyTallyEntry[]; compact?: boolean }) {
-  const maxVotes = () => Math.max(1, props.tally[0]?.votes ?? 0);
-
-  return (
-    <div class={`ml-tally ${props.compact ? 'ml-tally-compact' : ''}`}>
-      <For each={props.tally}>
-        {(entry) => (
-          <div class={`ml-tally-row ${entry.isDrinker ? 'ml-drinker' : ''}`}>
-            <Show when={entry.isDrinker}>
-              <span class="ml-drinks-badge">DRINKS</span>
-            </Show>
-            <span class="ml-tally-name">{entry.name}</span>
-            <span class="ml-tally-votes">
-              {entry.votes} {entry.votes === 1 ? 'vote' : 'votes'}
-            </span>
-            <div class="ml-tally-bar">
-              <div class="ml-tally-fill" style={{ width: `${(entry.votes / maxVotes()) * 100}%` }} />
-            </div>
-          </div>
-        )}
-      </For>
-    </div>
-  );
+function toTallyEntries(tally: MostLikelyHostView['tally']) {
+  return tally.map((entry) => ({
+    playerId: entry.playerId,
+    name: entry.name,
+    votes: entry.votes,
+    highlighted: entry.isDrinker,
+  }));
 }
 
 function MostLikelyTvView(props: TvGameViewProps<MostLikelyHostView>) {
@@ -66,33 +46,28 @@ function MostLikelyTvView(props: TvGameViewProps<MostLikelyHostView>) {
           when={host()?.phase === 'VOTING'}
           fallback={
             <>
-              <TallyList tally={host()?.tally ?? []} />
+              <TallyList entries={toTallyEntries(host()?.tally ?? [])} badgeLabel="DRINKS" />
               <p class="ml-next-hint">
                 <Show
                   when={(host()?.round ?? 0) < (host()?.totalRounds ?? 0)}
                   fallback="Final results coming up…"
                 >
-                  Next round in {secondsLeft(props)}s
+                  Next round in {secondsLeft(props.remainingMs)}s
                 </Show>
               </p>
             </>
           }
         >
           <p class="ml-vote-progress">
-            {host()?.votedCount}/{host()?.connectedCount} votes in · {secondsLeft(props)}s
+            {host()?.votedCount}/{host()?.connectedCount} votes in · {secondsLeft(props.remainingMs)}s
           </p>
           <p class="tv-hero-sub">Vote on your phone. Majority verdict drinks.</p>
         </Show>
 
         <div class="tv-action-bar ml-tv-actions">
-          <Show
-            when={host()?.phase === 'VOTING'}
-            fallback={<button class="btn btn-tv" onClick={() => props.sendAction({ type: 'next' })}>Next Round</button>}
-          >
-            <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'next' })}>
-              Reveal Now
-            </button>
-          </Show>
+          <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'next' })}>
+            {host()?.phase === 'VOTING' ? 'Reveal Now' : 'Next Round'}
+          </button>
           <button class="btn btn-tv" onClick={props.endGame}>
             End Game
           </button>
@@ -106,7 +81,7 @@ function MostLikelyMobileView(props: MobileGameViewProps<MostLikelyPlayerView>) 
   const view = () => props.state.playerState;
 
   return (
-    <div class="mobile-card ml-mobile">
+    <div class="mobile-card">
       <div class="ml-mobile-head">
         <span>
           Round {view()?.round}/{view()?.totalRounds}
@@ -127,7 +102,7 @@ function MostLikelyMobileView(props: MobileGameViewProps<MostLikelyPlayerView>) 
               <Show when={view()?.iAmDrinking} fallback={<p class="ml-reveal-wait">The people have spoken.</p>}>
                 <p class="ml-drink-verdict">The verdict is you. Drink up.</p>
               </Show>
-              <TallyList tally={view()?.tally ?? []} compact />
+              <TallyList entries={toTallyEntries(view()?.tally ?? [])} badgeLabel="DRINKS" compact />
             </>
           }
         >

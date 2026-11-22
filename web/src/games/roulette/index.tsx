@@ -34,7 +34,7 @@ function RouletteTvView(props: TvGameViewProps<RouletteHostView>) {
             Spin Again
           </button>
         </Show>
-        <button class="btn btn-tv" onClick={props.endGame}>
+        <button class="btn btn-tv" onClick={() => props.endGame()}>
           End Game
         </button>
       </div>
@@ -47,23 +47,21 @@ function RouletteMobileView(props: MobileGameViewProps<RoulettePlayerView>) {
 
   const screenClass = () => {
     const v = view();
-    if (!v) return 'roulette-screen roulette-screen-idle';
-    if (v.phase === 'SPINNING') {
-      return v.isActive
-        ? 'roulette-screen roulette-screen-white'
-        : 'roulette-screen roulette-screen-idle';
-    }
-    return v.isSelected
-      ? 'roulette-screen roulette-screen-red'
-      : 'roulette-screen roulette-screen-idle';
+    const variant =
+      v?.phase === 'SPINNING'
+        ? v.isActive
+          ? 'white'
+          : 'idle'
+        : v?.isSelected
+          ? 'red'
+          : 'idle';
+    return `roulette-screen roulette-screen-${variant}`;
   };
 
   return (
     <div class={screenClass()}>
-      <Show when={view()?.phase === 'SPINNING'}>
-        <Show when={!view()?.isActive}>
-          <p class="roulette-screen-sub">Watch the phones…</p>
-        </Show>
+      <Show when={view()?.phase === 'SPINNING' && !view()?.isActive}>
+        <p class="roulette-screen-sub">Watch the phones…</p>
       </Show>
 
       <Show when={view()?.phase === 'STOPPED'}>

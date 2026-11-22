@@ -200,10 +200,6 @@ h2,
   font-size: 0.8rem;
   font-weight: 800;
 }
-.conn-pill.online {
-  background: rgba(16, 185, 129, 0.18);
-  color: #6ee7b7;
-}
 .conn-pill.offline {
   background: var(--ink);
   color: #fca5a5;
@@ -215,7 +211,6 @@ h2,
   gap: 1rem;
 }
 
-.round-pill,
 .timer-pill,
 .room-code-badge,
 .audio-pill {
@@ -431,11 +426,6 @@ h2,
   cursor: pointer;
 }
 
-.hint {
-  color: var(--muted);
-  font-size: 1rem;
-}
-
 .tv-action-bar {
   margin-top: 2rem;
   display: flex;
@@ -447,8 +437,7 @@ h2,
   padding: 1.05rem 2.4rem;
 }
 
-.tv-phase-center,
-.tv-matchup-stage {
+.tv-phase-center {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -500,112 +489,92 @@ h2,
   background: rgba(16, 185, 129, 0.15);
 }
 
-.matchup-counter {
-  font-size: 1rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  color: var(--accent);
-}
-
-.tv-prompt-banner {
-  font-size: 2.5rem;
-  max-width: 1100px;
-  margin: 0.75rem 0 2rem;
-}
-
-.options-grid {
+.tally-list {
   width: 100%;
-  max-width: 1300px;
+  max-width: 760px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-  gap: 1.5rem;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
 }
 
-.answer-card {
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: 20px;
-  padding: 2rem;
-  text-align: left;
+.tally-row {
   position: relative;
-}
-
-.answer-card.sweep {
-  border-color: var(--accent);
-  box-shadow: 0 0 24px rgba(245, 158, 11, 0.18);
-}
-
-.answer-letter {
-  display: inline-grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-weight: 900;
-  margin-bottom: 0.75rem;
-}
-
-.answer-text {
-  font-size: 1.8rem;
-  font-weight: 700;
-  margin: 0;
-}
-
-.sweep-badge {
-  display: inline-block;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-size: 0.85rem;
-  font-weight: 900;
-  padding: 0.25rem 0.65rem;
-  border-radius: 8px;
-  margin-bottom: 0.75rem;
-}
-
-.result-meta {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 1.25rem;
-  font-size: 1.2rem;
-  font-weight: 700;
-}
-
-.points-earned {
-  color: var(--success);
-}
-
-.voter-names {
-  margin-top: 0.5rem;
-  color: var(--muted);
-  font-size: 1rem;
-}
-
-.voter-strip {
-  margin-top: 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
-}
-
-.voter-dots {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.voter-badge {
+  gap: 0.4rem 1rem;
   background: var(--surface);
   border: 1px solid var(--border);
-  padding: 0.4rem 0.9rem;
-  border-radius: 999px;
+  border-radius: 12px;
+  padding: 0.75rem 1.1rem;
+  font-weight: 700;
+  overflow: hidden;
 }
 
-.voter-badge.voted {
-  border-color: var(--success);
-  color: #6ee7b7;
+.tally-row.tally-accent {
+  border-color: var(--accent);
+}
+
+.tally-row.tally-danger {
+  border-color: var(--danger);
+}
+
+.tally-name {
+  position: relative;
+  z-index: 1;
+}
+
+.tally-badge {
+  position: relative;
+  z-index: 1;
+  justify-self: start;
+  grid-column: 1;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  padding: 0.12rem 0.5rem;
+  border-radius: 6px;
+}
+
+.tally-accent .tally-badge {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.tally-danger .tally-badge {
+  background: var(--danger);
+  color: #fff;
+}
+
+.tally-votes {
+  position: relative;
+  z-index: 1;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.tally-bar {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.tally-fill {
+  height: 100%;
+  background: var(--surface-2);
+}
+
+.tally-accent .tally-fill {
+  background: var(--accent-soft);
+}
+
+.tally-danger .tally-fill {
+  background: rgba(239, 68, 68, 0.16);
+}
+
+.tally-compact .tally-row {
+  padding: 0.55rem 0.9rem;
+  font-size: 0.95rem;
 }
 
 .podium-list {
@@ -753,8 +722,7 @@ h2,
   font-weight: 600;
 }
 
-.field input,
-.answer-form textarea {
+.field input {
   width: 100%;
   background: var(--bg);
   color: var(--text);
@@ -766,8 +734,7 @@ h2,
   transition: border-color 0.15s ease;
 }
 
-.field input:focus,
-.answer-form textarea:focus {
+.field input:focus {
   outline: none;
   border-color: var(--accent);
 }
@@ -840,21 +807,10 @@ h2,
   color: var(--muted);
 }
 
-.vote-buttons {
-  display: grid;
-  gap: 0.85rem;
-  margin-top: 1rem;
-}
-
 .btn-vote {
   text-align: left;
   align-items: flex-start;
   padding: 1rem 1.1rem;
-}
-
-.own-tag {
-  color: var(--muted);
-  font-weight: 500;
 }
 
 /* Game Selector (TV & Mobile) */

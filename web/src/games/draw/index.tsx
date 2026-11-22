@@ -4,6 +4,17 @@ import type { GameUiDefinition, MobileGameViewProps, TvGameViewProps } from '../
 import { DrawCanvas } from './DrawCanvas';
 import './draw.css';
 
+function DrawingThumb(props: { src: string; alt: string; placeholder: string; class?: string }) {
+  return (
+    <Show
+      when={props.src}
+      fallback={<div class="draw-tv-placeholder">{props.placeholder}</div>}
+    >
+      {(src) => <img class={props.class} src={src()} alt={props.alt} />}
+    </Show>
+  );
+}
+
 function DrawTvView(props: TvGameViewProps<DrawHostView>) {
   const hs = () => props.state.hostState;
 
@@ -45,12 +56,12 @@ function DrawTvView(props: TvGameViewProps<DrawHostView>) {
                 <For each={view().entries}>
                   {(entry) => (
                     <div class="draw-tv-card">
-                      <Show
-                        when={entry.imageData}
-                        fallback={<div class="draw-tv-placeholder">Drawing...</div>}
-                      >
-                        {(src) => <img class="draw-tv-thumb" src={src()} alt={entry.playerName} />}
-                      </Show>
+                      <DrawingThumb
+                        src={entry.imageData}
+                        alt={entry.playerName}
+                        placeholder="Drawing..."
+                        class="draw-tv-thumb"
+                      />
                       <div class="draw-tv-card-footer">
                         <span>{entry.playerName}</span>
                         <Show when={entry.submitted}>
@@ -68,12 +79,12 @@ function DrawTvView(props: TvGameViewProps<DrawHostView>) {
                 <For each={view().entries}>
                   {(entry, idx) => (
                     <div class="draw-tv-card">
-                      <Show
-                        when={entry.imageData}
-                        fallback={<div class="draw-tv-placeholder">Blank</div>}
-                      >
-                        {(src) => <img class="draw-tv-thumb" src={src()} alt={`Drawing ${idx() + 1}`} />}
-                      </Show>
+                      <DrawingThumb
+                        src={entry.imageData}
+                        alt={`Drawing ${idx() + 1}`}
+                        placeholder="Blank"
+                        class="draw-tv-thumb"
+                      />
                       <div class="draw-tv-card-footer">
                         <span>Drawing #{idx() + 1}</span>
                       </div>
@@ -102,12 +113,12 @@ function DrawTvView(props: TvGameViewProps<DrawHostView>) {
                 <For each={view().results}>
                   {(res) => (
                     <div class={`draw-tv-card ${res.isWinner ? 'winner' : ''}`}>
-                      <Show
-                        when={res.imageData}
-                        fallback={<div class="draw-tv-placeholder">Blank</div>}
-                      >
-                        {(src) => <img class="draw-tv-thumb" src={src()} alt={res.playerName} />}
-                      </Show>
+                      <DrawingThumb
+                        src={res.imageData}
+                        alt={res.playerName}
+                        placeholder="Blank"
+                        class="draw-tv-thumb"
+                      />
                       <div class="draw-tv-card-footer">
                         <span>{res.playerName}</span>
                         <span class={`draw-tag ${res.isWinner ? 'winner' : ''}`}>
@@ -222,12 +233,11 @@ function DrawMobileView(props: MobileGameViewProps<DrawPlayerView>) {
                         })
                       }
                     >
-                      <Show
-                        when={entry.imageData}
-                        fallback={<div class="draw-tv-placeholder">Blank</div>}
-                      >
-                        {(src) => <img src={src()} alt={`Option ${idx() + 1}`} />}
-                      </Show>
+                      <DrawingThumb
+                        src={entry.imageData}
+                        alt={`Option ${idx() + 1}`}
+                        placeholder="Blank"
+                      />
                       <span>#{idx() + 1}</span>
                     </button>
                   )}
@@ -249,7 +259,7 @@ function DrawMobileView(props: MobileGameViewProps<DrawPlayerView>) {
                   </p>
                 )}
               </Show>
-              <div style={{ display: 'grid', gap: '0.75rem', 'margin-top': '1rem' }}>
+              <div class="draw-mobile-actions">
                 <button
                   type="button"
                   class="btn btn-block"

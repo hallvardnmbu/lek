@@ -1,0 +1,299 @@
+import type {
+  PriceGuessAction,
+  PriceGuessHostView,
+  PriceGuessPhase,
+  PriceGuessPlayerView,
+  PriceGuessProductInfo,
+  PriceGuessResultEntry,
+} from '../../shared/games/priceguess';
+import type { GameContext, GameDefinition } from '../game';
+import { connectedPlayers } from './helpers';
+import {
+  fetchRandomProduct,
+  type PriceGuessProduct,
+  type ProductFetcher,
+} from './priceguess-db';
+
+const POLL_MS = 120;
+const ROUND_DURATION_MS = 30_000;
+
+interface GuessEntry {
+  price: number;
+  diff: number;
+}
+
+interface PriceGuessInbox {
+  round: number;
+  product?: PriceGuessProduct;
+  error?: string;
+}
+
+interface PriceGuessState {
+  phase: PriceGuessPhase;
+  round: number;
+  product: PriceGuessProduct | null;
+  guesses: Record<string, GuessEntry>;
+  usedIds: string[];
+  winnerId: string | null;
+  drinkerId: string | null;
+  error: string | null;
+  inbox: PriceGuessInbox;
+}
+
+function toProductInfo(product: PriceGuessProduct | null): PriceGuessProductInfo | null {
+  if (!product) return null;
+  return {
+    name: product.name,
+    category: product.category,
+    subcategory: product.subcategory,
+    country: product.country,
+    district: product.district,
+    description: product.description,
+    alcohol: product.alcohol,
+    year: product.year,
+    imageUrl: product.imageUrl,
+  };
+}
+
+function startRound(
+  ctx: GameContext,
+  fetcher: ProductFetcher,
+  round: number,
+  previousUsedIds: string[]
+): PriceGuessState {
+  const inbox: PriceGuessInbox = { round };
+  const usedIds = previousUsedIds.length >= 100 ? [] : [...previousUsedIds];
+
+  fetcher(usedIds)
+    .then((product) => {
+      if (inbox.round === round) {
+        inbox.product = product;
+      }
+    })
+    .catch((err) => {
+      if (inbox.round === round) {
+        inbox.error = err instanceof Error ? err.message : 'Failed to load product.';
+      }
+    });
+
+  ctx.setTimer(POLL_MS);
+
+  return {
+    phase: 'LOADING',
+    round,
+    product: null,
+    guesses: {},
+    usedIds,
+    winnerId: null,
+    drinkerId: null,
+    error: null,
+    inbox,
+  };
+}
+
+function revealRound(ctx: GameContext, state: PriceGuessState): void {
+  if (state.phase !== 'GUESSING') return;
+
+  ctx.clearTimer();
+  state.phase = 'REVEAL';
+
+  const players = ctx.getPlayers();
+  const submitted = players
+    .filter((p) => Boolean(state.guesses[p.id]))
+    .map((p) => ({
+      id: p.id,
+      diff: state.guesses[p.id].diff,
+    }))
+    .sort((a, b) => a.diff - b.diff);
+
+  const winner = submitted[0] ?? null;
+  state.winnerId = winner ? winner.id : null;
+  if (winner) {
+    ctx.addPlayerScore(winner.id, 1);
+  }
+
+  state.drinkerId = null;
+  const activePlayers = players.filter((p) => p.connected || state.guesses[p.id]);
+  if (activePlayers.length >= 2) {
+    const nonSubmitters = activePlayers.filter((p) => !state.guesses[p.id]);
+    if (nonSubmitters.length > 0) {
+      state.drinkerId = nonSubmitters[0].id;
+    } else if (submitted.length >= 2) {
+      state.drinkerId = submitted[submitted.length - 1].id;
+    }
+  }
+
+  ctx.broadcastEvent('priceguess_reveal', {
+    winnerId: state.winnerId,
+    drinkerId: state.drinkerId,
+    actualPrice: state.product?.price ?? null,
+  });
+}
+
+function maybeRevealOnAllGuessed(ctx: GameContext, state: PriceGuessState): void {
+  if (state.phase !== 'GUESSING') return;
+  const connected = connectedPlayers(ctx);
+  if (connected.length > 0 && connected.every((p) => Boolean(state.guesses[p.id]))) {
+    revealRound(ctx, state);
+  }
+}
+
+function playerName(ctx: GameContext, playerId: string | null): string | null {
+  return playerId ? (ctx.getPlayer(playerId)?.name ?? null) : null;
+}
+
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function buildResultEntries(ctx: GameContext, state: PriceGuessState): PriceGuessResultEntry[] {
+  const isReveal = state.phase === 'REVEAL';
+  return ctx
+    .getPlayers()
+    .map((p) => {
+      const guess = state.guesses[p.id];
+      return {
+        playerId: p.id,
+        name: p.name,
+        guess: isReveal && guess ? roundMoney(guess.price) : null,
+        diff: isReveal && guess ? roundMoney(guess.diff) : null,
+        isWinner: isReveal && state.winnerId === p.id,
+        drinks: isReveal && state.drinkerId === p.id,
+        connected: p.connected,
+        score: p.score,
+      };
+    })
+    .sort((a, b) => {
+      if (isReveal) {
+        if (a.diff !== null && b.diff !== null) {
+          return a.diff - b.diff;
+        }
+        if (a.diff !== null) return -1;
+        if (b.diff !== null) return 1;
+      }
+      return b.score - a.score || a.name.localeCompare(b.name);
+    });
+}
+
+export function createPriceGuessGame(
+  fetcher: ProductFetcher = fetchRandomProduct
+): GameDefinition<PriceGuessState, PriceGuessHostView, PriceGuessPlayerView, PriceGuessAction> {
+  return {
+    id: 'priceguess',
+    name: 'Price Guess',
+    description: 'Guess the price of a random bottle. Closest wins, furthest drinks!',
+    minPlayers: 1,
+    maxPlayers: 12,
+
+    onStart(ctx) {
+      return startRound(ctx, fetcher, 1, []);
+    },
+
+    onPlayerAction(ctx, state, playerId, action) {
+      const a = action as PriceGuessAction;
+
+      if (a.type === 'next_round' || a.type === 'skip_product') {
+        if (state.phase === 'REVEAL' || (a.type === 'skip_product' && state.phase !== 'LOADING')) {
+          ctx.clearTimer();
+          return startRound(ctx, fetcher, state.round + 1, state.usedIds);
+        }
+        return state;
+      }
+
+      if (a.type !== 'submit_guess') return state;
+      if (state.phase !== 'GUESSING' || !state.product) return state;
+
+      const price = Number(a.payload?.price);
+      if (!Number.isFinite(price) || price < 0) return state;
+
+      state.guesses[playerId] = {
+        price,
+        diff: Math.abs(price - state.product.price),
+      };
+
+      maybeRevealOnAllGuessed(ctx, state);
+      return state;
+    },
+
+    onHostAction(ctx, state, action) {
+      if (action.type === 'next_round' || action.type === 'skip_product') {
+        ctx.clearTimer();
+        return startRound(ctx, fetcher, state.round + 1, state.usedIds);
+      }
+      return state;
+    },
+
+    onTimerExpired(ctx, state) {
+      if (state.phase === 'LOADING') {
+        if (state.inbox.error) {
+          state.error = state.inbox.error;
+          return state;
+        }
+        if (state.inbox.product) {
+          state.product = state.inbox.product;
+          state.usedIds.push(state.inbox.product.id);
+          state.phase = 'GUESSING';
+          ctx.setTimer(ROUND_DURATION_MS);
+          return state;
+        }
+        ctx.setTimer(POLL_MS);
+        return state;
+      }
+
+      if (state.phase === 'GUESSING') {
+        revealRound(ctx, state);
+      }
+
+      return state;
+    },
+
+    onPlayerDisconnect(ctx, state) {
+      maybeRevealOnAllGuessed(ctx, state);
+      return state;
+    },
+
+    onPlayerLeave(ctx, state, playerId) {
+      delete state.guesses[playerId];
+      maybeRevealOnAllGuessed(ctx, state);
+      return state;
+    },
+
+    getHostView(state, ctx): PriceGuessHostView {
+      const connected = connectedPlayers(ctx);
+      const lockedCount = connected.filter((p) => Boolean(state.guesses[p.id])).length;
+      const isReveal = state.phase === 'REVEAL';
+
+      return {
+        phase: state.phase,
+        round: state.round,
+        product: toProductInfo(state.product),
+        actualPrice: isReveal && state.product ? roundMoney(state.product.price) : null,
+        lockedCount,
+        totalCount: connected.length,
+        players: buildResultEntries(ctx, state),
+        winnerName: playerName(ctx, state.winnerId),
+        drinkerName: playerName(ctx, state.drinkerId),
+        error: state.error,
+      };
+    },
+
+    getPlayerView(state, playerId): PriceGuessPlayerView {
+      const guess = state.guesses[playerId];
+      const isReveal = state.phase === 'REVEAL';
+
+      return {
+        phase: state.phase,
+        round: state.round,
+        productName: state.product?.name ?? null,
+        lockedIn: Boolean(guess),
+        guess: guess ? roundMoney(guess.price) : null,
+        actualPrice: isReveal && state.product ? roundMoney(state.product.price) : null,
+        diff: isReveal && guess ? roundMoney(guess.diff) : null,
+        isWinner: isReveal && state.winnerId === playerId,
+        drinks: isReveal && state.drinkerId === playerId,
+      };
+    },
+  };
+}
+
+export const priceGuessGame = createPriceGuessGame();

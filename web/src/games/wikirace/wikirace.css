@@ -91,9 +91,7 @@
 }
 
 .wr-tv-actions {
-  display: flex;
   gap: 1rem;
-  justify-content: center;
 }
 
 .wr-mobile-wrap {
@@ -187,27 +185,6 @@
 .wr-article-body.is-loading {
   opacity: 0.55;
   pointer-events: none;
-}
-
-.wr-article-body img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 6px;
-}
-
-.wr-article-body table {
-  max-width: 100%;
-  display: block;
-  overflow-x: auto;
-  border-collapse: collapse;
-  font-size: 0.85rem;
-  margin: 0.75rem 0;
-}
-
-.wr-article-body th,
-.wr-article-body td {
-  border: 1px solid var(--border);
-  padding: 0.35rem 0.5rem;
 }
 
 .wr-article-body .wr-link {

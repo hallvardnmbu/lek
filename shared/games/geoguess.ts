@@ -41,9 +41,6 @@ export interface GeoGuessPlayerView {
   distanceKm: number | null;
   isWinner: boolean;
   drinks: boolean;
-  winnerName: string | null;
-  drinkerName: string | null;
-  error: string | null;
 }
 
 export type GeoGuessAction =

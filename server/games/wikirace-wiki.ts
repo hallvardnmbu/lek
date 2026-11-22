@@ -104,17 +104,26 @@ function extractWikiTarget(href: string): string | null {
   return title || null;
 }
 
+const DROPPED_SELECTOR =
+  'img, picture, svg, figure, figcaption, table, caption, .thumb, .thumbcaption, .gallery, .gallerytext';
+
 export function sanitizeWikiHtml(rawHtml: string): { html: string; links: string[] } {
   const linkSet = new Set<string>();
 
-  let cleaned = rawHtml
+  const stripped = new HTMLRewriter()
+    .on(DROPPED_SELECTOR, {
+      element(el) {
+        el.remove();
+      },
+    })
+    .transform(rawHtml);
+
+  let cleaned = stripped
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
     .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
     .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, '')
     .replace(/<(link|meta|iframe|object|embed)\b[^>]*>/gi, '')
-    .replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-    .replace(/\s+srcset\s*=\s*(?:"[^"]*"|'[^']*')/gi, '')
-    .replace(/src="\/\/upload\.wikimedia\.org\//gi, 'src="https://upload.wikimedia.org/');
+    .replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
 
   cleaned = cleaned.replace(
     /<a\b([^>]*?)href\s*=\s*(?:"([^"]*)"|'([^']*)')([^>]*)>([\s\S]*?)<\/a>/gi,
@@ -135,10 +144,6 @@ export function sanitizeWikiHtml(rawHtml: string): { html: string; links: string
   };
 }
 
-function getCachedArticle(title: string): WikiArticle | undefined {
-  return articleCache.get(normalizeTitle(title));
-}
-
 function setCachedArticle(requestedTitle: string, article: WikiArticle): void {
   if (articleCache.size >= CACHE_LIMIT) {
     const oldest = articleCache.keys().next().value;
@@ -148,15 +153,11 @@ function setCachedArticle(requestedTitle: string, article: WikiArticle): void {
   articleCache.set(normalizeTitle(article.title), article);
 }
 
-export function getCachedWikiArticle(title: string): WikiArticle | undefined {
-  return getCachedArticle(title);
-}
-
 export async function fetchWikiArticle(
   title: string,
   fetchImpl: typeof fetch = fetch
 ): Promise<WikiArticle> {
-  const cached = getCachedArticle(title);
+  const cached = articleCache.get(normalizeTitle(title));
   if (cached) return cached;
 
   const url =

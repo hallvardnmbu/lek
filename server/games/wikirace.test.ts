@@ -10,8 +10,6 @@ interface TestPlayer {
 }
 
 function createTestCtx(players: TestPlayer[]) {
-  const timers: number[] = [];
-  let cleared = 0;
   const events: Array<{ event: string; payload: unknown }> = [];
 
   const toGamePlayers = () =>
@@ -30,10 +28,8 @@ function createTestCtx(players: TestPlayer[]) {
     setPlayerScore: () => {},
     addPlayerScore: () => {},
     setPlayerMeta: () => {},
-    setTimer: (ms) => timers.push(ms),
-    clearTimer: () => {
-      cleared++;
-    },
+    setTimer: () => {},
+    clearTimer: () => {},
     broadcastEvent: (event, payload) => events.push({ event, payload }),
     sendEventToHost: () => {},
     sendEventToPlayer: () => {},
@@ -41,7 +37,7 @@ function createTestCtx(players: TestPlayer[]) {
     endGame: () => {},
   };
 
-  return { ctx, timers, events, getCleared: () => cleared };
+  return { ctx, events };
 }
 
 async function flushMicrotasks(): Promise<void> {
@@ -66,6 +62,29 @@ describe('Wikipedia Race sanitization', () => {
     expect(html).toContain('data-wiki-title="2001: A Space Odyssey"');
     expect(html).toContain('data-wiki-title="Moon"');
     expect(links).toEqual(['2001: A Space Odyssey', 'Moon']);
+  });
+
+  it('drops images, tables, and captions along with links inside them', () => {
+    const raw = [
+      '<p>Lead <a href="/wiki/Earth">Earth</a> text.</p>',
+      '<figure><a href="/wiki/File:Globe.png"><img src="globe.png" alt="Globe" /></a><figcaption>A <a href="/wiki/Globe">globe</a> caption</figcaption></figure>',
+      '<div class="thumb tright"><div class="thumbinner"><img src="thumb.jpg" /><div class="thumbcaption">Thumb <a href="/wiki/Map">map</a></div></div></div>',
+      '<table class="infobox"><caption>Table <a href="/wiki/Summary">summary</a></caption><tr><td><table><tr><td><a href="/wiki/Nested">Nested</a></td></tr></table></td></tr></table>',
+      '<p>Trail <a href="/wiki/Mars">Mars</a> text.</p>',
+    ].join('');
+
+    const { html, links } = sanitizeWikiHtml(raw);
+    expect(html).not.toContain('<img');
+    expect(html).not.toContain('<figure');
+    expect(html).not.toContain('<figcaption');
+    expect(html).not.toContain('<table');
+    expect(html).not.toContain('<caption');
+    expect(html).not.toContain('thumbcaption');
+    expect(html).not.toContain('globe caption');
+    expect(html).not.toContain('Nested');
+    expect(html).toContain('Lead');
+    expect(html).toContain('Trail');
+    expect(links).toEqual(['Earth', 'Mars']);
   });
 });
 
@@ -173,7 +192,6 @@ describe('Wikipedia Race game', () => {
     }));
 
     let state = game.onStart(ctx);
-    state.targetTitle = 'Goal';
     await flushMicrotasks();
     state = game.onTimerExpired!(ctx, state)!;
     state.targetTitle = 'Goal';

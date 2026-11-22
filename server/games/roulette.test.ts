@@ -50,7 +50,7 @@ const threePlayers: TestPlayer[] = [
 ];
 
 describe('Roulette game', () => {
-  it('slows down step delays monotonically and totals ~40 seconds', () => {
+  it('slows down step delays monotonically and totals ~20 seconds', () => {
     const totalSteps = 55;
     const first = computeStepDelayMs(0, totalSteps);
     const mid = computeStepDelayMs(27, totalSteps);
@@ -63,8 +63,8 @@ describe('Roulette game', () => {
     for (let i = 0; i < totalSteps; i++) {
       sum += computeStepDelayMs(i, totalSteps);
     }
-    expect(sum).toBeGreaterThanOrEqual(39_900);
-    expect(sum).toBeLessThanOrEqual(40_100);
+    expect(sum).toBeGreaterThanOrEqual(19_900);
+    expect(sum).toBeLessThanOrEqual(20_100);
   });
 
   it('cycles active player around the room until stopping on one selected player', () => {

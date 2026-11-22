@@ -12,8 +12,6 @@ function makeContext(playersInput: Array<{ id: string; name: string; connected?:
     meta: {},
   }));
 
-  let timerCalls = 0;
-  let cleared = 0;
   const events: Array<{ event: string; payload: unknown }> = [];
 
   const ctx: GameContext = {
@@ -29,12 +27,8 @@ function makeContext(playersInput: Array<{ id: string; name: string; connected?:
       if (p) p.score += delta;
     },
     setPlayerMeta: () => {},
-    setTimer: () => {
-      timerCalls += 1;
-    },
-    clearTimer: () => {
-      cleared += 1;
-    },
+    setTimer: () => {},
+    clearTimer: () => {},
     broadcastEvent: (event, payload) => {
       events.push({ event, payload });
     },
@@ -47,8 +41,6 @@ function makeContext(playersInput: Array<{ id: string; name: string; connected?:
   return {
     ctx,
     players,
-    getTimerCalls: () => timerCalls,
-    getCleared: () => cleared,
     events,
   };
 }

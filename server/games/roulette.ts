@@ -5,6 +5,7 @@ import type {
   RouletteState,
 } from '../../shared/games/roulette';
 import type { GameContext, GameDefinition } from '../game';
+import { connectedOrAllPlayers } from './helpers';
 
 const TOTAL_SPIN_MS = 20_000;
 const WEIGHT_GROWTH = 18;
@@ -27,14 +28,8 @@ export function computeStepDelayMs(step: number, totalSteps: number): number {
   return Math.max(50, Math.round((TOTAL_SPIN_MS * stepWeight(step, totalSteps)) / totalWeight));
 }
 
-function getSpinPool(ctx: GameContext): string[] {
-  const connected = ctx.getPlayers().filter((p) => p.connected);
-  const pool = connected.length > 0 ? connected : ctx.getPlayers();
-  return pool.map((p) => p.id);
-}
-
 function startSpin(ctx: GameContext): RouletteState {
-  const playerOrder = getSpinPool(ctx);
+  const playerOrder = connectedOrAllPlayers(ctx).map((p) => p.id);
   if (playerOrder.length === 0) {
     ctx.clearTimer();
     return {
@@ -67,6 +62,21 @@ function startSpin(ctx: GameContext): RouletteState {
 function activePlayerId(state: RouletteState): string | null {
   if (state.playerOrder.length === 0) return null;
   return state.playerOrder[state.activeIndex % state.playerOrder.length] ?? null;
+}
+
+function selectedPlayerName(ctx: GameContext, selectedId: string | null): string | null {
+  return selectedId ? (ctx.getPlayer(selectedId)?.name ?? null) : null;
+}
+
+function maybeRespin(
+  ctx: GameContext,
+  state: RouletteState,
+  action: { type: string }
+): RouletteState {
+  if (action.type === 'spin' && state.phase === 'STOPPED') {
+    return startSpin(ctx);
+  }
+  return state;
 }
 
 export const rouletteGame: GameDefinition<
@@ -112,17 +122,11 @@ export const rouletteGame: GameDefinition<
   },
 
   onPlayerAction(ctx, state, _playerId, action) {
-    if (action.type === 'spin' && state.phase === 'STOPPED') {
-      return startSpin(ctx);
-    }
-    return state;
+    return maybeRespin(ctx, state, action);
   },
 
   onHostAction(ctx, state, action) {
-    if (action.type === 'spin' && state.phase === 'STOPPED') {
-      return startSpin(ctx);
-    }
-    return state;
+    return maybeRespin(ctx, state, action);
   },
 
   getHostView(state, ctx): RouletteHostView {
@@ -133,26 +137,22 @@ export const rouletteGame: GameDefinition<
       isActive: state.phase === 'SPINNING' && p.id === currentId,
       isSelected: state.phase === 'STOPPED' && p.id === state.selectedId,
     }));
-    const selectedName =
-      state.selectedId ? (ctx.getPlayer(state.selectedId)?.name ?? null) : null;
 
     return {
       phase: state.phase,
       players,
-      selectedName,
+      selectedName: selectedPlayerName(ctx, state.selectedId),
     };
   },
 
   getPlayerView(state, playerId, ctx): RoulettePlayerView {
     const currentId = activePlayerId(state);
-    const selectedName =
-      state.selectedId ? (ctx.getPlayer(state.selectedId)?.name ?? null) : null;
 
     return {
       phase: state.phase,
       isActive: state.phase === 'SPINNING' && currentId === playerId,
       isSelected: state.phase === 'STOPPED' && state.selectedId === playerId,
-      selectedName,
+      selectedName: selectedPlayerName(ctx, state.selectedId),
     };
   },
 };

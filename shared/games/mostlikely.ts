@@ -7,15 +7,6 @@ export interface MostLikelyTallyEntry {
   isDrinker: boolean;
 }
 
-/**
- * Shared mutable inbox written by the async prompt generator and read by the
- * game loop. Kept as a stable reference inside the state so prompt delivery
- * survives state object copies.
- */
-export interface MostLikelyAiInbox {
-  prompts: string[] | null;
-}
-
 export interface MostLikelyCandidate {
   id: string;
   name: string;
@@ -30,8 +21,7 @@ export interface MostLikelyState {
   votes: Record<string, string>;
   tally: MostLikelyTallyEntry[];
   drinkerIds: string[];
-  aiInbox: MostLikelyAiInbox;
-  aiLoaded: boolean;
+  aiInbox: { prompts: string[] | null };
   fallbackPrompts: string[] | null;
 }
 
@@ -44,7 +34,6 @@ export interface MostLikelyHostView {
   votedCount: number;
   connectedCount: number;
   tally: MostLikelyTallyEntry[];
-  drinkerNames: string[];
 }
 
 export interface MostLikelyPlayerView {

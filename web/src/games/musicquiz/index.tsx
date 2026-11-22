@@ -4,13 +4,9 @@ import {
   type MusicQuizPlayerView,
   type MusicQuizSong,
 } from '../../../../shared/games/musicquiz';
-import type { GameUiDefinition, MobileGameViewProps, TvGameViewProps } from '../registry';
+import { secondsLeft, type GameUiDefinition, type MobileGameViewProps, type TvGameViewProps } from '../registry';
 import { loadQuizCatalog, quizCatalog } from './catalog';
 import './musicquiz.css';
-
-function secondsLeft(props: { remainingMs: number | null }): number {
-  return Math.ceil((props.remainingMs ?? 0) / 1000);
-}
 
 function MusicQuizTvView(props: TvGameViewProps<MusicQuizHostView>) {
   const view = () => props.state.hostState;
@@ -66,9 +62,9 @@ function MusicQuizTvView(props: TvGameViewProps<MusicQuizHostView>) {
   const nextHint = () => {
     const v = view();
     if (!v) return '';
-    if (v.phase === 'INTRO') return `Song starts in ${secondsLeft(props)}s`;
+    if (v.phase === 'INTRO') return `Song starts in ${secondsLeft(props.remainingMs)}s`;
     if (v.phase === 'REVEAL') {
-      return v.round < v.totalRounds ? `Next round in ${secondsLeft(props)}s` : 'Final scores coming up';
+      return v.round < v.totalRounds ? `Next round in ${secondsLeft(props.remainingMs)}s` : 'Final scores coming up';
     }
     return '';
   };
@@ -203,8 +199,10 @@ function MusicQuizMobileView(props: MobileGameViewProps<MusicQuizPlayerView>) {
     return 'Reveal';
   });
 
+  const lockedSong = createMemo(() => songById(view()?.myGuessSongId));
+
   return (
-    <div class="mobile-card mq-mobile">
+    <div class="mobile-card">
       <div class="mq-head">
         <span>
           Round {view()?.round}/{view()?.totalRounds}
@@ -223,8 +221,8 @@ function MusicQuizMobileView(props: MobileGameViewProps<MusicQuizPlayerView>) {
           fallback={
             <div class="mq-locked">
               <p class="mq-locked-label">LOCKED IN</p>
-              <p class="mq-locked-song">{songById(view()?.myGuessSongId)?.title}</p>
-              <p class="mq-locked-artist">{songById(view()?.myGuessSongId)?.artist}</p>
+              <p class="mq-locked-song">{lockedSong()?.title}</p>
+              <p class="mq-locked-artist">{lockedSong()?.artist}</p>
               <p class="muted">Waiting for the reveal…</p>
             </div>
           }

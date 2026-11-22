@@ -308,14 +308,7 @@ export class RoomManager {
       };
     }
 
-    this.clearTimers(room);
-    room.lastActivityAt = Date.now();
-    room.phase = 'GAME_SELECT';
-    room.roundId = crypto.randomUUID();
-    room.phaseEndsAt = null;
-    room.gameState = null;
-    room.gameVotes.clear();
-    room.gameVotes.clear();
+    this.resetRoomPhase(room, 'GAME_SELECT');
 
     this.broadcastState(room);
     return { ok: true, room };
@@ -596,13 +589,7 @@ export class RoomManager {
     if (!auth.ok) return auth;
     const { room } = auth;
 
-    this.clearTimers(room);
-    room.lastActivityAt = Date.now();
-    room.phase = 'LOBBY';
-    room.roundId = crypto.randomUUID();
-    room.phaseEndsAt = null;
-    room.gameState = null;
-    room.gameVotes.clear();
+    this.resetRoomPhase(room, 'LOBBY');
 
     for (const p of room.players.values()) {
       p.score = 0;
@@ -633,12 +620,12 @@ export class RoomManager {
 
     const { minPlayers, maxPlayers } = this.getLimits(room);
     const game = this.getActiveGame(room);
-    const ctx = this.createGameContext(room);
 
     let hostState: unknown = undefined;
     let playerState: unknown = undefined;
 
     if (game && room.gameState !== null && (room.phase === 'PLAYING' || room.phase === 'ENDED')) {
+      const ctx = this.createGameContext(room);
       if (playerId) {
         playerState = game.getPlayerView(room.gameState, playerId, ctx);
       } else {
@@ -694,6 +681,16 @@ export class RoomManager {
       this.clearTimers(room);
     }
     this.rooms.clear();
+  }
+
+  private resetRoomPhase(room: InternalRoom, phase: RoomPhase): void {
+    this.clearTimers(room);
+    room.lastActivityAt = Date.now();
+    room.phase = phase;
+    room.roundId = crypto.randomUUID();
+    room.phaseEndsAt = null;
+    room.gameState = null;
+    room.gameVotes.clear();
   }
 
   private requireAuthorizedRoom(

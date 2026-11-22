@@ -39,10 +39,6 @@
   background: linear-gradient(rgba(10, 14, 18, 0.8), transparent);
 }
 
-.tk-topbar .tk-clock {
-  font-variant-numeric: tabular-nums;
-}
-
 .tk-feed {
   position: absolute;
   top: 3.4rem;
