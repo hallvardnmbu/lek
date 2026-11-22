@@ -49,21 +49,25 @@ export function refreshPreviews(songs: MusicQuizSong[]): void {
   }
 }
 
-async function fetchFreshPreview(song: MusicQuizSong): Promise<string | null> {
-  if (!song.deezerId) return null;
+async function fetchDeezerJson<T extends { error?: unknown }>(url: string): Promise<T | null> {
   try {
-    const res = await fetch(`${DEEZER_API_URL}/track/${song.deezerId}`);
+    const res = await fetch(url);
     if (!res.ok) return null;
-    const data = (await res.json()) as DeezerTrackResponse;
-    if (data.error || typeof data.preview !== 'string' || !data.preview) return null;
-    return data.preview;
+    const data = (await res.json()) as T;
+    return data.error ? null : data;
   } catch {
     return null;
   }
 }
 
+async function fetchFreshPreview(song: MusicQuizSong): Promise<string | null> {
+  if (!song.deezerId) return null;
+  const data = await fetchDeezerJson<DeezerTrackResponse>(`${DEEZER_API_URL}/track/${song.deezerId}`);
+  return data && typeof data.preview === 'string' && data.preview ? data.preview : null;
+}
+
 const ALT_VERSION_RE = /\b(remix|live|acoustic|karaoke|instrumental|tribute|sped up|slowed|reverb)\b/i;
-const TRIBUTE_ACTIST_RE = /(tribute|karaoke|cover band)/i;
+const TRIBUTE_ARTIST_RE = /(tribute|karaoke|cover band)/i;
 
 let catalog: MusicQuizSong[] = MUSIC_QUIZ_CATALOG;
 
@@ -100,7 +104,7 @@ export function findDeezerMatch(title: string, artists: string[], results: Deeze
   let best: DeezerTrack | null = null;
   let bestScore = 0;
   for (const result of results) {
-    if (!result.preview || isAltVersion(result.title) || TRIBUTE_ACTIST_RE.test(result.artist.name)) continue;
+    if (!result.preview || isAltVersion(result.title) || TRIBUTE_ARTIST_RE.test(result.artist.name)) continue;
     const normResult = normalizeName(result.title);
     const nameScore = normResult === normTitle ? 2 : normResult.startsWith(normTitle) || normTitle.startsWith(normResult) ? 1 : 0;
     if (nameScore === 0) continue;
@@ -115,24 +119,12 @@ export function findDeezerMatch(title: string, artists: string[], results: Deeze
   return best;
 }
 
-async function attemptDeezerFetch(url: string): Promise<DeezerTrack[] | null> {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = (await res.json()) as DeezerSearchResponse;
-    if (data.error || !Array.isArray(data.data)) return null;
-    return data.data;
-  } catch {
-    return null;
-  }
-}
-
 async function fetchDeezerResults(track: SpotifyTrack): Promise<DeezerTrack[] | null> {
   const term = encodeURIComponent(`${track.title} ${track.artists[0] ?? ''}`.trim());
   const url = `${DEEZER_API_URL}/search?q=${term}&limit=${DEEZER_RESULT_LIMIT}`;
   for (let attempt = 1; attempt <= DEEZER_MAX_ATTEMPTS; attempt++) {
-    const results = await attemptDeezerFetch(url);
-    if (results) return results;
+    const data = await fetchDeezerJson<DeezerSearchResponse>(url);
+    if (data && Array.isArray(data.data)) return data.data;
     if (attempt < DEEZER_MAX_ATTEMPTS) await sleep(DEEZER_RETRY_DELAY_MS);
   }
   return null;

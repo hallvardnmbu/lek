@@ -7,11 +7,12 @@ import type {
   DrawVoteMode,
   DrawVoteResult,
 } from '../../shared/games/draw';
-import type { GameContext, GameDefinition, GamePlayer } from '../game';
+import type { GameContext, GameDefinition } from '../game';
+import { buildVoteTally, connectedOrAllPlayers } from './helpers';
 
-export const PROMPT_DURATION_MS = 45_000;
+const PROMPT_DURATION_MS = 45_000;
 export const DRAW_DURATION_MS = 90_000;
-export const VOTE_DURATION_MS = 30_000;
+const VOTE_DURATION_MS = 30_000;
 const MAX_PROMPT_LENGTH = 60;
 const MAX_IMAGE_DATA_LENGTH = 200_000;
 const WIN_POINTS = 100;
@@ -24,7 +25,7 @@ const FALLBACK_PROMPTS = [
   'A wizard making coffee',
 ];
 
-export interface DrawGameState {
+interface DrawGameState {
   round: number;
   phase: DrawPhase;
   prompterId: string;
@@ -36,13 +37,8 @@ export interface DrawGameState {
   results: DrawVoteResult[];
 }
 
-function getConnectedPlayers(ctx: GameContext): GamePlayer[] {
-  const connected = ctx.getPlayers().filter((p) => p.connected);
-  return connected.length > 0 ? connected : ctx.getPlayers();
-}
-
 function pickRandomPrompter(ctx: GameContext, excludeId?: string): string {
-  const pool = getConnectedPlayers(ctx);
+  const pool = connectedOrAllPlayers(ctx);
   const candidates = excludeId && pool.length > 1 ? pool.filter((p) => p.id !== excludeId) : pool;
   const chosen = candidates[Math.floor(Math.random() * candidates.length)];
   return chosen?.id ?? '';
@@ -107,33 +103,22 @@ function startVotingPhase(ctx: GameContext, state: DrawGameState): DrawGameState
 
 function tallyResults(ctx: GameContext, state: DrawGameState): DrawGameState {
   ctx.clearTimer();
-  const counts = new Map<string, number>();
-  for (const targetId of Object.values(state.votes)) {
-    counts.set(targetId, (counts.get(targetId) ?? 0) + 1);
-  }
+  const tally = buildVoteTally(ctx, state.votes);
+  const maxVotes = tally[0]?.votes ?? 0;
 
-  let maxVotes = 0;
-  for (const count of counts.values()) {
-    if (count > maxVotes) maxVotes = count;
-  }
-
-  const results: DrawVoteResult[] = ctx
-    .getPlayers()
-    .map((p) => {
-      const votes = counts.get(p.id) ?? 0;
-      const isWinner = maxVotes > 0 && votes === maxVotes;
-      if (isWinner) {
-        ctx.addPlayerScore(p.id, WIN_POINTS);
-      }
-      return {
-        playerId: p.id,
-        playerName: p.name,
-        imageData: state.drawings[p.id] ?? '',
-        votes,
-        isWinner,
-      };
-    })
-    .sort((a, b) => b.votes - a.votes);
+  const results: DrawVoteResult[] = tally.map((entry) => {
+    const isWinner = maxVotes > 0 && entry.votes === maxVotes;
+    if (isWinner) {
+      ctx.addPlayerScore(entry.playerId, WIN_POINTS);
+    }
+    return {
+      playerId: entry.playerId,
+      playerName: entry.name,
+      imageData: state.drawings[entry.playerId] ?? '',
+      votes: entry.votes,
+      isWinner,
+    };
+  });
 
   return {
     ...state,
@@ -142,14 +127,44 @@ function tallyResults(ctx: GameContext, state: DrawGameState): DrawGameState {
   };
 }
 
-function allConnectedSubmitted(ctx: GameContext, submittedIds: string[]): boolean {
-  const active = getConnectedPlayers(ctx);
-  return active.length > 0 && active.every((p) => submittedIds.includes(p.id));
+function allConnectedDone(ctx: GameContext, done: (playerId: string) => boolean): boolean {
+  const active = connectedOrAllPlayers(ctx);
+  return active.length > 0 && active.every((p) => done(p.id));
 }
 
-function allConnectedVoted(ctx: GameContext, votes: Record<string, string>): boolean {
-  const active = getConnectedPlayers(ctx);
-  return active.length > 0 && active.every((p) => Boolean(votes[p.id]));
+function handleRoundControl(
+  ctx: GameContext,
+  state: DrawGameState,
+  action: DrawAction
+): DrawGameState {
+  if (state.phase !== 'RESULTS') return state;
+  if (action.type === 'next_round') {
+    return startPromptPhase(ctx, state.round + 1, state.prompterId);
+  }
+  if (action.type === 'finish_game') {
+    ctx.endGame();
+  }
+  return state;
+}
+
+function handlePlayerExit(
+  ctx: GameContext,
+  state: DrawGameState,
+  playerId: string
+): DrawGameState {
+  if (state.phase === 'PROMPTING' && state.prompterId === playerId) {
+    const nextPrompterId = pickRandomPrompter(ctx, playerId);
+    if (nextPrompterId && nextPrompterId !== playerId) {
+      return { ...state, prompterId: nextPrompterId };
+    }
+  }
+  if (state.phase === 'DRAWING' && allConnectedDone(ctx, (id) => state.submittedIds.includes(id))) {
+    return startVotingPhase(ctx, state);
+  }
+  if (state.phase === 'VOTING' && allConnectedDone(ctx, (id) => Boolean(state.votes[id]))) {
+    return tallyResults(ctx, state);
+  }
+  return state;
 }
 
 export const drawGame: GameDefinition<DrawGameState, DrawHostView, DrawPlayerView, DrawAction> = {
@@ -195,7 +210,7 @@ export const drawGame: GameDefinition<DrawGameState, DrawHostView, DrawPlayerVie
         drawings: nextDrawings,
         submittedIds: nextSubmitted,
       };
-      if (allConnectedSubmitted(ctx, nextSubmitted)) {
+      if (allConnectedDone(ctx, (id) => nextSubmitted.includes(id))) {
         return startVotingPhase(ctx, nextState);
       }
       return nextState;
@@ -210,33 +225,17 @@ export const drawGame: GameDefinition<DrawGameState, DrawHostView, DrawPlayerVie
         ...state,
         votes: nextVotes,
       };
-      if (allConnectedVoted(ctx, nextVotes)) {
+      if (allConnectedDone(ctx, (id) => Boolean(nextVotes[id]))) {
         return tallyResults(ctx, nextState);
       }
       return nextState;
     }
 
-    if (action.type === 'next_round' && state.phase === 'RESULTS') {
-      return startPromptPhase(ctx, state.round + 1, state.prompterId);
-    }
-
-    if (action.type === 'finish_game' && state.phase === 'RESULTS') {
-      ctx.endGame();
-      return state;
-    }
-
-    return state;
+    return handleRoundControl(ctx, state, action);
   },
 
   onHostAction(ctx, state, action) {
-    if (action.type === 'next_round' && state.phase === 'RESULTS') {
-      return startPromptPhase(ctx, state.round + 1, state.prompterId);
-    }
-    if (action.type === 'finish_game' && state.phase === 'RESULTS') {
-      ctx.endGame();
-      return state;
-    }
-    return state;
+    return handleRoundControl(ctx, state, action);
   },
 
   onTimerExpired(ctx, state) {
@@ -254,35 +253,11 @@ export const drawGame: GameDefinition<DrawGameState, DrawHostView, DrawPlayerVie
   },
 
   onPlayerDisconnect(ctx, state, playerId) {
-    if (state.phase === 'PROMPTING' && state.prompterId === playerId) {
-      const nextPrompterId = pickRandomPrompter(ctx, playerId);
-      if (nextPrompterId && nextPrompterId !== playerId) {
-        return { ...state, prompterId: nextPrompterId };
-      }
-    }
-    if (state.phase === 'DRAWING' && allConnectedSubmitted(ctx, state.submittedIds)) {
-      return startVotingPhase(ctx, state);
-    }
-    if (state.phase === 'VOTING' && allConnectedVoted(ctx, state.votes)) {
-      return tallyResults(ctx, state);
-    }
-    return state;
+    return handlePlayerExit(ctx, state, playerId);
   },
 
   onPlayerLeave(ctx, state, playerId) {
-    if (state.phase === 'PROMPTING' && state.prompterId === playerId) {
-      const nextPrompterId = pickRandomPrompter(ctx, playerId);
-      if (nextPrompterId && nextPrompterId !== playerId) {
-        return { ...state, prompterId: nextPrompterId };
-      }
-    }
-    if (state.phase === 'DRAWING' && allConnectedSubmitted(ctx, state.submittedIds)) {
-      return startVotingPhase(ctx, state);
-    }
-    if (state.phase === 'VOTING' && allConnectedVoted(ctx, state.votes)) {
-      return tallyResults(ctx, state);
-    }
-    return state;
+    return handlePlayerExit(ctx, state, playerId);
   },
 
   getHostView(state, ctx) {

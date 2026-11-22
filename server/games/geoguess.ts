@@ -1,4 +1,3 @@
-import type { GameAction } from '../../shared/protocol';
 import type {
   GeoGuessAction,
   GeoGuessHostView,
@@ -9,6 +8,7 @@ import type {
 } from '../../shared/games/geoguess';
 import type { GameContext, GameDefinition } from '../game';
 import { fetchRandomGeoSpot, type GeoSpot, type SpotFetcher } from './geoguess-spots';
+import { connectedPlayers } from './helpers';
 
 const POLL_MS = 120;
 const ROUND_DURATION_MS = 45_000;
@@ -37,7 +37,7 @@ interface GeoGuessInbox {
   error?: string;
 }
 
-export interface GeoGuessState {
+interface GeoGuessState {
   phase: GeoGuessPhase;
   round: number;
   spot: GeoSpot | null;
@@ -133,6 +133,7 @@ function revealRound(ctx: GameContext, state: GeoGuessState): void {
     ctx.addPlayerScore(winner.id, 1);
   }
 
+  state.drinkerId = null;
   const activePlayers = players.filter((p) => p.connected || state.guesses[p.id]);
   if (activePlayers.length >= 2) {
     const nonSubmitters = activePlayers.filter((p) => !state.guesses[p.id]);
@@ -140,11 +141,7 @@ function revealRound(ctx: GameContext, state: GeoGuessState): void {
       state.drinkerId = nonSubmitters[0].id;
     } else if (submitted.length >= 2) {
       state.drinkerId = submitted[submitted.length - 1].id;
-    } else {
-      state.drinkerId = null;
     }
-  } else {
-    state.drinkerId = null;
   }
 
   ctx.broadcastEvent('geoguess_reveal', {
@@ -153,9 +150,16 @@ function revealRound(ctx: GameContext, state: GeoGuessState): void {
   });
 }
 
-function allConnectedGuessed(ctx: GameContext, state: GeoGuessState): boolean {
-  const connected = ctx.getPlayers().filter((p) => p.connected);
-  return connected.length > 0 && connected.every((p) => Boolean(state.guesses[p.id]));
+function maybeRevealOnAllGuessed(ctx: GameContext, state: GeoGuessState): void {
+  if (state.phase !== 'GUESSING') return;
+  const connected = connectedPlayers(ctx);
+  if (connected.length > 0 && connected.every((p) => Boolean(state.guesses[p.id]))) {
+    revealRound(ctx, state);
+  }
+}
+
+function playerName(ctx: GameContext, playerId: string | null): string | null {
+  return playerId ? (ctx.getPlayer(playerId)?.name ?? null) : null;
 }
 
 function buildResultEntries(ctx: GameContext, state: GeoGuessState): GeoGuessResultEntry[] {
@@ -231,16 +235,13 @@ export function createGeoGuessGame(
         distanceKm: haversineKm(clamped, state.spot.coords),
       };
 
-      if (allConnectedGuessed(ctx, state)) {
-        revealRound(ctx, state);
-      }
+      maybeRevealOnAllGuessed(ctx, state);
 
       return state;
     },
 
-    onHostAction(ctx, state, action: GameAction) {
-      const a = action as GeoGuessAction;
-      if (a.type === 'next_round' || a.type === 'skip_spot') {
+    onHostAction(ctx, state, action) {
+      if (action.type === 'next_round' || action.type === 'skip_spot') {
         ctx.clearTimer();
         return startRound(ctx, fetcher, state.round + 1, state.usedIds);
       }
@@ -271,27 +272,19 @@ export function createGeoGuessGame(
       return state;
     },
 
-    onPlayerReconnect(_ctx, state) {
-      return state;
-    },
-
     onPlayerDisconnect(ctx, state) {
-      if (state.phase === 'GUESSING' && allConnectedGuessed(ctx, state)) {
-        revealRound(ctx, state);
-      }
+      maybeRevealOnAllGuessed(ctx, state);
       return state;
     },
 
     onPlayerLeave(ctx, state, playerId) {
       delete state.guesses[playerId];
-      if (state.phase === 'GUESSING' && allConnectedGuessed(ctx, state)) {
-        revealRound(ctx, state);
-      }
+      maybeRevealOnAllGuessed(ctx, state);
       return state;
     },
 
     getHostView(state, ctx): GeoGuessHostView {
-      const connected = ctx.getPlayers().filter((p) => p.connected);
+      const connected = connectedPlayers(ctx);
       const lockedCount = connected.filter((p) => Boolean(state.guesses[p.id])).length;
       const isReveal = state.phase === 'REVEAL';
 
@@ -304,13 +297,13 @@ export function createGeoGuessGame(
         lockedCount,
         totalCount: connected.length,
         players: buildResultEntries(ctx, state),
-        winnerName: state.winnerId ? (ctx.getPlayer(state.winnerId)?.name ?? null) : null,
-        drinkerName: state.drinkerId ? (ctx.getPlayer(state.drinkerId)?.name ?? null) : null,
+        winnerName: playerName(ctx, state.winnerId),
+        drinkerName: playerName(ctx, state.drinkerId),
         error: state.error,
       };
     },
 
-    getPlayerView(state, playerId, ctx): GeoGuessPlayerView {
+    getPlayerView(state, playerId): GeoGuessPlayerView {
       const guess = state.guesses[playerId];
       const isReveal = state.phase === 'REVEAL';
 
@@ -324,9 +317,6 @@ export function createGeoGuessGame(
         distanceKm: isReveal && guess ? Math.round(guess.distanceKm) : null,
         isWinner: isReveal && state.winnerId === playerId,
         drinks: isReveal && state.drinkerId === playerId,
-        winnerName: isReveal && state.winnerId ? (ctx.getPlayer(state.winnerId)?.name ?? null) : null,
-        drinkerName: isReveal && state.drinkerId ? (ctx.getPlayer(state.drinkerId)?.name ?? null) : null,
-        error: state.error,
       };
     },
   };

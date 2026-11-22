@@ -6,18 +6,15 @@ export interface MapMarker {
   label?: string;
   color: string;
   point: GeoPoint;
-  isTarget?: boolean;
 }
 
-export interface TileMapProps {
+interface TileMapProps {
   interactive?: boolean;
   markers?: MapMarker[];
   target?: GeoPoint | null;
   selectedPin?: GeoPoint | null;
   onSelectPin?: (point: GeoPoint) => void;
   fitAll?: boolean;
-  initialCenter?: GeoPoint;
-  initialZoom?: number;
   class?: string;
 }
 
@@ -36,26 +33,26 @@ function normalizeLng(lng: number): number {
   return v;
 }
 
+function worldScale(zoom: number): number {
+  return TILE_SIZE * Math.pow(2, zoom);
+}
+
 function lngToWorldX(lng: number, zoom: number): number {
-  const scale = TILE_SIZE * Math.pow(2, zoom);
-  return ((lng + 180) / 360) * scale;
+  return ((lng + 180) / 360) * worldScale(zoom);
 }
 
 function latToWorldY(lat: number, zoom: number): number {
   const rad = (clampLat(lat) * Math.PI) / 180;
-  const scale = TILE_SIZE * Math.pow(2, zoom);
   const mercN = Math.log(Math.tan(Math.PI / 4 + rad / 2));
-  return (0.5 - mercN / (2 * Math.PI)) * scale;
+  return (0.5 - mercN / (2 * Math.PI)) * worldScale(zoom);
 }
 
 function worldXToLng(x: number, zoom: number): number {
-  const scale = TILE_SIZE * Math.pow(2, zoom);
-  return normalizeLng((x / scale) * 360 - 180);
+  return normalizeLng((x / worldScale(zoom)) * 360 - 180);
 }
 
 function worldYToLat(y: number, zoom: number): number {
-  const scale = TILE_SIZE * Math.pow(2, zoom);
-  const n = Math.PI - (2 * Math.PI * y) / scale;
+  const n = Math.PI - (2 * Math.PI * y) / worldScale(zoom);
   return clampLat((180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))));
 }
 
@@ -117,10 +114,8 @@ function computeFittedView(
 export function TileMap(props: TileMapProps) {
   const [containerEl, setContainerEl] = createSignal<HTMLDivElement | undefined>(undefined);
   const [size, setSize] = createSignal({ width: 360, height: 320 });
-  const [center, setCenter] = createSignal<GeoPoint>(
-    props.initialCenter ?? { lat: 25, lng: 10 }
-  );
-  const [zoom, setZoom] = createSignal<number>(props.initialZoom ?? 2);
+  const [center, setCenter] = createSignal<GeoPoint>({ lat: 25, lng: 10 });
+  const [zoom, setZoom] = createSignal<number>(2);
 
   let dragging = false;
   let pointerId: number | null = null;
@@ -201,7 +196,7 @@ export function TileMap(props: TileMapProps) {
 
   const project = (point: GeoPoint) => {
     const m = viewMetrics();
-    const scale = TILE_SIZE * Math.pow(2, m.z);
+    const scale = worldScale(m.z);
     let x = lngToWorldX(point.lng, m.z) - m.left;
     if (x < -scale / 2) x += scale;
     if (x > m.width + scale / 2) x -= scale;

@@ -1,4 +1,5 @@
-import type { GameContext, GameDefinition, GamePlayer } from '../game';
+import type { GameContext, GameDefinition } from '../game';
+import { connectedOrAllPlayers, shuffle } from './helpers';
 import {
   TANK_COLORS,
   TANK_SPAWNS,
@@ -79,8 +80,7 @@ function moveTank(tank: TankGameTank, input: TankInput, dtSec: number): void {
   tank.y = Math.max(TANK_RADIUS, Math.min(TANK_WORLD_HEIGHT - TANK_RADIUS, tank.y));
 }
 
-function separateTanks(tanks: TankGameTank[]): void {
-  const alive = tanks.filter((t) => t.alive);
+function separateTanks(alive: TankGameTank[]): void {
   for (let i = 0; i < alive.length; i++) {
     for (let j = i + 1; j < alive.length; j++) {
       const a = alive[i];
@@ -108,14 +108,7 @@ function separateTanks(tanks: TankGameTank[]): void {
 
 function bulletBlocked(x: number, y: number): boolean {
   if (x < 0 || x > TANK_WORLD_WIDTH || y < 0 || y > TANK_WORLD_HEIGHT) return true;
-  for (const wall of TANK_WALLS) {
-    const closestX = Math.max(wall.x, Math.min(x, wall.x + wall.w));
-    const closestY = Math.max(wall.y, Math.min(y, wall.y + wall.h));
-    const dx = x - closestX;
-    const dy = y - closestY;
-    if (dx * dx + dy * dy < BULLET_RADIUS * BULLET_RADIUS) return true;
-  }
-  return false;
+  return TANK_WALLS.some((wall) => resolveCircleWall(x, y, BULLET_RADIUS, wall) !== null);
 }
 
 function findBulletHit(state: TankGameState, bullet: TankGameBullet): TankGameTank | null {
@@ -169,12 +162,12 @@ function simulate(ctx: GameContext, state: TankGameState, now: number): void {
   const dt = Math.min(now - state.tickAt, MAX_DT_MS);
   if (dt <= 0) return;
   const dtSec = dt / 1000;
-  for (const tank of Object.values(state.tanks)) {
-    if (!tank.alive) continue;
+  const alive = aliveTanks(state);
+  for (const tank of alive) {
     const input = state.inputs[tank.playerId];
     if (input) moveTank(tank, input, dtSec);
   }
-  separateTanks(Object.values(state.tanks));
+  separateTanks(alive);
   advanceBullets(ctx, state, dtSec, now);
   state.tickAt = now;
 }
@@ -183,7 +176,7 @@ function aliveTanks(state: TankGameState): TankGameTank[] {
   return Object.values(state.tanks).filter((t) => t.alive);
 }
 
-function checkGameEnd(ctx: GameContext, state: TankGameState): boolean {
+function checkGameEnd(ctx: GameContext, state: TankGameState, now: number): boolean {
   if (state.phase !== 'PLAYING') return false;
   const alive = aliveTanks(state);
   if (alive.length <= 1) {
@@ -191,7 +184,7 @@ function checkGameEnd(ctx: GameContext, state: TankGameState): boolean {
     ctx.endGame();
     return true;
   }
-  if (Date.now() - state.playingStartedAt >= GAME_TIMEOUT_MS) {
+  if (now - state.playingStartedAt >= GAME_TIMEOUT_MS) {
     ctx.endGame();
     return true;
   }
@@ -218,10 +211,8 @@ export const tankGame: GameDefinition<TankGameState, TankGameHostView, TankGameP
   maxPlayers: TANK_SPAWNS.length,
 
   onStart(ctx) {
-    const players = ctx.getPlayers();
-    const connected = players.filter((p) => p.connected);
-    const roster: GamePlayer[] = connected.length > 0 ? connected : players;
-    const spawns = [...TANK_SPAWNS].sort(() => Math.random() - 0.5);
+    const roster = connectedOrAllPlayers(ctx);
+    const spawns = shuffle(TANK_SPAWNS);
     const now = Date.now();
     const state: TankGameState = {
       phase: 'COUNTDOWN',
@@ -261,15 +252,14 @@ export const tankGame: GameDefinition<TankGameState, TankGameHostView, TankGameP
     }
     if (state.phase !== 'PLAYING') return state;
     simulate(ctx, state, now);
-    if (!checkGameEnd(ctx, state)) ctx.setTimer(TICK_MS);
+    if (!checkGameEnd(ctx, state, now)) ctx.setTimer(TICK_MS);
     return state;
   },
 
   onPlayerAction(ctx, state, playerId, action) {
-    if (state.phase !== 'PLAYING') return state;
+    const tank = state.tanks[playerId];
+    if (state.phase !== 'PLAYING' || !tank?.alive) return state;
     if (action.type === 'input') {
-      const tank = state.tanks[playerId];
-      if (!tank?.alive) return state;
       const raw = action.payload as { x?: unknown; y?: unknown } | undefined;
       const x = Number(raw?.x);
       const y = Number(raw?.y);
@@ -280,8 +270,6 @@ export const tankGame: GameDefinition<TankGameState, TankGameHostView, TankGameP
       return state;
     }
     if (action.type === 'fire') {
-      const tank = state.tanks[playerId];
-      if (!tank?.alive) return state;
       const now = Date.now();
       if (now - tank.lastFiredAt < FIRE_COOLDOWN_MS) return state;
       tank.lastFiredAt = now;
@@ -299,15 +287,17 @@ export const tankGame: GameDefinition<TankGameState, TankGameHostView, TankGameP
   },
 
   onPlayerDisconnect(ctx, state, playerId) {
-    destroyTank(ctx, state, playerId, Date.now());
-    checkGameEnd(ctx, state);
+    const now = Date.now();
+    destroyTank(ctx, state, playerId, now);
+    checkGameEnd(ctx, state, now);
     return state;
   },
 
   onPlayerLeave(ctx, state, playerId) {
-    destroyTank(ctx, state, playerId, Date.now());
+    const now = Date.now();
+    destroyTank(ctx, state, playerId, now);
     delete state.tanks[playerId];
-    checkGameEnd(ctx, state);
+    checkGameEnd(ctx, state, now);
     return state;
   },
 

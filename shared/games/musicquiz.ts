@@ -56,22 +56,4 @@ export interface MusicQuizPlayerView {
   results: MusicQuizRoundResult[];
 }
 
-export type MusicQuizAction =
-  | { type: 'guess'; payload: { songId: string } }
-  | { type: 'reveal' };
-
-interface CatalogFileEntry {
-  id: string;
-  title: string;
-  artist: string;
-  previewUrl?: string | null;
-  deezerId?: number;
-}
-
-export const MUSIC_QUIZ_CATALOG: MusicQuizSong[] = (songsJson as CatalogFileEntry[]).map((song) => ({
-  id: song.id,
-  title: song.title,
-  artist: song.artist,
-  previewUrl: song.previewUrl ?? null,
-  deezerId: song.deezerId,
-}));
+export const MUSIC_QUIZ_CATALOG: MusicQuizSong[] = songsJson;

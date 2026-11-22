@@ -91,9 +91,7 @@
 }
 
 .wr-tv-actions {
-  display: flex;
   gap: 1rem;
-  justify-content: center;
 }
 
 .wr-mobile-wrap {

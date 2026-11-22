@@ -37,81 +37,7 @@
 }
 
 .cat-tv-actions {
-  display: flex;
   gap: 1rem;
-  justify-content: center;
-}
-
-.cat-tally {
-  width: 100%;
-  max-width: 760px;
-  display: grid;
-  gap: 0.75rem;
-  margin-top: 1.5rem;
-}
-
-.cat-tally-row {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 0.4rem 1rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 0.75rem 1.1rem;
-  font-weight: 700;
-  overflow: hidden;
-}
-
-.cat-tally-row.cat-failed {
-  border-color: var(--danger);
-}
-
-.cat-tally-name {
-  position: relative;
-  z-index: 1;
-}
-
-.cat-failed-badge {
-  position: relative;
-  z-index: 1;
-  justify-self: start;
-  grid-column: 1;
-  background: var(--danger);
-  color: #fff;
-  font-size: 0.72rem;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  padding: 0.12rem 0.5rem;
-  border-radius: 6px;
-}
-
-.cat-tally-votes {
-  position: relative;
-  z-index: 1;
-  color: var(--muted);
-  font-size: 0.95rem;
-}
-
-.cat-tally-bar {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-}
-
-.cat-tally-fill {
-  height: 100%;
-  background: var(--surface-2);
-}
-
-.cat-tally-row.cat-failed .cat-tally-fill {
-  background: rgba(239, 68, 68, 0.16);
-}
-
-.cat-tally-compact .cat-tally-row {
-  padding: 0.55rem 0.9rem;
-  font-size: 0.95rem;
 }
 
 .cat-mobile-head {
@@ -173,16 +99,17 @@
   font-size: 0.85rem;
 }
 
-.cat-result-safe {
+.cat-result-safe,
+.cat-result-fail {
   margin: 0 0 0.75rem;
   font-size: 1.15rem;
   font-weight: 800;
+}
+
+.cat-result-safe {
   color: var(--success);
 }
 
 .cat-result-fail {
-  margin: 0 0 0.75rem;
-  font-size: 1.15rem;
-  font-weight: 900;
   color: var(--danger);
 }

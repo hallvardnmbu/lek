@@ -130,16 +130,9 @@ function pickRandom<T>(items: ReadonlyArray<T>): T {
   return items[Math.floor(Math.random() * items.length)];
 }
 
-function pickSeedRegion(usedIds: string[]): SeedRegion {
-  const available = SEED_REGIONS.filter((r) => !usedIds.includes(r.id));
-  const pool = available.length > 0 ? available : SEED_REGIONS;
-  return pickRandom(pool);
-}
-
-function pickFallbackSpot(usedIds: string[]): GeoSpot {
-  const available = FALLBACK_SPOTS.filter((s) => !usedIds.includes(s.id));
-  const pool = available.length > 0 ? available : FALLBACK_SPOTS;
-  return pickRandom(pool);
+function pickUnused<T extends { id: string }>(items: ReadonlyArray<T>, usedIds: string[]): T {
+  const available = items.filter((item) => !usedIds.includes(item.id));
+  return pickRandom(available.length > 0 ? available : items);
 }
 
 async function queryPanoramaxAround(region: SeedRegion): Promise<GeoSpot | null> {
@@ -194,9 +187,9 @@ async function queryPanoramaxAround(region: SeedRegion): Promise<GeoSpot | null>
 
 export async function fetchRandomGeoSpot(usedIds: string[]): Promise<GeoSpot> {
   for (let attempt = 0; attempt < 5; attempt++) {
-    const region = pickSeedRegion(usedIds);
+    const region = pickUnused(SEED_REGIONS, usedIds);
     const spot = await queryPanoramaxAround(region);
     if (spot) return spot;
   }
-  return pickFallbackSpot(usedIds);
+  return pickUnused(FALLBACK_SPOTS, usedIds);
 }

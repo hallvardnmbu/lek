@@ -24,7 +24,6 @@ interface TestPlayer {
 
 function createTestCtx(roomCode: string, players: TestPlayer[]) {
   const scores = new Map<string, number>();
-  const events: Array<{ event: string; payload: unknown }> = [];
   let ended = false;
 
   const toGamePlayers = () =>
@@ -46,7 +45,7 @@ function createTestCtx(roomCode: string, players: TestPlayer[]) {
     setPlayerMeta: () => {},
     setTimer: () => {},
     clearTimer: () => {},
-    broadcastEvent: (event, payload) => events.push({ event, payload }),
+    broadcastEvent: () => {},
     sendEventToHost: () => {},
     sendEventToPlayer: () => {},
     emitWebhook: () => {},
@@ -57,7 +56,6 @@ function createTestCtx(roomCode: string, players: TestPlayer[]) {
 
   return {
     ctx,
-    events,
     isEnded: () => ended,
     score: (id: string) => scores.get(id) ?? 0,
   };
@@ -96,7 +94,7 @@ describe('Most Likely To game', () => {
     expect(state.tally.find((t) => t.playerId === 'p2')?.isDrinker).toBe(true);
 
     const hostView = game.getHostView(state, ctx);
-    expect(hostView.drinkerNames).toEqual(['Bob']);
+    expect(hostView.tally.filter((t) => t.isDrinker).map((t) => t.name)).toEqual(['Bob']);
     expect(hostView.votedCount).toBe(2);
     expect(hostView.connectedCount).toBe(2);
 

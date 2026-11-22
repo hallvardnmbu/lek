@@ -10,8 +10,6 @@ interface TestPlayer {
 }
 
 function createTestCtx(players: TestPlayer[]) {
-  const timers: number[] = [];
-  let cleared = 0;
   const events: Array<{ event: string; payload: unknown }> = [];
 
   const toGamePlayers = () =>
@@ -30,10 +28,8 @@ function createTestCtx(players: TestPlayer[]) {
     setPlayerScore: () => {},
     addPlayerScore: () => {},
     setPlayerMeta: () => {},
-    setTimer: (ms) => timers.push(ms),
-    clearTimer: () => {
-      cleared++;
-    },
+    setTimer: () => {},
+    clearTimer: () => {},
     broadcastEvent: (event, payload) => events.push({ event, payload }),
     sendEventToHost: () => {},
     sendEventToPlayer: () => {},
@@ -41,7 +37,7 @@ function createTestCtx(players: TestPlayer[]) {
     endGame: () => {},
   };
 
-  return { ctx, timers, events, getCleared: () => cleared };
+  return { ctx, events };
 }
 
 async function flushMicrotasks(): Promise<void> {
@@ -173,7 +169,6 @@ describe('Wikipedia Race game', () => {
     }));
 
     let state = game.onStart(ctx);
-    state.targetTitle = 'Goal';
     await flushMicrotasks();
     state = game.onTimerExpired!(ctx, state)!;
     state.targetTitle = 'Goal';

@@ -1,9 +1,5 @@
 export type CategoriesPhase = 'GENERATING' | 'PLAYING' | 'REVEAL';
 
-export interface CategoriesAiInbox {
-  categories: string[] | null;
-}
-
 export interface CategoriesCandidate {
   id: string;
   name: string;
@@ -26,7 +22,7 @@ export interface CategoriesState {
   continueVotes: Record<string, boolean>;
   tally: CategoriesTallyEntry[];
   failedIds: string[];
-  aiInbox: CategoriesAiInbox;
+  aiInbox: { categories: string[] | null };
   fallbackCategories: string[] | null;
 }
 
@@ -40,7 +36,6 @@ export interface CategoriesHostView {
   continueCount: number;
   connectedCount: number;
   tally: CategoriesTallyEntry[];
-  failedNames: string[];
 }
 
 export interface CategoriesPlayerView {

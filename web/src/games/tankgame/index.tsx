@@ -8,9 +8,10 @@ import {
   type TankGameHostView,
   type TankGamePlayerView,
 } from '../../../../shared/games/tankgame';
-import type {
-  MobileGameViewProps,
-  TvGameViewProps,
+import {
+  secondsLeft,
+  type MobileGameViewProps,
+  type TvGameViewProps,
 } from '../registry';
 import './tankgame.css';
 
@@ -46,7 +47,6 @@ interface Snapshot {
   at: number;
   tanks: Map<string, TankSnap>;
   bullets: Map<number, { x: number; y: number }>;
-  alive: Set<string>;
 }
 
 function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
@@ -64,19 +64,19 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
     () => view(),
     (host) => {
       if (!host) return;
+      const now = Date.now();
       const snap: Snapshot = {
-        at: Date.now(),
+        at: now,
         tanks: new Map(
           host.tanks
             .filter((t) => t.alive)
             .map((t) => [t.playerId, { x: t.x, y: t.y, angle: t.angle }])
         ),
         bullets: new Map(host.bullets.map((b) => [b.id, { x: b.x, y: b.y }])),
-        alive: new Set(host.tanks.filter((t) => t.alive).map((t) => t.playerId)),
       };
       if (curr) {
         for (const [id, pos] of curr.tanks) {
-          if (!snap.alive.has(id)) blasts.push({ x: pos.x, y: pos.y, at: Date.now() });
+          if (!snap.tanks.has(id)) blasts.push({ x: pos.x, y: pos.y, at: now });
         }
       }
       prev = curr;
@@ -189,7 +189,7 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
         <Show when={view()?.phase !== 'PLAYING'}>
           <div class="tk-countdown">
             <p class="tk-count-label">BATTLE STARTING</p>
-            <p class="tk-count-num">{Math.max(1, Math.ceil((props.remainingMs ?? 0) / 1000))}</p>
+            <p class="tk-count-num">{Math.max(1, secondsLeft(props.remainingMs))}</p>
           </div>
         </Show>
       </div>
@@ -287,7 +287,7 @@ function TankGameMobileView(props: MobileGameViewProps<TankGamePlayerView>) {
       </div>
 
       <Show when={view()?.phase !== 'PLAYING'}>
-        <p class="tk-status">Battle starts in {Math.max(1, Math.ceil((props.remainingMs ?? 0) / 1000))}s</p>
+        <p class="tk-status">Battle starts in {Math.max(1, secondsLeft(props.remainingMs))}s</p>
       </Show>
 
       <Show when={view()?.phase === 'PLAYING' && view()?.participating === false}>

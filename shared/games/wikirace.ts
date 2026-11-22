@@ -6,7 +6,6 @@ export interface WikiRacePlayerProgress {
   hops: number;
   finishedRank: number | null;
   connected: boolean;
-  currentTitle: string | null;
 }
 
 export interface WikiRaceHostView {

@@ -1,9 +1,10 @@
 import { join, resolve, sep } from 'path';
 import type { ServerWebSocket } from 'bun';
 import type { ClientMessage, ServerMessage } from '../shared/protocol';
-import { RoomManager, type RoomBroadcaster } from './roomManager';
+import { RoomManager, type ActionResult, type InternalRoom, type RoomBroadcaster } from './roomManager';
 import { verifyWebhookSignature } from './webhooks';
-import { getMusicQuizCatalog, initMusicQuizCatalog } from './games/musicquizCatalog';
+import { handleGameApi, initGames } from './games';
+import type { GamePlayer } from './game';
 
 interface SocketData {
   roomCode?: string;
@@ -68,6 +69,48 @@ function resolveActor(
   }
 
   return { ok: true, actor: { playerId: payloadPlayerId, hostToken } };
+}
+
+function sendJoinedState(
+  ws: ServerWebSocket<SocketData>,
+  res: ActionResult<{ room: InternalRoom; player: GamePlayer }>
+): void {
+  if (!res.ok) {
+    sendResultError(ws, res);
+    return;
+  }
+  registerPlayerSocket(res.room.code, res.player.id, ws);
+  safeSend(ws, {
+    type: 'joined',
+    payload: {
+      code: res.room.code,
+      playerId: res.player.id,
+      name: res.player.name,
+    },
+  });
+  safeSend(ws, {
+    type: 'room_state',
+    payload: roomManager.buildStateForClient(res.room, res.player.id),
+  });
+}
+
+function withActorCode(
+  ws: ServerWebSocket<SocketData>,
+  payload: Record<string, unknown>,
+  missingMsg: string,
+  fn: (code: string, actor: { playerId?: string; hostToken?: string }) => ActionResult
+): void {
+  const code = asString(payload.code);
+  if (!code) {
+    sendError(ws, 'BAD_PAYLOAD', missingMsg);
+    return;
+  }
+  const resolved = resolveActor(ws, payload);
+  if (!resolved.ok) {
+    sendError(ws, 'UNAUTHORIZED', 'Player identity mismatch.');
+    return;
+  }
+  sendResultError(ws, fn(code, resolved.actor));
 }
 
 const broadcaster: RoomBroadcaster = {
@@ -149,9 +192,8 @@ async function handleApiRequest(req: Request, url: URL): Promise<Response | null
     return Response.json({ games: roomManager.registry.list() });
   }
 
-  if (url.pathname === '/api/musicquiz/songs' && req.method === 'GET') {
-    return Response.json({ songs: getMusicQuizCatalog() });
-  }
+  const gameApiResponse = handleGameApi(req, url);
+  if (gameApiResponse) return gameApiResponse;
 
   const roomMatch = url.pathname.match(/^\/api\/rooms\/([A-Za-z]{4})$/);
   if (roomMatch && req.method === 'GET') {
@@ -240,7 +282,7 @@ async function serveStatic(pathname: string): Promise<Response> {
   );
 }
 
-await initMusicQuizCatalog();
+await initGames();
 
 const server = Bun.serve<SocketData>({
   hostname: HOST,
@@ -312,24 +354,7 @@ const server = Bun.serve<SocketData>({
             sendError(ws, 'BAD_PAYLOAD', 'join_room requires string "code" and "name".');
             return;
           }
-          const res = roomManager.joinRoom(code, name, asString(payload.playerId));
-          if (!res.ok) {
-            sendResultError(ws, res);
-            return;
-          }
-          registerPlayerSocket(res.room.code, res.player.id, ws);
-          safeSend(ws, {
-            type: 'joined',
-            payload: {
-              code: res.room.code,
-              playerId: res.player.id,
-              name: res.player.name,
-            },
-          });
-          safeSend(ws, {
-            type: 'room_state',
-            payload: roomManager.buildStateForClient(res.room, res.player.id),
-          });
+          sendJoinedState(ws, roomManager.joinRoom(code, name, asString(payload.playerId)));
           return;
         }
 
@@ -340,24 +365,7 @@ const server = Bun.serve<SocketData>({
             sendError(ws, 'BAD_PAYLOAD', 'reconnect requires string "code" and "playerId".');
             return;
           }
-          const res = roomManager.reconnectPlayer(code, playerId);
-          if (!res.ok) {
-            sendResultError(ws, res);
-            return;
-          }
-          registerPlayerSocket(res.room.code, res.player.id, ws);
-          safeSend(ws, {
-            type: 'joined',
-            payload: {
-              code: res.room.code,
-              playerId: res.player.id,
-              name: res.player.name,
-            },
-          });
-          safeSend(ws, {
-            type: 'room_state',
-            payload: roomManager.buildStateForClient(res.room, res.player.id),
-          });
+          sendJoinedState(ws, roomManager.reconnectPlayer(code, playerId));
           return;
         }
 
@@ -386,50 +394,27 @@ const server = Bun.serve<SocketData>({
         }
 
         case 'open_game_selector': {
-          const code = asString(payload.code);
-          if (!code) {
-            sendError(ws, 'BAD_PAYLOAD', 'open_game_selector requires "code".');
-            return;
-          }
-          const resolved = resolveActor(ws, payload);
-          if (!resolved.ok) {
-            sendError(ws, 'UNAUTHORIZED', 'Player identity mismatch.');
-            return;
-          }
-          sendResultError(ws, roomManager.openGameSelector(code, resolved.actor));
+          withActorCode(ws, payload, 'open_game_selector requires "code".', (code, actor) =>
+            roomManager.openGameSelector(code, actor)
+          );
           return;
         }
 
         case 'vote_game': {
-          const code = asString(payload.code);
           const gameId = asString(payload.gameId);
-          if (!code || !gameId) {
+          if (!gameId) {
             sendError(ws, 'BAD_PAYLOAD', 'vote_game requires string "code" and "gameId".');
             return;
           }
-          const resolved = resolveActor(ws, payload);
-          if (!resolved.ok) {
-            sendError(ws, 'UNAUTHORIZED', 'Player identity mismatch.');
-            return;
-          }
-          sendResultError(ws, roomManager.voteGame(code, resolved.actor, gameId));
+          withActorCode(ws, payload, 'vote_game requires string "code" and "gameId".', (code, actor) =>
+            roomManager.voteGame(code, actor, gameId)
+          );
           return;
         }
 
         case 'start_game': {
-          const code = asString(payload.code);
-          if (!code) {
-            sendError(ws, 'BAD_PAYLOAD', 'start_game requires "code".');
-            return;
-          }
-          const resolved = resolveActor(ws, payload);
-          if (!resolved.ok) {
-            sendError(ws, 'UNAUTHORIZED', 'Player identity mismatch.');
-            return;
-          }
-          sendResultError(
-            ws,
-            roomManager.startGame(code, resolved.actor, {
+          withActorCode(ws, payload, 'start_game requires "code".', (code, actor) =>
+            roomManager.startGame(code, actor, {
               gameId: asString(payload.gameId),
               config: isRecord(payload.config) ? payload.config : undefined,
             })
@@ -438,56 +423,37 @@ const server = Bun.serve<SocketData>({
         }
 
         case 'game_action': {
-          const code = asString(payload.code);
           const action = payload.action;
-          if (!code || !isRecord(action) || typeof action.type !== 'string') {
+          if (!isRecord(action) || typeof action.type !== 'string') {
             sendError(ws, 'BAD_PAYLOAD', 'game_action requires "code" and an "action" with a string "type".');
             return;
           }
-          const resolved = resolveActor(ws, payload);
-          if (!resolved.ok) {
-            sendError(ws, 'UNAUTHORIZED', 'Player identity mismatch.');
-            return;
-          }
-          sendResultError(
+          withActorCode(
             ws,
-            roomManager.handleAction(
-              code,
-              resolved.actor,
-              { type: action.type, payload: action.payload },
-              asString(payload.roundId)
-            )
+            payload,
+            'game_action requires "code" and an "action" with a string "type".',
+            (code, actor) =>
+              roomManager.handleAction(
+                code,
+                actor,
+                { type: action.type as string, payload: action.payload },
+                asString(payload.roundId)
+              )
           );
           return;
         }
 
         case 'end_game': {
-          const code = asString(payload.code);
-          if (!code) {
-            sendError(ws, 'BAD_PAYLOAD', 'end_game requires "code".');
-            return;
-          }
-          const resolved = resolveActor(ws, payload);
-          if (!resolved.ok) {
-            sendError(ws, 'UNAUTHORIZED', 'Player identity mismatch.');
-            return;
-          }
-          sendResultError(ws, roomManager.endGame(code, resolved.actor));
+          withActorCode(ws, payload, 'end_game requires "code".', (code, actor) =>
+            roomManager.endGame(code, actor)
+          );
           return;
         }
 
         case 'return_to_lobby': {
-          const code = asString(payload.code);
-          if (!code) {
-            sendError(ws, 'BAD_PAYLOAD', 'return_to_lobby requires "code".');
-            return;
-          }
-          const resolved = resolveActor(ws, payload);
-          if (!resolved.ok) {
-            sendError(ws, 'UNAUTHORIZED', 'Player identity mismatch.');
-            return;
-          }
-          sendResultError(ws, roomManager.returnToLobby(code, resolved.actor));
+          withActorCode(ws, payload, 'return_to_lobby requires "code".', (code, actor) =>
+            roomManager.returnToLobby(code, actor)
+          );
           return;
         }
       }

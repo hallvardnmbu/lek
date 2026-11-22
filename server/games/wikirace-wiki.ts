@@ -135,10 +135,6 @@ export function sanitizeWikiHtml(rawHtml: string): { html: string; links: string
   };
 }
 
-function getCachedArticle(title: string): WikiArticle | undefined {
-  return articleCache.get(normalizeTitle(title));
-}
-
 function setCachedArticle(requestedTitle: string, article: WikiArticle): void {
   if (articleCache.size >= CACHE_LIMIT) {
     const oldest = articleCache.keys().next().value;
@@ -148,15 +144,11 @@ function setCachedArticle(requestedTitle: string, article: WikiArticle): void {
   articleCache.set(normalizeTitle(article.title), article);
 }
 
-export function getCachedWikiArticle(title: string): WikiArticle | undefined {
-  return getCachedArticle(title);
-}
-
 export async function fetchWikiArticle(
   title: string,
   fetchImpl: typeof fetch = fetch
 ): Promise<WikiArticle> {
-  const cached = getCachedArticle(title);
+  const cached = articleCache.get(normalizeTitle(title));
   if (cached) return cached;
 
   const url =

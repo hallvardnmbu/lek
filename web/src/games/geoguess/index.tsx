@@ -4,14 +4,14 @@ import type {
   GeoGuessPlayerView,
   GeoPoint,
 } from '../../../../shared/games/geoguess';
-import type { GameUiDefinition, MobileGameViewProps, TvGameViewProps } from '../registry';
+import {
+  secondsLeft,
+  type GameUiDefinition,
+  type MobileGameViewProps,
+  type TvGameViewProps,
+} from '../registry';
 import { TileMap, type MapMarker } from './TileMap';
 import './geoguess.css';
-
-function formatSeconds(ms: number | null): string {
-  if (ms === null) return '';
-  return `${Math.max(0, Math.ceil(ms / 1000))}s`;
-}
 
 function GeoGuessTvView(props: TvGameViewProps<GeoGuessHostView>) {
   const host = () => props.state.hostState;
@@ -19,18 +19,9 @@ function GeoGuessTvView(props: TvGameViewProps<GeoGuessHostView>) {
   const revealMarkers = createMemo<MapMarker[]>(() => {
     const h = host();
     if (!h || h.phase !== 'REVEAL') return [];
-    const list: MapMarker[] = [];
-    for (const p of h.players) {
-      if (p.guess) {
-        list.push({
-          id: p.playerId,
-          label: p.name,
-          color: p.color,
-          point: p.guess,
-        });
-      }
-    }
-    return list;
+    return h.players.flatMap((p) =>
+      p.guess ? [{ id: p.playerId, label: p.name, color: p.color, point: p.guess }] : []
+    );
   });
 
   return (
@@ -38,7 +29,7 @@ function GeoGuessTvView(props: TvGameViewProps<GeoGuessHostView>) {
       <div class="geo-tv-header">
         <p class="eyebrow">GEO-GUESS ROULETTE · ROUND {host()?.round ?? 1}</p>
         <Show when={host()?.phase === 'GUESSING' && props.remainingMs !== null}>
-          <span class="geo-tv-timer">{formatSeconds(props.remainingMs)}</span>
+          <span class="geo-tv-timer">{secondsLeft(props.remainingMs)}s</span>
         </Show>
       </div>
 
@@ -115,7 +106,7 @@ function GeoGuessTvView(props: TvGameViewProps<GeoGuessHostView>) {
         </div>
       </Show>
 
-      <div class="tv-action-bar geo-tv-actions">
+      <div class="tv-action-bar">
         <Show when={host()?.phase === 'GUESSING'}>
           <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'skip_spot' })}>
             Skip Spot
@@ -145,8 +136,6 @@ function GeoGuessMobileView(props: MobileGameViewProps<GeoGuessPlayerView>) {
     }
   );
 
-  const activePin = () => view()?.guess ?? draftPin();
-
   const submitGuess = () => {
     const pin = draftPin();
     if (!pin) return;
@@ -161,7 +150,7 @@ function GeoGuessMobileView(props: MobileGameViewProps<GeoGuessPlayerView>) {
       <div class="geo-mobile-header">
         <span class="eyebrow">ROUND {view()?.round ?? 1}</span>
         <Show when={view()?.phase === 'GUESSING' && props.remainingMs !== null}>
-          <span class="geo-mobile-timer">{formatSeconds(props.remainingMs)}</span>
+          <span class="geo-mobile-timer">{secondsLeft(props.remainingMs)}s</span>
         </Show>
       </div>
 
@@ -186,7 +175,7 @@ function GeoGuessMobileView(props: MobileGameViewProps<GeoGuessPlayerView>) {
           <TileMap
             class="geo-mobile-map"
             interactive={true}
-            selectedPin={activePin()}
+            selectedPin={draftPin()}
             onSelectPin={(pt) => setDraftPin(pt)}
           />
           <button
@@ -215,9 +204,7 @@ function GeoGuessMobileView(props: MobileGameViewProps<GeoGuessPlayerView>) {
 
           <p class="geo-mobile-spot">{view()?.spotLabel ?? 'Location revealed'}</p>
           <p class="geo-mobile-distance">
-            {view()?.distanceKm !== null && view()?.distanceKm !== undefined
-              ? `${view()?.distanceKm} km away`
-              : 'No guess submitted'}
+            {view()?.distanceKm != null ? `${view()!.distanceKm} km away` : 'No guess submitted'}
           </p>
         </div>
 
