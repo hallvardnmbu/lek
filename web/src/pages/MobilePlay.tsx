@@ -127,12 +127,12 @@ export function MobilePlay(props: MobilePlayProps) {
     });
   };
 
-  const handleStartGame = (gameId: string) => {
+  const handleVoteGame = (gameId: string) => {
     const s = state();
     const id = playerId();
     if (!s || !id) return;
     socket.send({
-      type: 'start_game',
+      type: 'vote_game',
       payload: { code: s.code, playerId: id, gameId },
     });
   };
@@ -208,8 +208,9 @@ export function MobilePlay(props: MobilePlayProps) {
             <Show when={s().phase === 'GAME_SELECT'}>
               <MobileGameSelector
                 state={s()}
+                playerId={playerId()!}
                 isVip={Boolean(me()?.isVip)}
-                onStartGame={handleStartGame}
+                onVoteGame={handleVoteGame}
                 onReturnToLobby={handleReturnToLobby}
               />
             </Show>

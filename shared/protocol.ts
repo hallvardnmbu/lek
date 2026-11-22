@@ -28,6 +28,8 @@ export interface RoomState<THostState = unknown, TPlayerState = unknown> {
   maxPlayers: number;
   /** Registered games available in the game selector */
   games: GameInfo[];
+  /** Player votes (playerId -> gameId) during GAME_SELECT */
+  gameVotes?: Record<string, string>;
   /** Game-specific state visible to the TV host */
   hostState?: THostState;
   /** Game-specific state projected for an individual phone player */
@@ -85,6 +87,10 @@ export type ClientMessage =
   | {
       type: 'open_game_selector';
       payload: { code: string; playerId?: string; hostToken?: string };
+    }
+  | {
+      type: 'vote_game';
+      payload: { code: string; playerId?: string; gameId: string };
     }
   | {
       type: 'start_game';

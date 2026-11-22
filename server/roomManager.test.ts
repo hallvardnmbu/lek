@@ -164,6 +164,114 @@ describe('RoomManager & GameDefinition foundation', () => {
 
     manager.dispose();
   });
+
+  it('collects game votes and starts the most popular game when all users vote', () => {
+    const registry = new GameRegistry();
+    const makeGame = (id: string, name: string): GameDefinition<unknown> => ({
+      id,
+      name,
+      minPlayers: 2,
+      maxPlayers: 6,
+      onStart() {
+        return {};
+      },
+      onPlayerAction(_ctx, state) {
+        return state;
+      },
+      getHostView(state) {
+        return state;
+      },
+      getPlayerView(state) {
+        return state;
+      },
+    });
+    registry.register(makeGame('game-a', 'Game A'));
+    registry.register(makeGame('game-b', 'Game B'));
+
+    const { manager } = createTestHarness({ registry });
+    const { room } = manager.createRoom();
+
+    const p1 = manager.joinRoom(room.code, 'Alice');
+    const p2 = manager.joinRoom(room.code, 'Bob');
+    const p3 = manager.joinRoom(room.code, 'Carol');
+    expect(p1.ok && p2.ok && p3.ok).toBe(true);
+    if (!p1.ok || !p2.ok || !p3.ok) return;
+
+    expect(manager.openGameSelector(room.code, { playerId: p1.player.id }).ok).toBe(true);
+
+    const v1 = manager.voteGame(room.code, { playerId: p1.player.id }, 'game-a');
+    expect(v1.ok && !v1.started).toBe(true);
+    expect(room.phase).toBe('GAME_SELECT');
+
+    const v2 = manager.voteGame(room.code, { playerId: p2.player.id }, 'game-b');
+    expect(v2.ok && !v2.started).toBe(true);
+    const v1Change = manager.voteGame(room.code, { playerId: p1.player.id }, 'game-b');
+    expect(v1Change.ok && !v1Change.started).toBe(true);
+    expect(manager.buildStateForClient(room).gameVotes).toEqual({
+      [p1.player.id]: 'game-b',
+      [p2.player.id]: 'game-b',
+    });
+
+    const v3 = manager.voteGame(room.code, { playerId: p3.player.id }, 'game-a');
+    expect(v3.ok && v3.started).toBe(true);
+    expect(room.phase).toBe('PLAYING');
+    expect(room.gameId).toBe('game-b');
+    expect(manager.buildStateForClient(room).gameVotes).toBeUndefined();
+
+    manager.disposeRoom(room.code);
+  });
+
+  it('allows TV host selection to override game voting and resolves on disconnect', () => {
+    const registry = new GameRegistry();
+    const makeGame = (id: string): GameDefinition<unknown> => ({
+      id,
+      name: id,
+      minPlayers: 1,
+      maxPlayers: 6,
+      onStart() {
+        return {};
+      },
+      onPlayerAction(_ctx, state) {
+        return state;
+      },
+      getHostView(state) {
+        return state;
+      },
+      getPlayerView(state) {
+        return state;
+      },
+    });
+    registry.register(makeGame('game-a'));
+    registry.register(makeGame('game-b'));
+
+    const { manager } = createTestHarness({ registry });
+    const { room, hostToken } = manager.createRoom();
+
+    const p1 = manager.joinRoom(room.code, 'Alice');
+    const p2 = manager.joinRoom(room.code, 'Bob');
+    expect(p1.ok && p2.ok).toBe(true);
+    if (!p1.ok || !p2.ok) return;
+
+    manager.openGameSelector(room.code, { hostToken });
+    manager.voteGame(room.code, { playerId: p1.player.id }, 'game-a');
+    expect(room.phase).toBe('GAME_SELECT');
+
+    const override = manager.startGame(room.code, { hostToken }, { gameId: 'game-b' });
+    expect(override.ok).toBe(true);
+    expect(room.phase).toBe('PLAYING');
+    expect(room.gameId).toBe('game-b');
+
+    manager.endGame(room.code, { hostToken });
+    manager.openGameSelector(room.code, { hostToken });
+    manager.voteGame(room.code, { playerId: p1.player.id }, 'game-a');
+    expect(room.phase).toBe('GAME_SELECT');
+
+    manager.markPlayerDisconnected(room.code, p2.player.id);
+    expect(room.phase).toBe('PLAYING');
+    expect(room.gameId).toBe('game-a');
+
+    manager.disposeRoom(room.code);
+  });
 });
 
 describe('WebhookManager', () => {

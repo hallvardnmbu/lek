@@ -741,6 +741,12 @@ body,
   text-align: center;
 }
 
+.selector-subtitle {
+  margin-top: 0.4rem;
+  font-size: 1.05rem;
+  color: var(--muted);
+}
+
 .game-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -756,9 +762,27 @@ body,
   padding: 1.75rem;
 }
 
+.game-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+}
+
 .game-card-title {
   font-size: 1.5rem;
   font-weight: 800;
+}
+
+.vote-count-pill {
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  background: var(--accent);
+  color: #fff;
+  white-space: nowrap;
 }
 
 .game-card-desc {
@@ -768,11 +792,19 @@ body,
 }
 
 .game-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
   margin-top: auto;
   padding-top: 0.5rem;
   font-size: 0.9rem;
   font-weight: 700;
   color: var(--accent);
+}
+
+.game-card-voters {
+  font-weight: 500;
+  color: var(--muted);
 }
 
 .mobile-game-list {
@@ -785,6 +817,21 @@ body,
   text-align: left;
   align-items: flex-start;
   padding: 1rem 1.1rem;
+}
+
+.mobile-game-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.mobile-vote-tag {
+  font-size: 0.78rem;
+  font-weight: 700;
+  opacity: 0.9;
+  white-space: nowrap;
 }
 
 .mobile-game-desc {

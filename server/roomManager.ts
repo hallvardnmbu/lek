@@ -31,6 +31,7 @@ export interface InternalRoom {
   phaseEndsAt: number | null;
   lastActivityAt: number;
   players: Map<string, GamePlayer>;
+  gameVotes: Map<string, string>;
   phaseTimer?: ReturnType<typeof setTimeout>;
   tickInterval?: ReturnType<typeof setInterval>;
 }
@@ -119,6 +120,7 @@ export class RoomManager {
       phaseEndsAt: null,
       lastActivityAt: Date.now(),
       players: new Map(),
+      gameVotes: new Map(),
     };
 
     this.rooms.set(code, room);
@@ -246,6 +248,7 @@ export class RoomManager {
     room.lastActivityAt = Date.now();
     const wasVip = player.isVip;
     room.players.delete(playerId);
+    room.gameVotes.delete(playerId);
 
     if (wasVip && room.players.size > 0) {
       const nextVip =
@@ -254,6 +257,11 @@ export class RoomManager {
       if (nextVip) {
         nextVip.isVip = true;
       }
+    }
+
+    if (room.phase === 'GAME_SELECT' && this.maybeResolveGameVote(room)) {
+      this.emitWebhook('player.left', room.code, { playerId, name: player.name });
+      return { ok: true };
     }
 
     this.broadcastState(room);
@@ -272,6 +280,14 @@ export class RoomManager {
       this.invokeGameHook(room, (game, ctx) =>
         game.onPlayerDisconnect?.(ctx, room.gameState, playerId)
       );
+    }
+
+    if (room.phase === 'GAME_SELECT' && this.maybeResolveGameVote(room)) {
+      this.emitWebhook('player.disconnected', room.code, {
+        playerId: player.id,
+        name: player.name,
+      });
+      return;
     }
 
     this.broadcastState(room);
@@ -307,9 +323,55 @@ export class RoomManager {
     room.roundId = crypto.randomUUID();
     room.phaseEndsAt = null;
     room.gameState = null;
+    room.gameVotes.clear();
+    room.gameVotes.clear();
 
     this.broadcastState(room);
     return { ok: true, room };
+  }
+
+  voteGame(
+    rawCode: string,
+    actor: { playerId?: string },
+    gameId: string
+  ): ActionResult<{ room: InternalRoom; started: boolean }> {
+    const room = this.getRoom(rawCode);
+    if (!room) {
+      return { ok: false, code: 'ROOM_NOT_FOUND', message: 'Room not found.' };
+    }
+    if (room.phase !== 'GAME_SELECT') {
+      return {
+        ok: false,
+        code: 'INVALID_PHASE',
+        message: 'Game voting is only available in the game selector.',
+      };
+    }
+    if (!actor.playerId || !room.players.has(actor.playerId)) {
+      return { ok: false, code: 'PLAYER_NOT_FOUND', message: 'Player not found in room.' };
+    }
+
+    const game = this.registry.get(gameId);
+    if (!game) {
+      return { ok: false, code: 'NO_GAME', message: 'Selected game was not found.' };
+    }
+    const minPlayers = game.minPlayers ?? this.defaultMinPlayers;
+    if (room.players.size < minPlayers) {
+      return {
+        ok: false,
+        code: 'NOT_ENOUGH_PLAYERS',
+        message: `Need at least ${minPlayers} player(s) to start.`,
+      };
+    }
+
+    room.lastActivityAt = Date.now();
+    room.gameVotes.set(actor.playerId, gameId);
+
+    if (this.maybeResolveGameVote(room)) {
+      return { ok: true, room, started: true };
+    }
+
+    this.broadcastState(room);
+    return { ok: true, room, started: false };
   }
 
   startGame(
@@ -344,7 +406,17 @@ export class RoomManager {
       };
     }
 
+    this.launchGame(room, game, options?.config);
+    return { ok: true, room };
+  }
+
+  private launchGame(
+    room: InternalRoom,
+    game: GameDefinition<any, any, any, any>,
+    config?: Record<string, unknown>
+  ): void {
     this.clearTimers(room);
+    room.gameVotes.clear();
     for (const p of room.players.values()) {
       p.score = 0;
       p.meta = {};
@@ -357,15 +429,53 @@ export class RoomManager {
     room.phaseEndsAt = null;
 
     const ctx = this.createGameContext(room);
-    room.gameState = game.onStart(ctx, options?.config);
+    room.gameState = game.onStart(ctx, config);
 
     this.broadcastState(room);
     this.emitWebhook('game.started', room.code, {
       gameId: game.id,
       playerCount: room.players.size,
-      config: options?.config,
+      config,
     });
-    return { ok: true, room };
+  }
+
+  private maybeResolveGameVote(room: InternalRoom): boolean {
+    const connectedPlayers = Array.from(room.players.values()).filter((p) => p.connected);
+    if (connectedPlayers.length === 0) return false;
+    if (!connectedPlayers.every((p) => room.gameVotes.has(p.id))) {
+      return false;
+    }
+
+    const counts = new Map<string, number>();
+    for (const player of connectedPlayers) {
+      const votedGameId = room.gameVotes.get(player.id);
+      if (!votedGameId) continue;
+      const game = this.registry.get(votedGameId);
+      if (!game) continue;
+      const minPlayers = game.minPlayers ?? this.defaultMinPlayers;
+      if (room.players.size < minPlayers) continue;
+      counts.set(votedGameId, (counts.get(votedGameId) ?? 0) + 1);
+    }
+
+    if (counts.size === 0) return false;
+
+    let maxVotes = 0;
+    let leaders: string[] = [];
+    for (const [gameId, count] of counts.entries()) {
+      if (count > maxVotes) {
+        maxVotes = count;
+        leaders = [gameId];
+      } else if (count === maxVotes) {
+        leaders.push(gameId);
+      }
+    }
+
+    const winnerId = leaders[Math.floor(Math.random() * leaders.length)];
+    const winnerGame = this.registry.get(winnerId);
+    if (!winnerGame) return false;
+
+    this.launchGame(room, winnerGame);
+    return true;
   }
 
   handleAction(
@@ -501,6 +611,7 @@ export class RoomManager {
     room.roundId = crypto.randomUUID();
     room.phaseEndsAt = null;
     room.gameState = null;
+    room.gameVotes.clear();
 
     for (const p of room.players.values()) {
       p.score = 0;
@@ -548,6 +659,8 @@ export class RoomManager {
       minPlayers,
       maxPlayers,
       games: this.registry.list(),
+      gameVotes:
+        room.phase === 'GAME_SELECT' ? Object.fromEntries(room.gameVotes) : undefined,
       hostState,
       playerState,
     };

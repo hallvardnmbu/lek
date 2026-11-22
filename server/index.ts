@@ -393,6 +393,22 @@ const server = Bun.serve<SocketData>({
           return;
         }
 
+        case 'vote_game': {
+          const code = asString(payload.code);
+          const gameId = asString(payload.gameId);
+          if (!code || !gameId) {
+            sendError(ws, 'BAD_PAYLOAD', 'vote_game requires string "code" and "gameId".');
+            return;
+          }
+          const resolved = resolveActor(ws, payload);
+          if (!resolved.ok) {
+            sendError(ws, 'UNAUTHORIZED', 'Player identity mismatch.');
+            return;
+          }
+          sendResultError(ws, roomManager.voteGame(code, resolved.actor, gameId));
+          return;
+        }
+
         case 'start_game': {
           const code = asString(payload.code);
           if (!code) {
