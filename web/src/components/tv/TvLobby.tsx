@@ -54,7 +54,6 @@ export function TvLobby(props: TvLobbyProps) {
         </Show>
 
         <section class="lobby-join-card">
-          <p class="lobby-card-label">SCAN TO JOIN</p>
           <div class="qr-frame">
             <QrCode value={props.joinUrl} size={280} />
           </div>

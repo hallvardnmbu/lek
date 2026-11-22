@@ -33,8 +33,8 @@ export function QrCode(props: QrCodeProps) {
       role="img"
       aria-label={`QR code for ${props.value}`}
     >
-      <rect width="100%" height="100%" fill="#d4d4d8" rx="1" />
-      <path d={svgData().paths} fill="#09090b" />
+      <rect width="100%" height="100%" fill="var(--bg)" rx="1" />
+      <path d={svgData().paths} fill="var(--accent)" />
     </svg>
   );
 }
