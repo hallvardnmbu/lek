@@ -400,6 +400,32 @@ const server = Bun.serve<SocketData>({
           return;
         }
 
+        case 'set_game_select_mode': {
+          const mode = payload.mode;
+          if (mode !== 'CHOOSE' && mode !== 'VOTE') {
+            sendError(ws, 'BAD_PAYLOAD', 'set_game_select_mode requires mode "CHOOSE" or "VOTE".');
+            return;
+          }
+          withActorCode(ws, payload, 'set_game_select_mode requires "code".', (code, actor) =>
+            roomManager.setGameSelectMode(code, actor, mode)
+          );
+          return;
+        }
+
+        case 'start_random_game': {
+          withActorCode(ws, payload, 'start_random_game requires "code".', (code, actor) =>
+            roomManager.startRandomGame(code, actor)
+          );
+          return;
+        }
+
+        case 'stop_randomized': {
+          withActorCode(ws, payload, 'stop_randomized requires "code".', (code, actor) =>
+            roomManager.stopRandomized(code, actor)
+          );
+          return;
+        }
+
         case 'vote_game': {
           const gameId = asString(payload.gameId);
           if (!gameId) {

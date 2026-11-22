@@ -1,4 +1,5 @@
 import { Show, createMemo, createSignal, dynamicComponent, onSettled } from 'solid-js';
+import type { GameSelectMode } from '../../../shared/protocol';
 import { TvEnded } from '../components/tv/TvEnded';
 import { TvExitModal } from '../components/tv/TvExitModal';
 import { TvGameFallback } from '../components/tv/TvGameFallback';
@@ -55,6 +56,33 @@ export function TvHost() {
     if (!s || !canEnterSelector()) return;
     socket.send({
       type: 'open_game_selector',
+      payload: { code: s.code, hostToken: hostToken() },
+    });
+  };
+
+  const handleSelectGameMode = (mode: GameSelectMode) => {
+    const s = state();
+    if (!s) return;
+    socket.send({
+      type: 'set_game_select_mode',
+      payload: { code: s.code, hostToken: hostToken(), mode },
+    });
+  };
+
+  const handleStartRandomGame = () => {
+    const s = state();
+    if (!s) return;
+    socket.send({
+      type: 'start_random_game',
+      payload: { code: s.code, hostToken: hostToken() },
+    });
+  };
+
+  const handleStopRandomized = () => {
+    const s = state();
+    if (!s) return;
+    socket.send({
+      type: 'stop_randomized',
       payload: { code: s.code, hostToken: hostToken() },
     });
   };
@@ -175,6 +203,8 @@ export function TvHost() {
               <Show when={s().phase === 'GAME_SELECT'}>
                 <TvGameSelector
                   state={s()}
+                  onSelectMode={handleSelectGameMode}
+                  onStartRandomGame={handleStartRandomGame}
                   onStartGame={handleStartGame}
                   onReturnToLobby={handleReturnToLobby}
                 />
@@ -207,6 +237,8 @@ export function TvHost() {
               <Show when={s().phase === 'ENDED'}>
                 <TvEnded
                   state={s()}
+                  onNextRandomGame={handleStartRandomGame}
+                  onStopRandomized={handleStopRandomized}
                   onChooseAnotherGame={handleChooseAnotherGame}
                   onReturnToLobby={handleReturnToLobby}
                 />

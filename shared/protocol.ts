@@ -1,5 +1,7 @@
 export type RoomPhase = 'LOBBY' | 'GAME_SELECT' | 'PLAYING' | 'ENDED';
 
+export type GameSelectMode = 'CHOOSE' | 'VOTE';
+
 export type RoomCode = string;
 
 export interface PlayerSummary {
@@ -28,6 +30,10 @@ export interface RoomState<THostState = unknown, TPlayerState = unknown> {
   maxPlayers: number;
   /** Registered games available in the game selector */
   games: GameInfo[];
+  /** Active sub-step during GAME_SELECT */
+  gameSelectMode?: GameSelectMode;
+  /** Whether the room is continuously cycling through random games */
+  randomizedMode?: boolean;
   /** Player votes (playerId -> gameId) during GAME_SELECT */
   gameVotes?: Record<string, string>;
   /** Game-specific state visible to the TV host */
@@ -86,6 +92,18 @@ export type ClientMessage =
     }
   | {
       type: 'open_game_selector';
+      payload: { code: string; playerId?: string; hostToken?: string };
+    }
+  | {
+      type: 'set_game_select_mode';
+      payload: { code: string; playerId?: string; hostToken?: string; mode: GameSelectMode };
+    }
+  | {
+      type: 'start_random_game';
+      payload: { code: string; playerId?: string; hostToken?: string };
+    }
+  | {
+      type: 'stop_randomized';
       payload: { code: string; playerId?: string; hostToken?: string };
     }
   | {

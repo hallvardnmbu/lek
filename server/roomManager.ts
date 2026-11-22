@@ -1,5 +1,6 @@
 import type {
   GameAction,
+  GameSelectMode,
   PlayerSummary,
   RoomPhase,
   RoomState,
@@ -32,6 +33,8 @@ export interface InternalRoom {
   lastActivityAt: number;
   players: Map<string, GamePlayer>;
   seats: Map<string, number>;
+  gameSelectMode: GameSelectMode;
+  randomizedMode: boolean;
   gameVotes: Map<string, string>;
   phaseTimer?: ReturnType<typeof setTimeout>;
   tickInterval?: ReturnType<typeof setInterval>;
@@ -47,6 +50,7 @@ export interface RoomManagerOptions {
   cleanupIntervalMs?: number;
   registry?: GameRegistry;
   webhooks?: WebhookManager;
+  randomizedNextDelayMs?: number;
 }
 
 export type ActionResult<T = Record<never, never>> =
@@ -61,6 +65,7 @@ export class RoomManager {
   private readonly defaultMaxPlayers: number;
   private readonly enableTickInterval: boolean;
   private readonly roomTtlMs: number;
+  private readonly randomizedNextDelayMs: number;
   private cleanupTimer?: ReturnType<typeof setInterval>;
   readonly registry: GameRegistry;
   readonly webhooks: WebhookManager;
@@ -73,6 +78,7 @@ export class RoomManager {
     this.defaultMaxPlayers = options.maxPlayers ?? 12;
     this.enableTickInterval = options.enableTickInterval ?? true;
     this.roomTtlMs = options.roomTtlMs ?? 4 * 60 * 60 * 1000;
+    this.randomizedNextDelayMs = options.randomizedNextDelayMs ?? 8_000;
     this.webhooks = options.webhooks ?? new WebhookManager();
 
     if (options.registry) {
@@ -122,6 +128,8 @@ export class RoomManager {
       lastActivityAt: Date.now(),
       players: new Map(),
       seats: new Map(),
+      gameSelectMode: 'CHOOSE',
+      randomizedMode: false,
       gameVotes: new Map(),
     };
 
@@ -308,8 +316,88 @@ export class RoomManager {
       };
     }
 
+    room.randomizedMode = false;
     this.resetRoomPhase(room, 'GAME_SELECT');
 
+    this.broadcastState(room);
+    return { ok: true, room };
+  }
+
+  setGameSelectMode(
+    rawCode: string,
+    actor: { playerId?: string; hostToken?: string },
+    mode: GameSelectMode
+  ): ActionResult<{ room: InternalRoom }> {
+    const auth = this.requireAuthorizedRoom(
+      rawCode,
+      actor,
+      'Only a room player or TV host can change the game selector mode.'
+    );
+    if (!auth.ok) return auth;
+    const { room } = auth;
+
+    if (room.phase !== 'GAME_SELECT') {
+      return {
+        ok: false,
+        code: 'INVALID_PHASE',
+        message: 'Game selector mode can only be changed in the game selector.',
+      };
+    }
+
+    room.lastActivityAt = Date.now();
+    room.gameSelectMode = mode;
+    this.broadcastState(room);
+    return { ok: true, room };
+  }
+
+  startRandomGame(
+    rawCode: string,
+    actor: { playerId?: string; hostToken?: string }
+  ): ActionResult<{ room: InternalRoom }> {
+    const auth = this.requireAuthorizedRoom(
+      rawCode,
+      actor,
+      'Only a room player or TV host can start a random game.'
+    );
+    if (!auth.ok) return auth;
+    const { room } = auth;
+
+    if (room.phase !== 'LOBBY' && room.phase !== 'GAME_SELECT' && room.phase !== 'ENDED') {
+      return { ok: false, code: 'INVALID_PHASE', message: 'Game has already started.' };
+    }
+
+    const game = this.pickRandomEligibleGame(room);
+    if (!game) {
+      return {
+        ok: false,
+        code: 'NO_GAME',
+        message: 'No eligible game found for the current player count.',
+      };
+    }
+
+    room.randomizedMode = true;
+    this.launchGame(room, game);
+    return { ok: true, room };
+  }
+
+  stopRandomized(
+    rawCode: string,
+    actor: { playerId?: string; hostToken?: string }
+  ): ActionResult<{ room: InternalRoom }> {
+    const auth = this.requireAuthorizedRoom(
+      rawCode,
+      actor,
+      'Only a room player or TV host can stop randomized mode.'
+    );
+    if (!auth.ok) return auth;
+    const { room } = auth;
+
+    room.randomizedMode = false;
+    if (room.phase === 'ENDED') {
+      this.clearTimers(room);
+      room.phaseEndsAt = null;
+    }
+    room.lastActivityAt = Date.now();
     this.broadcastState(room);
     return { ok: true, room };
   }
@@ -390,6 +478,7 @@ export class RoomManager {
       };
     }
 
+    room.randomizedMode = false;
     this.launchGame(room, game, options?.config);
     return { ok: true, room };
   }
@@ -458,6 +547,7 @@ export class RoomManager {
     const winnerGame = this.registry.get(winnerId);
     if (!winnerGame) return false;
 
+    room.randomizedMode = false;
     this.launchGame(room, winnerGame);
     return true;
   }
@@ -589,6 +679,7 @@ export class RoomManager {
     if (!auth.ok) return auth;
     const { room } = auth;
 
+    room.randomizedMode = false;
     this.resetRoomPhase(room, 'LOBBY');
 
     for (const p of room.players.values()) {
@@ -644,6 +735,8 @@ export class RoomManager {
       minPlayers,
       maxPlayers,
       games: this.registry.list(),
+      gameSelectMode: room.phase === 'GAME_SELECT' ? room.gameSelectMode : undefined,
+      randomizedMode: room.randomizedMode || undefined,
       gameVotes:
         room.phase === 'GAME_SELECT' ? Object.fromEntries(room.gameVotes) : undefined,
       hostState,
@@ -690,6 +783,7 @@ export class RoomManager {
     room.roundId = crypto.randomUUID();
     room.phaseEndsAt = null;
     room.gameState = null;
+    room.gameSelectMode = 'CHOOSE';
     room.gameVotes.clear();
   }
 
@@ -733,6 +827,10 @@ export class RoomManager {
     room.phase = 'ENDED';
     room.roundId = crypto.randomUUID();
     room.phaseEndsAt = null;
+    if (room.randomizedMode) {
+      room.phaseEndsAt = Date.now() + this.randomizedNextDelayMs;
+      this.scheduleRandomizedNextTimer(room, this.randomizedNextDelayMs);
+    }
     this.broadcastState(room);
 
     const standings = Array.from(room.players.values())
@@ -850,6 +948,53 @@ export class RoomManager {
         type: 'room_state',
         payload: this.buildStateForClient(room, playerId),
       });
+    }
+  }
+
+  private pickRandomEligibleGame(
+    room: InternalRoom
+  ): GameDefinition<any, any, any, any> | undefined {
+    const eligible = this.registry.list().filter((info) => {
+      const min = info.minPlayers ?? this.defaultMinPlayers;
+      const max = info.maxPlayers ?? this.defaultMaxPlayers;
+      return room.players.size >= min && room.players.size <= max;
+    });
+    if (eligible.length === 0) return undefined;
+
+    const nonRepeating =
+      room.gameId && eligible.length > 1
+        ? eligible.filter((info) => info.id !== room.gameId)
+        : eligible;
+    const pool = nonRepeating.length > 0 ? nonRepeating : eligible;
+    const chosen = pool[Math.floor(Math.random() * pool.length)];
+    return this.registry.get(chosen.id);
+  }
+
+  private scheduleRandomizedNextTimer(room: InternalRoom, durationMs: number): void {
+    room.phaseTimer = setTimeout(() => {
+      room.phaseEndsAt = null;
+      this.clearTimers(room);
+      if (room.phase !== 'ENDED' || !room.randomizedMode) return;
+
+      const nextGame = this.pickRandomEligibleGame(room);
+      if (!nextGame) {
+        room.randomizedMode = false;
+        this.broadcastState(room);
+        return;
+      }
+
+      this.launchGame(room, nextGame);
+    }, durationMs);
+
+    if (this.enableTickInterval) {
+      room.tickInterval = setInterval(() => {
+        if (room.phaseEndsAt === null) return;
+        const remainingMs = Math.max(0, room.phaseEndsAt - Date.now());
+        this.broadcaster.broadcastAll(room.code, {
+          type: 'tick',
+          payload: { remainingMs, phaseEndsAt: room.phaseEndsAt },
+        });
+      }, 1000);
     }
   }
 

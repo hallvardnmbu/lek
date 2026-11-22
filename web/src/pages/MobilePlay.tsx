@@ -117,16 +117,6 @@ export function MobilePlay(props: MobilePlayProps) {
     });
   };
 
-  const handleOpenSelector = () => {
-    const s = state();
-    const id = playerId();
-    if (!s || !id) return;
-    socket.send({
-      type: 'open_game_selector',
-      payload: { code: s.code, playerId: id },
-    });
-  };
-
   const handleVoteGame = (gameId: string) => {
     const s = state();
     const id = playerId();
@@ -134,16 +124,6 @@ export function MobilePlay(props: MobilePlayProps) {
     socket.send({
       type: 'vote_game',
       payload: { code: s.code, playerId: id, gameId },
-    });
-  };
-
-  const handleReturnToLobby = () => {
-    const s = state();
-    const id = playerId();
-    if (!s || !id) return;
-    socket.send({
-      type: 'return_to_lobby',
-      payload: { code: s.code, playerId: id },
     });
   };
 
@@ -200,7 +180,6 @@ export function MobilePlay(props: MobilePlayProps) {
               <MobileLobby
                 state={s()}
                 me={me()}
-                onOpenSelector={handleOpenSelector}
                 onLeave={handleLeave}
               />
             </Show>
@@ -210,7 +189,6 @@ export function MobilePlay(props: MobilePlayProps) {
                 state={s()}
                 playerId={playerId()!}
                 onVoteGame={handleVoteGame}
-                onReturnToLobby={handleReturnToLobby}
               />
             </Show>
 
@@ -241,8 +219,7 @@ export function MobilePlay(props: MobilePlayProps) {
             <Show when={s().phase === 'ENDED'}>
               <MobileEnded
                 score={me()?.score ?? 0}
-                onOpenSelector={handleOpenSelector}
-                onReturnToLobby={handleReturnToLobby}
+                randomizedMode={s().randomizedMode}
               />
             </Show>
           </div>

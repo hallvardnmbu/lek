@@ -64,7 +64,7 @@ export function TvLobby(props: TvLobbyProps) {
             onClick={props.onOpenSelector}
           >
             {props.canEnterSelector
-              ? 'Choose Game'
+              ? 'Start'
               : `Waiting for ${Math.max(0, props.state.minPlayers - props.state.players.length)} more...`}
           </button>
           <button class="lobby-card-label lobby-sound-btn" onClick={props.onToggleSound}>

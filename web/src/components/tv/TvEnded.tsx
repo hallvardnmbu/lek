@@ -1,8 +1,10 @@
-import { For, createMemo } from 'solid-js';
+import { For, Show, createMemo } from 'solid-js';
 import type { RoomState } from '../../../../shared/protocol';
 
 interface TvEndedProps {
   state: RoomState;
+  onNextRandomGame: () => void;
+  onStopRandomized: () => void;
   onChooseAnotherGame: () => void;
   onReturnToLobby: () => void;
 }
@@ -14,6 +16,9 @@ export function TvEnded(props: TvEndedProps) {
 
   return (
     <div class="tv-phase-center">
+      <Show when={props.state.randomizedMode}>
+        <p class="eyebrow">RANDOMIZED MODE · NEXT GAME SOON</p>
+      </Show>
       <h1 class="tv-hero-title">Game Over</h1>
 
       <div class="podium-list">
@@ -32,9 +37,21 @@ export function TvEnded(props: TvEndedProps) {
         class="tv-action-bar"
         style={{ display: 'flex', gap: '1rem', 'justify-content': 'center' }}
       >
-        <button class="btn btn-tv" onClick={props.onChooseAnotherGame}>
-          Choose Game
-        </button>
+        <Show
+          when={props.state.randomizedMode}
+          fallback={
+            <button class="btn btn-tv" onClick={props.onChooseAnotherGame}>
+              Choose Game
+            </button>
+          }
+        >
+          <button class="btn btn-tv" onClick={props.onNextRandomGame}>
+            Next Game
+          </button>
+          <button class="btn btn-tv" onClick={props.onStopRandomized}>
+            Stop
+          </button>
+        </Show>
         <button class="btn btn-tv" onClick={props.onReturnToLobby}>
           Back to Lobby
         </button>

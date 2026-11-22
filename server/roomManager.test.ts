@@ -6,6 +6,7 @@ import { WebhookManager, verifyWebhookSignature } from './webhooks';
 function createTestHarness(options?: {
   registry?: GameRegistry;
   webhooks?: WebhookManager;
+  randomizedNextDelayMs?: number;
 }) {
   const hostMessages: unknown[] = [];
   const playerMessages = new Map<string, unknown[]>();
@@ -29,6 +30,7 @@ function createTestHarness(options?: {
     enableTickInterval: false,
     registry: options?.registry,
     webhooks: options?.webhooks,
+    randomizedNextDelayMs: options?.randomizedNextDelayMs,
   });
 
   return { manager, hostMessages, playerMessages, broadcastMessages };
@@ -266,6 +268,111 @@ describe('RoomManager & GameDefinition foundation', () => {
     manager.markPlayerDisconnected(room.code, p2.player.id);
     expect(room.phase).toBe('PLAYING');
     expect(room.gameId).toBe('game-a');
+
+    manager.disposeRoom(room.code);
+  });
+
+  it('defaults game selector to CHOOSE mode, switches to VOTE, and starts eligible random games', () => {
+    const registry = new GameRegistry();
+    const makeGame = (id: string, minPlayers: number, maxPlayers: number): GameDefinition<unknown> => ({
+      id,
+      name: id,
+      minPlayers,
+      maxPlayers,
+      onStart() {
+        return {};
+      },
+      onPlayerAction(_ctx, state) {
+        return state;
+      },
+      getHostView(state) {
+        return state;
+      },
+      getPlayerView(state) {
+        return state;
+      },
+    });
+    registry.register(makeGame('party-game', 2, 6));
+    registry.register(makeGame('solo-only', 1, 1));
+
+    const { manager } = createTestHarness({ registry });
+    const { room, hostToken } = manager.createRoom();
+
+    const p1 = manager.joinRoom(room.code, 'Alice');
+    const p2 = manager.joinRoom(room.code, 'Bob');
+    expect(p1.ok && p2.ok).toBe(true);
+    if (!p1.ok || !p2.ok) return;
+
+    expect(manager.openGameSelector(room.code, { hostToken }).ok).toBe(true);
+    expect(manager.buildStateForClient(room).gameSelectMode).toBe('CHOOSE');
+
+    expect(manager.setGameSelectMode(room.code, { playerId: p1.player.id }, 'VOTE').ok).toBe(true);
+    expect(manager.buildStateForClient(room).gameSelectMode).toBe('VOTE');
+
+    expect(manager.openGameSelector(room.code, { hostToken }).ok).toBe(true);
+    expect(manager.buildStateForClient(room).gameSelectMode).toBe('CHOOSE');
+
+    const randomStart = manager.startRandomGame(room.code, { hostToken });
+    expect(randomStart.ok).toBe(true);
+    expect(room.phase).toBe('PLAYING');
+    expect(room.gameId).toBe('party-game');
+    expect(manager.buildStateForClient(room).randomizedMode).toBe(true);
+
+    manager.disposeRoom(room.code);
+  });
+
+  it('continues cycling random games after a game ends until stopped', async () => {
+    const registry = new GameRegistry();
+    const makeGame = (id: string): GameDefinition<unknown> => ({
+      id,
+      name: id,
+      minPlayers: 1,
+      maxPlayers: 6,
+      onStart() {
+        return {};
+      },
+      onPlayerAction(_ctx, state) {
+        return state;
+      },
+      getHostView(state) {
+        return state;
+      },
+      getPlayerView(state) {
+        return state;
+      },
+    });
+    registry.register(makeGame('game-a'));
+    registry.register(makeGame('game-b'));
+
+    const { manager } = createTestHarness({ registry, randomizedNextDelayMs: 25 });
+    const { room, hostToken } = manager.createRoom();
+
+    const p1 = manager.joinRoom(room.code, 'Alice');
+    expect(p1.ok).toBe(true);
+    if (!p1.ok) return;
+
+    expect(manager.startRandomGame(room.code, { hostToken }).ok).toBe(true);
+    const firstGameId = room.gameId;
+    expect(room.phase).toBe('PLAYING');
+    expect(manager.buildStateForClient(room).randomizedMode).toBe(true);
+
+    expect(manager.endGame(room.code, { hostToken }).ok).toBe(true);
+    expect(room.phase).toBe('ENDED');
+    expect(room.phaseEndsAt).not.toBeNull();
+
+    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    expect(room.phase).toBe('PLAYING');
+    expect(room.gameId).not.toBe(firstGameId);
+    expect(manager.buildStateForClient(room).randomizedMode).toBe(true);
+
+    expect(manager.endGame(room.code, { hostToken }).ok).toBe(true);
+    expect(manager.stopRandomized(room.code, { playerId: p1.player.id }).ok).toBe(true);
+    expect(manager.buildStateForClient(room).randomizedMode).toBeUndefined();
+    expect(room.phaseEndsAt).toBeNull();
+
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(room.phase).toBe('ENDED');
 
     manager.disposeRoom(room.code);
   });

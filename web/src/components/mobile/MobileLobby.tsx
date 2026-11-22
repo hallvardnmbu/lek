@@ -5,7 +5,6 @@ import { ARMS, ARM_CANVAS, armSrc } from '../arms';
 interface MobileLobbyProps {
   state: RoomState;
   me: PlayerSummary | null;
-  onOpenSelector: () => void;
   onLeave: () => void;
 }
 
@@ -42,15 +41,11 @@ export function MobileLobby(props: MobileLobbyProps) {
       </Show>
 
       <div style={{ display: 'grid', gap: '0.75rem', 'margin-top': '1rem' }}>
-        <button
-          class="btn btn-block"
-          disabled={props.state.players.length < props.state.minPlayers}
-          onClick={props.onOpenSelector}
-        >
-          {props.state.players.length >= props.state.minPlayers
-            ? 'Choose Game'
-            : `Need ${props.state.minPlayers - props.state.players.length} more`}
-        </button>
+        <Show when={props.state.players.length < props.state.minPlayers}>
+          <p class="wait-note">
+            Need {props.state.minPlayers - props.state.players.length} more
+          </p>
+        </Show>
 
         <button class="btn btn-block" onClick={props.onLeave}>
           Leave Room

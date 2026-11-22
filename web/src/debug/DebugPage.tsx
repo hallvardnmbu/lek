@@ -103,12 +103,6 @@ function DebugPhone(props: DebugPhoneProps) {
                   <MobileLobby
                     state={s()}
                     me={me() ?? null}
-                    onOpenSelector={() =>
-                      socket.send({
-                        type: 'open_game_selector',
-                        payload: { code: s().code, playerId: playerId()! },
-                      })
-                    }
                     onLeave={handleLeave}
                   />
                 </Show>
@@ -121,12 +115,6 @@ function DebugPhone(props: DebugPhoneProps) {
                       socket.send({
                         type: 'vote_game',
                         payload: { code: s().code, playerId: playerId()!, gameId },
-                      })
-                    }
-                    onReturnToLobby={() =>
-                      socket.send({
-                        type: 'return_to_lobby',
-                        payload: { code: s().code, playerId: playerId()! },
                       })
                     }
                   />
@@ -159,18 +147,7 @@ function DebugPhone(props: DebugPhoneProps) {
                 <Show when={s().phase === 'ENDED'}>
                   <MobileEnded
                     score={me()?.score ?? 0}
-                    onOpenSelector={() =>
-                      socket.send({
-                        type: 'open_game_selector',
-                        payload: { code: s().code, playerId: playerId()! },
-                      })
-                    }
-                    onReturnToLobby={() =>
-                      socket.send({
-                        type: 'return_to_lobby',
-                        payload: { code: s().code, playerId: playerId()! },
-                      })
-                    }
+                    randomizedMode={s().randomizedMode}
                   />
                 </Show>
               </>
@@ -437,6 +414,18 @@ export function DebugPage() {
                   <Show when={s().phase === 'GAME_SELECT'}>
                     <TvGameSelector
                       state={s()}
+                      onSelectMode={(mode) =>
+                        socket.send({
+                          type: 'set_game_select_mode',
+                          payload: { code: s().code, hostToken: hostToken(), mode },
+                        })
+                      }
+                      onStartRandomGame={() =>
+                        socket.send({
+                          type: 'start_random_game',
+                          payload: { code: s().code, hostToken: hostToken() },
+                        })
+                      }
                       onStartGame={(gameId) =>
                         socket.send({
                           type: 'start_game',
@@ -489,6 +478,18 @@ export function DebugPage() {
                   <Show when={s().phase === 'ENDED'}>
                     <TvEnded
                       state={s()}
+                      onNextRandomGame={() =>
+                        socket.send({
+                          type: 'start_random_game',
+                          payload: { code: s().code, hostToken: hostToken() },
+                        })
+                      }
+                      onStopRandomized={() =>
+                        socket.send({
+                          type: 'stop_randomized',
+                          payload: { code: s().code, hostToken: hostToken() },
+                        })
+                      }
                       onChooseAnotherGame={() =>
                         socket.send({
                           type: 'open_game_selector',
