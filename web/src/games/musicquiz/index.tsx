@@ -5,7 +5,7 @@ import {
   type MusicQuizSong,
 } from '../../../../shared/games/musicquiz';
 import { secondsLeft, type GameUiDefinition, type MobileGameViewProps, type TvGameViewProps } from '../registry';
-import { loadQuizCatalog, quizCatalog } from './catalog';
+import { loadQuizCatalog, quizCatalog, songById } from './catalog';
 import './musicquiz.css';
 
 function MusicQuizTvView(props: TvGameViewProps<MusicQuizHostView>) {
@@ -18,6 +18,7 @@ function MusicQuizTvView(props: TvGameViewProps<MusicQuizHostView>) {
   let playingKey = '';
 
   onSettled(() => {
+    loadQuizCatalog();
     audio = new Audio();
     audio.preload = 'auto';
     return () => {
@@ -64,7 +65,9 @@ function MusicQuizTvView(props: TvGameViewProps<MusicQuizHostView>) {
     if (!v) return '';
     if (v.phase === 'INTRO') return `Song starts in ${secondsLeft(props.remainingMs)}s`;
     if (v.phase === 'REVEAL') {
-      return v.round < v.totalRounds ? `Next round in ${secondsLeft(props.remainingMs)}s` : 'Final scores coming up';
+      return v.round < v.totalRounds
+        ? `Next round in ${secondsLeft(props.remainingMs)}s`
+        : 'Press Finish when you are ready for the final scores';
     }
     return '';
   };
@@ -110,6 +113,11 @@ function MusicQuizTvView(props: TvGameViewProps<MusicQuizHostView>) {
             {(result) => (
               <div class={`mq-result-pill ${result.correct ? 'ok' : 'missed'}`}>
                 <span>{result.playerName}</span>
+                <span class="mq-pill-guess">
+                  {result.guessSongId
+                    ? (songById(result.guessSongId)?.title ?? 'unknown song')
+                    : 'no guess'}
+                </span>
                 <strong>{result.correct ? `+${result.points}` : 'missed'}</strong>
               </div>
             )}
@@ -133,6 +141,11 @@ function MusicQuizTvView(props: TvGameViewProps<MusicQuizHostView>) {
         <Show when={view()?.phase === 'GUESSING'}>
           <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'reveal' })}>
             Reveal Now
+          </button>
+        </Show>
+        <Show when={view()?.phase === 'REVEAL' && (view()?.round ?? 0) >= (view()?.totalRounds ?? 0)}>
+          <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'next' })}>
+            Finish
           </button>
         </Show>
         <Show when={nextHint()}>
@@ -174,9 +187,6 @@ function MusicQuizMobileView(props: MobileGameViewProps<MusicQuizPlayerView>) {
       .slice(0, 12)
       .map((entry) => entry.song);
   });
-
-  const songById = (id: string | null | undefined) =>
-    id ? quizCatalog().find((song) => song.id === id) ?? null : null;
 
   const submitGuess = (songId: string) => {
     props.sendAction({ type: 'guess', payload: { songId } });
@@ -291,11 +301,20 @@ function MusicQuizMobileView(props: MobileGameViewProps<MusicQuizPlayerView>) {
             {(result) => (
               <div class={`mq-round-row ${result.correct ? 'ok' : ''}`}>
                 <span>{result.playerName}</span>
+                <span class="mq-round-guess">
+                  {result.guessSongId
+                    ? (songById(result.guessSongId)?.title ?? 'unknown song')
+                    : 'no guess'}
+                </span>
                 <span>{result.correct ? `+${result.points}` : '-'}</span>
               </div>
             )}
           </For>
         </div>
+
+        <Show when={(view()?.round ?? 0) >= (view()?.totalRounds ?? 0)}>
+          <p class="muted mq-guessed-progress">Waiting for the host to show the final scores…</p>
+        </Show>
       </Show>
     </div>
   );

@@ -89,7 +89,7 @@ describe('Wikipedia Race sanitization', () => {
 });
 
 describe('Wikipedia Race game', () => {
-  it('runs a race from start to target and marks the last connected player as loser', async () => {
+  it('runs a race until every player finishes and marks the last arrival as loser', async () => {
     const players: TestPlayer[] = [
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
@@ -168,6 +168,18 @@ describe('Wikipedia Race game', () => {
       payload: { title: state.targetTitle },
     })!;
 
+    expect(state.phase).toBe('RACING');
+    expect(gameWithArticles.getPlayerView(state, 'p2', ctx).finishedRank).toBe(2);
+
+    state = gameWithArticles.onPlayerAction(ctx, state, 'p3', {
+      type: 'navigate',
+      payload: { title: 'Hub' },
+    })!;
+    state = gameWithArticles.onPlayerAction(ctx, state, 'p3', {
+      type: 'navigate',
+      payload: { title: state.targetTitle },
+    })!;
+
     expect(state.phase).toBe('RESULTS');
     expect(state.loserId).toBe('p3');
     expect(events.some((e) => e.event === 'wikirace_finished')).toBe(true);
@@ -177,7 +189,7 @@ describe('Wikipedia Race game', () => {
     expect(gameWithArticles.getHostView(state, ctx).loserName).toBe('Carol');
   });
 
-  it('completes the race if a player disconnects leaving one unfinished player', async () => {
+  it('continues the race after a disconnect until every connected player finishes', async () => {
     const players: TestPlayer[] = [
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
@@ -206,6 +218,12 @@ describe('Wikipedia Race game', () => {
 
     players[2].connected = false;
     state = game.onPlayerDisconnect!(ctx, state, 'p3')!;
+    expect(state.phase).toBe('RACING');
+
+    state = game.onPlayerAction(ctx, state, 'p2', {
+      type: 'navigate',
+      payload: { title: 'Goal' },
+    })!;
     expect(state.phase).toBe('RESULTS');
     expect(state.loserId).toBe('p2');
   });

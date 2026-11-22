@@ -27,7 +27,9 @@ function GeoGuessTvView(props: TvGameViewProps<GeoGuessHostView>) {
   return (
     <div class="tv-phase-center geo-tv-wrap">
       <div class="geo-tv-header">
-        <p class="eyebrow">GEO-GUESS ROULETTE · ROUND {host()?.round ?? 1}</p>
+        <p class="eyebrow">
+          GEO-GUESS ROULETTE · ROUND {host()?.round ?? 1} OF {host()?.totalRounds ?? 5}
+        </p>
         <Show when={host()?.phase === 'GUESSING' && props.remainingMs !== null}>
           <span class="geo-tv-timer">{secondsLeft(props.remainingMs)}s</span>
         </Show>
@@ -96,7 +98,13 @@ function GeoGuessTvView(props: TvGameViewProps<GeoGuessHostView>) {
                       {player.distanceKm !== null ? `${player.distanceKm} km` : 'No guess'}
                     </span>
                     <span class="geo-tv-badge">
-                      {player.isWinner ? 'WIN' : player.drinks ? 'DRINK' : `${player.score} pts`}
+                      {player.isWinner
+                        ? `WIN +${player.roundPoints ?? 0}`
+                        : player.drinks
+                          ? 'DRINK'
+                          : player.roundPoints !== null
+                            ? `+${player.roundPoints}`
+                            : `${player.score} pts`}
                     </span>
                   </div>
                 )}
@@ -114,7 +122,7 @@ function GeoGuessTvView(props: TvGameViewProps<GeoGuessHostView>) {
         </Show>
         <Show when={host()?.phase === 'REVEAL' || host()?.error}>
           <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'next_round' })}>
-            Next Round
+            {(host()?.round ?? 1) >= (host()?.totalRounds ?? 5) ? 'Finish' : 'Next Round'}
           </button>
         </Show>
         <button class="btn btn-tv" onClick={props.endGame}>
@@ -148,7 +156,9 @@ function GeoGuessMobileView(props: MobileGameViewProps<GeoGuessPlayerView>) {
   return (
     <div class="geo-mobile-wrap">
       <div class="geo-mobile-header">
-        <span class="eyebrow">ROUND {view()?.round ?? 1}</span>
+        <span class="eyebrow">
+          ROUND {view()?.round ?? 1} OF {view()?.totalRounds ?? 5}
+        </span>
         <Show when={view()?.phase === 'GUESSING' && props.remainingMs !== null}>
           <span class="geo-mobile-timer">{secondsLeft(props.remainingMs)}s</span>
         </Show>
@@ -206,6 +216,9 @@ function GeoGuessMobileView(props: MobileGameViewProps<GeoGuessPlayerView>) {
           <p class="geo-mobile-distance">
             {view()?.distanceKm != null ? `${view()!.distanceKm} km away` : 'No guess submitted'}
           </p>
+          <Show when={view()?.roundPoints != null}>
+            <p class="geo-mobile-points">+{view()!.roundPoints} pts</p>
+          </Show>
         </div>
 
         <Show when={view()?.target}>
@@ -225,7 +238,7 @@ function GeoGuessMobileView(props: MobileGameViewProps<GeoGuessPlayerView>) {
           class="btn geo-mobile-submit"
           onClick={() => props.sendAction({ type: 'next_round' })}
         >
-          Next Round
+          {(view()?.round ?? 1) >= (view()?.totalRounds ?? 5) ? 'Finish' : 'Next Round'}
         </button>
       </Show>
     </div>

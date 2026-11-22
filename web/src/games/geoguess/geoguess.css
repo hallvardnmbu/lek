@@ -289,6 +289,12 @@
   color: var(--muted);
 }
 
+.geo-mobile-points {
+  margin: 0.25rem 0 0;
+  font-weight: 800;
+  color: var(--accent);
+}
+
 .geo-map {
   position: relative;
   overflow: hidden;

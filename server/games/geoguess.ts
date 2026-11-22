@@ -12,7 +12,10 @@ import { connectedPlayers } from './helpers';
 
 const POLL_MS = 120;
 const ROUND_DURATION_MS = 45_000;
+const TOTAL_ROUNDS = 5;
 const EARTH_RADIUS_KM = 6371;
+const MAX_ROUND_POINTS = 100;
+const POINTS_FALLOFF_KM = 2_000;
 
 const PLAYER_COLORS = [
   '#38bdf8',
@@ -40,9 +43,11 @@ interface GeoGuessInbox {
 interface GeoGuessState {
   phase: GeoGuessPhase;
   round: number;
+  totalRounds: number;
   spot: GeoSpot | null;
   guesses: Record<string, GuessEntry>;
   usedIds: string[];
+  roundPoints: Record<string, number>;
   winnerId: string | null;
   drinkerId: string | null;
   error: string | null;
@@ -70,6 +75,10 @@ function normalizeLng(lng: number): number {
   let v = ((lng + 180) % 360 + 360) % 360 - 180;
   if (v === -180 && lng > 0) v = 180;
   return v;
+}
+
+function closenessPoints(distanceKm: number): number {
+  return Math.max(0, Math.round(MAX_ROUND_POINTS * Math.exp(-distanceKm / POINTS_FALLOFF_KM)));
 }
 
 function playerColor(index: number): string {
@@ -102,14 +111,29 @@ function startRound(
   return {
     phase: 'LOADING',
     round,
+    totalRounds: TOTAL_ROUNDS,
     spot: null,
     guesses: {},
     usedIds,
+    roundPoints: {},
     winnerId: null,
     drinkerId: null,
     error: null,
     inbox,
   };
+}
+
+function advanceRound(
+  ctx: GameContext,
+  fetcher: SpotFetcher,
+  state: GeoGuessState
+): GeoGuessState {
+  if (state.round >= state.totalRounds) {
+    ctx.endGame();
+    return state;
+  }
+  ctx.clearTimer();
+  return startRound(ctx, fetcher, state.round + 1, state.usedIds);
 }
 
 function revealRound(ctx: GameContext, state: GeoGuessState): void {
@@ -129,8 +153,13 @@ function revealRound(ctx: GameContext, state: GeoGuessState): void {
 
   const winner = submitted[0] ?? null;
   state.winnerId = winner ? winner.id : null;
-  if (winner) {
-    ctx.addPlayerScore(winner.id, 1);
+
+  for (const p of players) {
+    const guess = state.guesses[p.id];
+    if (!guess) continue;
+    const points = closenessPoints(guess.distanceKm);
+    state.roundPoints[p.id] = points;
+    ctx.addPlayerScore(p.id, points);
   }
 
   state.drinkerId = null;
@@ -174,6 +203,7 @@ function buildResultEntries(ctx: GameContext, state: GeoGuessState): GeoGuessRes
         color: playerColor(idx),
         guess: isReveal && guess ? { lat: guess.lat, lng: guess.lng } : null,
         distanceKm: isReveal && guess ? Math.round(guess.distanceKm) : null,
+        roundPoints: isReveal && state.roundPoints[p.id] !== undefined ? state.roundPoints[p.id] : null,
         isWinner: isReveal && state.winnerId === p.id,
         drinks: isReveal && state.drinkerId === p.id,
         connected: p.connected,
@@ -211,8 +241,7 @@ export function createGeoGuessGame(
 
       if (a.type === 'next_round' || a.type === 'skip_spot') {
         if (state.phase === 'REVEAL' || (a.type === 'skip_spot' && state.phase !== 'LOADING')) {
-          ctx.clearTimer();
-          return startRound(ctx, fetcher, state.round + 1, state.usedIds);
+          return advanceRound(ctx, fetcher, state);
         }
         return state;
       }
@@ -242,8 +271,7 @@ export function createGeoGuessGame(
 
     onHostAction(ctx, state, action) {
       if (action.type === 'next_round' || action.type === 'skip_spot') {
-        ctx.clearTimer();
-        return startRound(ctx, fetcher, state.round + 1, state.usedIds);
+        return advanceRound(ctx, fetcher, state);
       }
       return state;
     },
@@ -291,6 +319,7 @@ export function createGeoGuessGame(
       return {
         phase: state.phase,
         round: state.round,
+        totalRounds: state.totalRounds,
         imageUrl: state.spot?.imageUrl ?? null,
         spotLabel: isReveal ? (state.spot?.label ?? null) : null,
         target: isReveal ? (state.spot?.coords ?? null) : null,
@@ -310,11 +339,13 @@ export function createGeoGuessGame(
       return {
         phase: state.phase,
         round: state.round,
+        totalRounds: state.totalRounds,
         lockedIn: Boolean(guess),
         guess: guess ? { lat: guess.lat, lng: guess.lng } : null,
         target: isReveal ? (state.spot?.coords ?? null) : null,
         spotLabel: isReveal ? (state.spot?.label ?? null) : null,
         distanceKm: isReveal && guess ? Math.round(guess.distanceKm) : null,
+        roundPoints: isReveal && state.roundPoints[playerId] !== undefined ? state.roundPoints[playerId] : null,
         isWinner: isReveal && state.winnerId === playerId,
         drinks: isReveal && state.drinkerId === playerId,
       };

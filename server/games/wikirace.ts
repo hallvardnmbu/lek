@@ -108,13 +108,16 @@ function checkRaceCompletion(ctx: GameContext, state: WikiRaceState): void {
   if (connected.length === 0) return;
 
   const unfinished = connected.filter((p) => !state.racers[p.id]?.finishedRank);
-  const isDone =
-    (connected.length >= 2 && unfinished.length <= 1) ||
-    (connected.length === 1 && unfinished.length === 0);
-  if (!isDone) return;
+  if (unfinished.length > 0) return;
 
   state.phase = 'RESULTS';
-  state.loserId = connected.length >= 2 && unfinished.length === 1 ? unfinished[0].id : null;
+  state.loserId =
+    connected.length >= 2
+      ? [...connected].sort(
+          (a, b) =>
+            (state.racers[b.id]?.finishedRank ?? 0) - (state.racers[a.id]?.finishedRank ?? 0)
+        )[0]?.id ?? null
+      : null;
   ctx.clearTimer();
   ctx.broadcastEvent('wikirace_finished', { loserId: state.loserId });
 }

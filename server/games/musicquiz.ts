@@ -81,7 +81,9 @@ function reveal(ctx: GameContext, state: MusicQuizState): MusicQuizState {
 
   state.phase = 'REVEAL';
   state.lastResults = results;
-  ctx.setTimer(REVEAL_MS);
+  if (state.round < state.totalRounds) {
+    ctx.setTimer(REVEAL_MS);
+  }
   return state;
 }
 
@@ -167,10 +169,13 @@ export function createMusicQuizGame(
     },
 
     onHostAction(ctx, state, action) {
-      if (action.type !== 'reveal' || state.phase !== 'GUESSING') {
-        return state;
+      if (action.type === 'reveal' && state.phase === 'GUESSING') {
+        return reveal(ctx, state);
       }
-      return reveal(ctx, state);
+      if (action.type === 'next' && state.phase === 'REVEAL') {
+        return nextRound(ctx, state);
+      }
+      return state;
     },
 
     onPlayerDisconnect(ctx, state) {

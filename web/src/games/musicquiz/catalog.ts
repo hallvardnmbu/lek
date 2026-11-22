@@ -19,3 +19,8 @@ export async function loadQuizCatalog(): Promise<void> {
 }
 
 export { quizCatalog };
+
+export function songById(id: string | null | undefined): MusicQuizSong | null {
+  if (!id) return null;
+  return quizCatalog().find((song) => song.id === id) ?? null;
+}

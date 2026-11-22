@@ -13,6 +13,7 @@ function makeContext(playersInput: Array<{ id: string; name: string; connected?:
   }));
 
   const events: Array<{ event: string; payload: unknown }> = [];
+  let ended = false;
 
   const ctx: GameContext = {
     roomCode: 'ABCD',
@@ -35,13 +36,16 @@ function makeContext(playersInput: Array<{ id: string; name: string; connected?:
     sendEventToHost: () => {},
     sendEventToPlayer: () => {},
     emitWebhook: () => {},
-    endGame: () => {},
+    endGame: () => {
+      ended = true;
+    },
   };
 
   return {
     ctx,
     players,
     events,
+    isEnded: () => ended,
   };
 }
 
@@ -62,7 +66,7 @@ describe('geoguess game', () => {
     expect(km).toBeLessThan(360);
   });
 
-  test('loads spot, accepts guesses, awards closest and marks furthest to drink', async () => {
+  test('loads spot, accepts guesses, awards closeness points and marks furthest to drink', async () => {
     const game = createGeoGuessGame(async () => TEST_SPOT);
     const { ctx, players, events } = makeContext([
       { id: 'p1', name: 'Alice' },
@@ -72,6 +76,7 @@ describe('geoguess game', () => {
 
     let state = game.onStart(ctx);
     expect(state.phase).toBe('LOADING');
+    expect(state.totalRounds).toBe(5);
 
     await Promise.resolve();
     state = game.onTimerExpired!(ctx, state) ?? state;
@@ -101,7 +106,9 @@ describe('geoguess game', () => {
     }) ?? state;
 
     expect(state.phase).toBe('REVEAL');
-    expect(players.find((p) => p.id === 'p1')?.score).toBe(1);
+    expect(players.find((p) => p.id === 'p1')?.score).toBeGreaterThan(95);
+    expect(players.find((p) => p.id === 'p2')?.score).toBeLessThan(5);
+    expect(players.find((p) => p.id === 'p3')?.score).toBeGreaterThanOrEqual(80);
     expect(events.some((e) => e.event === 'geoguess_reveal')).toBe(true);
 
     const hostReveal = game.getHostView(state, ctx);
@@ -109,6 +116,7 @@ describe('geoguess game', () => {
     expect(hostReveal.drinkerName).toBe('Bob');
     expect(hostReveal.spotLabel).toBe('Paris, France');
     expect(hostReveal.target).toEqual(TEST_SPOT.coords);
+    expect(hostReveal.players.find((p) => p.playerId === 'p1')?.roundPoints).toBeGreaterThan(95);
 
     const bobView = game.getPlayerView(state, 'p2', ctx);
     expect(bobView.drinks).toBe(true);
@@ -117,6 +125,7 @@ describe('geoguess game', () => {
     const aliceView = game.getPlayerView(state, 'p1', ctx);
     expect(aliceView.isWinner).toBe(true);
     expect(aliceView.drinks).toBe(false);
+    expect(aliceView.roundPoints).toBeGreaterThan(95);
   });
 
   test('non-submitter drinks when timer expires', async () => {
@@ -159,5 +168,33 @@ describe('geoguess game', () => {
     state = game.onHostAction!(ctx, state, { type: 'next_round' }) ?? state;
     expect(state.phase).toBe('LOADING');
     expect(state.round).toBe(2);
+  });
+
+  test('ends the game after the final round instead of starting a new one', async () => {
+    const game = createGeoGuessGame(async () => TEST_SPOT);
+    const { ctx, isEnded } = makeContext([{ id: 'p1', name: 'Alice' }]);
+
+    let state = game.onStart(ctx);
+    await Promise.resolve();
+    state = game.onTimerExpired!(ctx, state) ?? state;
+
+    for (let round = 1; round <= 5; round++) {
+      state = game.onPlayerAction(ctx, state, 'p1', {
+        type: 'submit_guess',
+        payload: { lat: 48.8, lng: 2.3 },
+      }) ?? state;
+      expect(state.phase).toBe('REVEAL');
+
+      state = game.onHostAction!(ctx, state, { type: 'next_round' }) ?? state;
+      if (round < 5) {
+        expect(state.phase).toBe('LOADING');
+        expect(state.round).toBe(round + 1);
+        await Promise.resolve();
+        state = game.onTimerExpired!(ctx, state) ?? state;
+      }
+    }
+
+    expect(isEnded()).toBe(true);
+    expect(state.phase).toBe('REVEAL');
   });
 });

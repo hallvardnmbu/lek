@@ -78,11 +78,10 @@ function WikiRaceMobileView(props: MobileGameViewProps<WikiRacePlayerView>) {
   const view = () => props.state.playerState;
 
   createEffect(
-    () => view()?.currentTitle,
-    (title) => {
-      if (title) {
-        window.scrollTo(0, 0);
-      }
+    () => ({ html: view()?.articleHtml, title: view()?.currentTitle }),
+    (deps) => {
+      if (!deps.html || !deps.title) return;
+      requestAnimationFrame(() => window.scrollTo(0, 0));
     }
   );
 

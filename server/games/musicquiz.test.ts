@@ -230,6 +230,25 @@ describe('Music Quiz game', () => {
     expect(hostView.results.find((r) => r.playerId === 'p2')?.correct).toBe(false);
   });
 
+  it('waits for the host on the final reveal and ends via the next action', () => {
+    const game = makeGame();
+    const { ctx, isEnded } = createTestCtx('mq-final', twoPlayers);
+
+    let state = game.onStart(ctx, { rounds: 1 });
+    state = game.onTimerExpired(ctx, state)!;
+    expect(state.phase).toBe('GUESSING');
+
+    const answerId = state.songs[0].id;
+    state = game.onPlayerAction(ctx, state, 'p1', { type: 'guess', payload: { songId: answerId } })!;
+    state = game.onPlayerAction(ctx, state, 'p2', { type: 'guess', payload: { songId: answerId } })!;
+    expect(state.phase).toBe('REVEAL');
+    expect(isEnded()).toBe(false);
+
+    state = game.onHostAction(ctx, state, { type: 'next' })!;
+    expect(state.phase).toBe('REVEAL');
+    expect(isEnded()).toBe(true);
+  });
+
   it('clamps rounds to the catalog size and avoids repeating songs across games', () => {
     const game = makeGame();
 

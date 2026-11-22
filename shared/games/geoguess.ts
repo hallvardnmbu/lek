@@ -11,6 +11,7 @@ export interface GeoGuessResultEntry {
   color: string;
   guess: GeoPoint | null;
   distanceKm: number | null;
+  roundPoints: number | null;
   isWinner: boolean;
   drinks: boolean;
   connected: boolean;
@@ -20,6 +21,7 @@ export interface GeoGuessResultEntry {
 export interface GeoGuessHostView {
   phase: GeoGuessPhase;
   round: number;
+  totalRounds: number;
   imageUrl: string | null;
   spotLabel: string | null;
   target: GeoPoint | null;
@@ -34,11 +36,13 @@ export interface GeoGuessHostView {
 export interface GeoGuessPlayerView {
   phase: GeoGuessPhase;
   round: number;
+  totalRounds: number;
   lockedIn: boolean;
   guess: GeoPoint | null;
   target: GeoPoint | null;
   spotLabel: string | null;
   distanceKm: number | null;
+  roundPoints: number | null;
   isWinner: boolean;
   drinks: boolean;
 }

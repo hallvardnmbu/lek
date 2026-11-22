@@ -125,6 +125,12 @@ export function TileMap(props: TileMapProps) {
   let startCenterWorldY = 0;
   let movedDistance = 0;
 
+  const activePointers = new Map<number, { x: number; y: number }>();
+  let pinching = false;
+  let pinchStartDist = 0;
+  let pinchStartZoom = 2;
+  let pinchAnchor: GeoPoint | null = null;
+
   const updateSize = (el: HTMLDivElement) => {
     const rect = el.getBoundingClientRect();
     if (rect.width > 0 && rect.height > 0) {
@@ -205,27 +211,93 @@ export function TileMap(props: TileMapProps) {
   };
 
   const changeZoom = (delta: number) => {
-    setZoom((prev) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, prev + delta)));
+    setZoom((prev) => clampZoom(prev + delta));
+  };
+
+  const clampZoom = (value: number): number => {
+    return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(value)));
+  };
+
+  const screenToGeo = (x: number, y: number): GeoPoint => {
+    const m = viewMetrics();
+    return {
+      lat: worldYToLat(m.top + y, m.z),
+      lng: worldXToLng(m.left + x, m.z),
+    };
+  };
+
+  const beginPan = (id: number, x: number, y: number) => {
+    dragging = true;
+    pointerId = id;
+    startX = x;
+    startY = y;
+    movedDistance = 0;
+    const z = zoom();
+    const c = center();
+    startCenterWorldX = lngToWorldX(c.lng, z);
+    startCenterWorldY = latToWorldY(c.lat, z);
+  };
+
+  const applyPinch = () => {
+    const el = containerEl();
+    if (!el || !pinchAnchor) return;
+    const points = [...activePointers.values()];
+    if (points.length < 2 || pinchStartDist <= 0) return;
+
+    const [a, b] = points;
+    const dist = Math.hypot(a.x - b.x, a.y - b.y);
+    const nextZoom = clampZoom(pinchStartZoom + Math.log2(dist / pinchStartDist));
+
+    const rect = el.getBoundingClientRect();
+    const midX = (a.x + b.x) / 2 - rect.left;
+    const midY = (a.y + b.y) / 2 - rect.top;
+    const s = size();
+    const centerWorldX = lngToWorldX(pinchAnchor.lng, nextZoom) - midX + s.width / 2;
+    const centerWorldY = latToWorldY(pinchAnchor.lat, nextZoom) - midY + s.height / 2;
+
+    setZoom(nextZoom);
+    setCenter({
+      lat: worldYToLat(centerWorldY, nextZoom),
+      lng: worldXToLng(centerWorldX, nextZoom),
+    });
   };
 
   const onPointerDown = (e: PointerEvent) => {
     const el = containerEl();
     if (!props.interactive || !el) return;
     if ((e.target as HTMLElement)?.closest('.geo-map-controls')) return;
+    if (activePointers.size >= 2) return;
 
-    dragging = true;
-    pointerId = e.pointerId;
-    startX = e.clientX;
-    startY = e.clientY;
-    movedDistance = 0;
-    const z = zoom();
-    const c = center();
-    startCenterWorldX = lngToWorldX(c.lng, z);
-    startCenterWorldY = latToWorldY(c.lat, z);
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     el.setPointerCapture(e.pointerId);
+
+    if (activePointers.size === 2) {
+      const [a, b] = [...activePointers.values()];
+      dragging = false;
+      pointerId = null;
+      pinching = true;
+      pinchStartDist = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+      pinchStartZoom = zoom();
+      const rect = el.getBoundingClientRect();
+      pinchAnchor = screenToGeo((a.x + b.x) / 2 - rect.left, (a.y + b.y) / 2 - rect.top);
+      return;
+    }
+
+    beginPan(e.pointerId, e.clientX, e.clientY);
   };
 
   const onPointerMove = (e: PointerEvent) => {
+    const tracked = activePointers.get(e.pointerId);
+    if (tracked) {
+      tracked.x = e.clientX;
+      tracked.y = e.clientY;
+    }
+
+    if (pinching) {
+      applyPinch();
+      return;
+    }
+
     if (!dragging || e.pointerId !== pointerId) return;
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
@@ -240,12 +312,30 @@ export function TileMap(props: TileMapProps) {
 
   const onPointerUp = (e: PointerEvent) => {
     const el = containerEl();
-    if (!dragging || e.pointerId !== pointerId || !el) return;
-    dragging = false;
-    pointerId = null;
+    if (!el) return;
+
+    activePointers.delete(e.pointerId);
     if (el.hasPointerCapture(e.pointerId)) {
       el.releasePointerCapture(e.pointerId);
     }
+
+    if (pinching) {
+      if (activePointers.size < 2) {
+        pinching = false;
+        pinchAnchor = null;
+        const [remainingId, remaining] = [...activePointers.entries()][0];
+        if (remainingId !== undefined) {
+          beginPan(remainingId, remaining.x, remaining.y);
+          movedDistance = 8;
+          el.setPointerCapture(remainingId);
+        }
+      }
+      return;
+    }
+
+    if (!dragging || e.pointerId !== pointerId) return;
+    dragging = false;
+    pointerId = null;
 
     if (movedDistance < 8 && props.onSelectPin) {
       const rect = el.getBoundingClientRect();

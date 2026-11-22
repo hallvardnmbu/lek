@@ -74,6 +74,16 @@
   color: var(--success);
 }
 
+.mq-pill-guess {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
 .mq-result-pill.missed strong {
   color: var(--danger);
 }
@@ -219,6 +229,17 @@
 
 .mq-round-row.ok {
   border-color: var(--success);
+}
+
+.mq-round-guess {
+  flex: 1;
+  margin: 0 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--muted);
 }
 
 .mq-round-row span:last-child {
