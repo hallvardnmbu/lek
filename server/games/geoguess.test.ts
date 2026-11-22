@@ -66,7 +66,7 @@ describe('geoguess game', () => {
     expect(km).toBeLessThan(360);
   });
 
-  test('loads spot, accepts guesses, awards closeness points and marks furthest to drink', async () => {
+  test('loads spot, accepts guesses and awards closeness points', async () => {
     const game = createGeoGuessGame(async () => TEST_SPOT);
     const { ctx, players, events } = makeContext([
       { id: 'p1', name: 'Alice' },
@@ -113,13 +113,13 @@ describe('geoguess game', () => {
 
     const hostReveal = game.getHostView(state, ctx);
     expect(hostReveal.winnerName).toBe('Alice');
-    expect(hostReveal.drinkerName).toBe('Bob');
+    expect(hostReveal.drinkerName).toBeNull();
     expect(hostReveal.spotLabel).toBe('Paris, France');
     expect(hostReveal.target).toEqual(TEST_SPOT.coords);
     expect(hostReveal.players.find((p) => p.playerId === 'p1')?.roundPoints).toBeGreaterThan(95);
 
     const bobView = game.getPlayerView(state, 'p2', ctx);
-    expect(bobView.drinks).toBe(true);
+    expect(bobView.drinks).toBe(false);
     expect(bobView.isWinner).toBe(false);
 
     const aliceView = game.getPlayerView(state, 'p1', ctx);
@@ -128,9 +128,9 @@ describe('geoguess game', () => {
     expect(aliceView.roundPoints).toBeGreaterThan(95);
   });
 
-  test('non-submitter drinks when timer expires', async () => {
+  test('non-submitter scores nothing and no one drinks mid-game', async () => {
     const game = createGeoGuessGame(async () => TEST_SPOT);
-    const { ctx } = makeContext([
+    const { ctx, players } = makeContext([
       { id: 'p1', name: 'Alice' },
       { id: 'p2', name: 'Bob' },
     ]);
@@ -147,9 +147,11 @@ describe('geoguess game', () => {
     state = game.onTimerExpired!(ctx, state) ?? state;
     expect(state.phase).toBe('REVEAL');
 
+    expect(players.find((p) => p.id === 'p2')?.score).toBe(0);
+
     const hostReveal = game.getHostView(state, ctx);
     expect(hostReveal.winnerName).toBe('Alice');
-    expect(hostReveal.drinkerName).toBe('Bob');
+    expect(hostReveal.drinkerName).toBeNull();
   });
 
   test('host can advance to next round', async () => {
@@ -170,9 +172,12 @@ describe('geoguess game', () => {
     expect(state.round).toBe(2);
   });
 
-  test('ends the game after the final round instead of starting a new one', async () => {
+  test('ends the game after the final round and the lowest score drinks', async () => {
     const game = createGeoGuessGame(async () => TEST_SPOT);
-    const { ctx, isEnded } = makeContext([{ id: 'p1', name: 'Alice' }]);
+    const { ctx, players, isEnded } = makeContext([
+      { id: 'p1', name: 'Alice' },
+      { id: 'p2', name: 'Bob' },
+    ]);
 
     let state = game.onStart(ctx);
     await Promise.resolve();
@@ -183,18 +188,31 @@ describe('geoguess game', () => {
         type: 'submit_guess',
         payload: { lat: 48.8, lng: 2.3 },
       }) ?? state;
+      state = game.onPlayerAction(ctx, state, 'p2', {
+        type: 'submit_guess',
+        payload: { lat: -33.8688, lng: 151.2093 },
+      }) ?? state;
       expect(state.phase).toBe('REVEAL');
 
-      state = game.onHostAction!(ctx, state, { type: 'next_round' }) ?? state;
       if (round < 5) {
+        expect(game.getHostView(state, ctx).drinkerName).toBeNull();
+        state = game.onHostAction!(ctx, state, { type: 'next_round' }) ?? state;
         expect(state.phase).toBe('LOADING');
-        expect(state.round).toBe(round + 1);
         await Promise.resolve();
         state = game.onTimerExpired!(ctx, state) ?? state;
       }
     }
 
+    const aliceScore = players.find((p) => p.id === 'p1')!.score;
+    const bobScore = players.find((p) => p.id === 'p2')!.score;
+    expect(aliceScore).toBeGreaterThan(bobScore);
+
+    const finalHost = game.getHostView(state, ctx);
+    expect(finalHost.drinkerName).toBe('Bob');
+    expect(game.getPlayerView(state, 'p2', ctx).drinks).toBe(true);
+    expect(game.getPlayerView(state, 'p1', ctx).drinks).toBe(false);
+
+    state = game.onHostAction!(ctx, state, { type: 'next_round' }) ?? state;
     expect(isEnded()).toBe(true);
-    expect(state.phase).toBe('REVEAL');
   });
 });

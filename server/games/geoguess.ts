@@ -163,13 +163,17 @@ function revealRound(ctx: GameContext, state: GeoGuessState): void {
   }
 
   state.drinkerId = null;
-  const activePlayers = players.filter((p) => p.connected || state.guesses[p.id]);
-  if (activePlayers.length >= 2) {
-    const nonSubmitters = activePlayers.filter((p) => !state.guesses[p.id]);
-    if (nonSubmitters.length > 0) {
-      state.drinkerId = nonSubmitters[0].id;
-    } else if (submitted.length >= 2) {
-      state.drinkerId = submitted[submitted.length - 1].id;
+  if (state.round >= state.totalRounds) {
+    const connected = players.filter((p) => p.connected);
+    if (connected.length >= 2) {
+      const finalDistance = (id: string) =>
+        state.guesses[id] ? state.guesses[id].distanceKm : Number.POSITIVE_INFINITY;
+      state.drinkerId = [...connected].sort(
+        (a, b) =>
+          a.score - b.score ||
+          finalDistance(b.id) - finalDistance(a.id) ||
+          a.name.localeCompare(b.name)
+      )[0].id;
     }
   }
 
@@ -211,14 +215,13 @@ function buildResultEntries(ctx: GameContext, state: GeoGuessState): GeoGuessRes
       };
     })
     .sort((a, b) => {
+      if (a.score !== b.score) return b.score - a.score;
       if (isReveal) {
-        if (a.distanceKm !== null && b.distanceKm !== null) {
-          return a.distanceKm - b.distanceKm;
-        }
-        if (a.distanceKm !== null) return -1;
-        if (b.distanceKm !== null) return 1;
+        const aDist = a.distanceKm ?? Number.POSITIVE_INFINITY;
+        const bDist = b.distanceKm ?? Number.POSITIVE_INFINITY;
+        if (aDist !== bDist) return aDist - bDist;
       }
-      return b.score - a.score || a.name.localeCompare(b.name);
+      return a.name.localeCompare(b.name);
     });
 }
 
@@ -228,7 +231,8 @@ export function createGeoGuessGame(
   return {
     id: 'geoguess',
     name: 'Geo-Guess Roulette',
-    description: 'Spot the place on the TV, pin your guess on your phone. Closest wins, furthest drinks!',
+    description:
+      'Spot the place on the TV, pin your guess on your phone. Closest scores the most — last place after 5 rounds drinks!',
     minPlayers: 1,
     maxPlayers: 12,
 

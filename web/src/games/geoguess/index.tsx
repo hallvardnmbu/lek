@@ -79,7 +79,7 @@ function GeoGuessTvView(props: TvGameViewProps<GeoGuessHostView>) {
             </Show>
             <Show when={host()?.drinkerName}>
               <div class="geo-tv-callout is-drinker">
-                Furthest: <strong>{host()?.drinkerName}</strong>. DRINKS!
+                Last place: <strong>{host()?.drinkerName}</strong>. DRINKS!
               </div>
             </Show>
 
@@ -104,8 +104,9 @@ function GeoGuessTvView(props: TvGameViewProps<GeoGuessHostView>) {
                           ? 'DRINK'
                           : player.roundPoints !== null
                             ? `+${player.roundPoints}`
-                            : `${player.score} pts`}
+                            : '—'}
                     </span>
+                    <span class="geo-tv-total">{player.score} pts</span>
                   </div>
                 )}
               </For>
@@ -206,10 +207,7 @@ function GeoGuessMobileView(props: MobileGameViewProps<GeoGuessPlayerView>) {
             <p class="geo-mobile-verdict">CLOSEST! YOU WIN</p>
           </Show>
           <Show when={view()?.drinks}>
-            <p class="geo-mobile-verdict">FURTHEST OFF. DRINK!</p>
-          </Show>
-          <Show when={!view()?.isWinner && !view()?.drinks}>
-            <p class="geo-mobile-verdict">YOU ARE SAFE</p>
+            <p class="geo-mobile-verdict">LAST PLACE. DRINK!</p>
           </Show>
 
           <p class="geo-mobile-spot">{view()?.spotLabel ?? 'Location revealed'}</p>
