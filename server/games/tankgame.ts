@@ -1,0 +1,352 @@
+import type { GameContext, GameDefinition, GamePlayer } from '../game';
+import {
+  TANK_COLORS,
+  TANK_SPAWNS,
+  TANK_WALLS,
+  TANK_WORLD_HEIGHT,
+  TANK_WORLD_WIDTH,
+  type TankGameBullet,
+  type TankGameHostView,
+  type TankGamePlayerView,
+  type TankGameState,
+  type TankGameTank,
+  type TankInput,
+  type TankWall,
+} from '../../shared/games/tankgame';
+
+const TICK_MS = 50;
+const COUNTDOWN_MS = 3000;
+const GAME_TIMEOUT_MS = 120_000;
+const MAX_DT_MS = 150;
+const TANK_SPEED = 220;
+const TANK_RADIUS = 16;
+const BULLET_SPEED = 420;
+const BULLET_RADIUS = 5;
+const BULLET_LIFETIME_MS = 1600;
+const FIRE_COOLDOWN_MS = 900;
+const INPUT_DEADZONE = 0.18;
+const KILL_POINTS = 500;
+const WIN_POINTS = 500;
+const ELIMINATION_FEED_MS = 3500;
+const BULLET_SUBSTEP_PX = 12;
+
+function resolveCircleWall(
+  cx: number,
+  cy: number,
+  r: number,
+  wall: TankWall
+): { x: number; y: number } | null {
+  const closestX = Math.max(wall.x, Math.min(cx, wall.x + wall.w));
+  const closestY = Math.max(wall.y, Math.min(cy, wall.y + wall.h));
+  const dx = cx - closestX;
+  const dy = cy - closestY;
+  const distSq = dx * dx + dy * dy;
+  if (distSq >= r * r) return null;
+  if (distSq > 0) {
+    const dist = Math.sqrt(distSq);
+    return { x: (dx / dist) * (r - dist), y: (dy / dist) * (r - dist) };
+  }
+  const left = cx - wall.x;
+  const right = wall.x + wall.w - cx;
+  const top = cy - wall.y;
+  const bottom = wall.y + wall.h - cy;
+  const min = Math.min(left, right, top, bottom);
+  if (min === left) return { x: -(left + r), y: 0 };
+  if (min === right) return { x: right + r, y: 0 };
+  if (min === top) return { x: 0, y: -(top + r) };
+  return { x: 0, y: bottom + r };
+}
+
+function moveTank(tank: TankGameTank, input: TankInput, dtSec: number): void {
+  const mag = Math.hypot(input.x, input.y);
+  if (mag < INPUT_DEADZONE) return;
+  const nx = input.x / mag;
+  const ny = input.y / mag;
+  const scale = Math.min(1, mag);
+  tank.angle = Math.atan2(ny, nx);
+  tank.x += nx * TANK_SPEED * scale * dtSec;
+  tank.y += ny * TANK_SPEED * scale * dtSec;
+  for (let pass = 0; pass < 2; pass++) {
+    for (const wall of TANK_WALLS) {
+      const push = resolveCircleWall(tank.x, tank.y, TANK_RADIUS, wall);
+      if (push) {
+        tank.x += push.x;
+        tank.y += push.y;
+      }
+    }
+  }
+  tank.x = Math.max(TANK_RADIUS, Math.min(TANK_WORLD_WIDTH - TANK_RADIUS, tank.x));
+  tank.y = Math.max(TANK_RADIUS, Math.min(TANK_WORLD_HEIGHT - TANK_RADIUS, tank.y));
+}
+
+function separateTanks(tanks: TankGameTank[]): void {
+  const alive = tanks.filter((t) => t.alive);
+  for (let i = 0; i < alive.length; i++) {
+    for (let j = i + 1; j < alive.length; j++) {
+      const a = alive[i];
+      const b = alive[j];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const dist = Math.hypot(dx, dy);
+      const minDist = TANK_RADIUS * 2;
+      if (dist === 0) {
+        a.x -= 1;
+        b.x += 1;
+        continue;
+      }
+      if (dist >= minDist) continue;
+      const push = (minDist - dist) / 2;
+      const nx = dx / dist;
+      const ny = dy / dist;
+      a.x -= nx * push;
+      a.y -= ny * push;
+      b.x += nx * push;
+      b.y += ny * push;
+    }
+  }
+}
+
+function bulletBlocked(x: number, y: number): boolean {
+  if (x < 0 || x > TANK_WORLD_WIDTH || y < 0 || y > TANK_WORLD_HEIGHT) return true;
+  for (const wall of TANK_WALLS) {
+    const closestX = Math.max(wall.x, Math.min(x, wall.x + wall.w));
+    const closestY = Math.max(wall.y, Math.min(y, wall.y + wall.h));
+    const dx = x - closestX;
+    const dy = y - closestY;
+    if (dx * dx + dy * dy < BULLET_RADIUS * BULLET_RADIUS) return true;
+  }
+  return false;
+}
+
+function findBulletHit(state: TankGameState, bullet: TankGameBullet): TankGameTank | null {
+  for (const tank of Object.values(state.tanks)) {
+    if (!tank.alive || tank.playerId === bullet.ownerId) continue;
+    const dx = bullet.x - tank.x;
+    const dy = bullet.y - tank.y;
+    if (dx * dx + dy * dy < (TANK_RADIUS + BULLET_RADIUS) * (TANK_RADIUS + BULLET_RADIUS)) {
+      return tank;
+    }
+  }
+  return null;
+}
+
+function eliminateTank(
+  ctx: GameContext,
+  state: TankGameState,
+  tank: TankGameTank,
+  byPlayerId: string | null,
+  now: number
+): void {
+  tank.alive = false;
+  delete state.inputs[tank.playerId];
+  state.eliminations.push({ playerId: tank.playerId, byPlayerId, at: now });
+  if (state.eliminations.length > 10) state.eliminations = state.eliminations.slice(-10);
+  if (byPlayerId) ctx.addPlayerScore(byPlayerId, KILL_POINTS);
+}
+
+function advanceBullets(ctx: GameContext, state: TankGameState, dtSec: number, now: number): void {
+  const keep: TankGameBullet[] = [];
+  outer: for (const bullet of state.bullets) {
+    const totalDist = BULLET_SPEED * dtSec;
+    const steps = Math.max(1, Math.ceil(totalDist / BULLET_SUBSTEP_PX));
+    const stepDist = totalDist / steps;
+    for (let s = 0; s < steps; s++) {
+      bullet.x += Math.cos(bullet.angle) * stepDist;
+      bullet.y += Math.sin(bullet.angle) * stepDist;
+      if (bulletBlocked(bullet.x, bullet.y)) continue outer;
+      const victim = findBulletHit(state, bullet);
+      if (victim) {
+        eliminateTank(ctx, state, victim, bullet.ownerId, now);
+        continue outer;
+      }
+    }
+    if (now - bullet.firedAt <= BULLET_LIFETIME_MS) keep.push(bullet);
+  }
+  state.bullets = keep;
+}
+
+function simulate(ctx: GameContext, state: TankGameState, now: number): void {
+  const dt = Math.min(now - state.tickAt, MAX_DT_MS);
+  if (dt <= 0) return;
+  const dtSec = dt / 1000;
+  for (const tank of Object.values(state.tanks)) {
+    if (!tank.alive) continue;
+    const input = state.inputs[tank.playerId];
+    if (input) moveTank(tank, input, dtSec);
+  }
+  separateTanks(Object.values(state.tanks));
+  advanceBullets(ctx, state, dtSec, now);
+  state.tickAt = now;
+}
+
+function aliveTanks(state: TankGameState): TankGameTank[] {
+  return Object.values(state.tanks).filter((t) => t.alive);
+}
+
+function checkGameEnd(ctx: GameContext, state: TankGameState): boolean {
+  if (state.phase !== 'PLAYING') return false;
+  const alive = aliveTanks(state);
+  if (alive.length <= 1) {
+    if (alive.length === 1) ctx.addPlayerScore(alive[0].playerId, WIN_POINTS);
+    ctx.endGame();
+    return true;
+  }
+  if (Date.now() - state.playingStartedAt >= GAME_TIMEOUT_MS) {
+    ctx.endGame();
+    return true;
+  }
+  return false;
+}
+
+function timeLeftMs(state: TankGameState, now: number): number {
+  if (state.phase === 'COUNTDOWN') return Math.max(0, state.countdownEndsAt - now);
+  return Math.max(0, GAME_TIMEOUT_MS - (now - state.playingStartedAt));
+}
+
+function destroyTank(ctx: GameContext, state: TankGameState, playerId: string, now: number): void {
+  const tank = state.tanks[playerId];
+  delete state.inputs[playerId];
+  if (!tank?.alive) return;
+  eliminateTank(ctx, state, tank, null, now);
+}
+
+export const tankGame: GameDefinition<TankGameState, TankGameHostView, TankGamePlayerView> = {
+  id: 'tank-battle',
+  name: 'Tank Battle',
+  description: 'Drive, hide behind cover, and be the last tank rolling.',
+  minPlayers: 2,
+  maxPlayers: TANK_SPAWNS.length,
+
+  onStart(ctx) {
+    const players = ctx.getPlayers();
+    const connected = players.filter((p) => p.connected);
+    const roster: GamePlayer[] = connected.length > 0 ? connected : players;
+    const spawns = [...TANK_SPAWNS].sort(() => Math.random() - 0.5);
+    const now = Date.now();
+    const state: TankGameState = {
+      phase: 'COUNTDOWN',
+      countdownEndsAt: now + COUNTDOWN_MS,
+      playingStartedAt: 0,
+      tickAt: now,
+      nextBulletId: 1,
+      tanks: {},
+      bullets: [],
+      inputs: {},
+      eliminations: [],
+    };
+    roster.slice(0, TANK_SPAWNS.length).forEach((player, i) => {
+      const spawn = spawns[i];
+      state.tanks[player.id] = {
+        playerId: player.id,
+        x: spawn.x,
+        y: spawn.y,
+        angle: Math.atan2(TANK_WORLD_HEIGHT / 2 - spawn.y, TANK_WORLD_WIDTH / 2 - spawn.x),
+        alive: true,
+        colorIndex: i % TANK_COLORS.length,
+        lastFiredAt: 0,
+      };
+    });
+    ctx.setTimer(COUNTDOWN_MS);
+    return state;
+  },
+
+  onTimerExpired(ctx, state) {
+    const now = Date.now();
+    if (state.phase === 'COUNTDOWN') {
+      state.phase = 'PLAYING';
+      state.playingStartedAt = now;
+      state.tickAt = now;
+      ctx.setTimer(TICK_MS);
+      return state;
+    }
+    if (state.phase !== 'PLAYING') return state;
+    simulate(ctx, state, now);
+    if (!checkGameEnd(ctx, state)) ctx.setTimer(TICK_MS);
+    return state;
+  },
+
+  onPlayerAction(ctx, state, playerId, action) {
+    if (state.phase !== 'PLAYING') return state;
+    if (action.type === 'input') {
+      const tank = state.tanks[playerId];
+      if (!tank?.alive) return state;
+      const raw = action.payload as { x?: unknown; y?: unknown } | undefined;
+      const x = Number(raw?.x);
+      const y = Number(raw?.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return state;
+      const mag = Math.hypot(x, y);
+      state.inputs[playerId] =
+        mag <= 1 ? { x, y } : { x: x / mag, y: y / mag };
+      return state;
+    }
+    if (action.type === 'fire') {
+      const tank = state.tanks[playerId];
+      if (!tank?.alive) return state;
+      const now = Date.now();
+      if (now - tank.lastFiredAt < FIRE_COOLDOWN_MS) return state;
+      tank.lastFiredAt = now;
+      state.bullets.push({
+        id: state.nextBulletId++,
+        ownerId: playerId,
+        x: tank.x + Math.cos(tank.angle) * (TANK_RADIUS + BULLET_RADIUS + 2),
+        y: tank.y + Math.sin(tank.angle) * (TANK_RADIUS + BULLET_RADIUS + 2),
+        angle: tank.angle,
+        firedAt: now,
+      });
+      return state;
+    }
+    return state;
+  },
+
+  onPlayerDisconnect(ctx, state, playerId) {
+    destroyTank(ctx, state, playerId, Date.now());
+    checkGameEnd(ctx, state);
+    return state;
+  },
+
+  onPlayerLeave(ctx, state, playerId) {
+    destroyTank(ctx, state, playerId, Date.now());
+    delete state.tanks[playerId];
+    checkGameEnd(ctx, state);
+    return state;
+  },
+
+  getHostView(state) {
+    const now = Date.now();
+    return {
+      phase: state.phase,
+      timeLeftMs: timeLeftMs(state, now),
+      aliveCount: aliveTanks(state).length,
+      tanks: Object.values(state.tanks).map((t) => ({
+        playerId: t.playerId,
+        x: Math.round(t.x),
+        y: Math.round(t.y),
+        angle: t.angle,
+        colorIndex: t.colorIndex,
+        alive: t.alive,
+      })),
+      bullets: state.bullets.map((b) => ({
+        id: b.id,
+        x: Math.round(b.x),
+        y: Math.round(b.y),
+      })),
+      eliminations: state.eliminations.filter((e) => now - e.at <= ELIMINATION_FEED_MS),
+    };
+  },
+
+  getPlayerView(state, playerId) {
+    const now = Date.now();
+    const tank = state.tanks[playerId];
+    return {
+      phase: state.phase,
+      participating: Boolean(tank),
+      alive: tank?.alive ?? false,
+      colorIndex: tank?.colorIndex ?? null,
+      timeLeftMs: timeLeftMs(state, now),
+      cooldownMs:
+        tank?.alive && state.phase === 'PLAYING'
+          ? Math.max(0, FIRE_COOLDOWN_MS - (now - tank.lastFiredAt))
+          : 0,
+    };
+  },
+};
