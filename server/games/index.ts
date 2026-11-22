@@ -2,6 +2,7 @@ import { GameRegistry } from '../game';
 import { categoriesGame } from './categories';
 import { drawGame } from './draw';
 import { mostLikelyGame } from './mostlikely';
+import { rouletteGame } from './roulette';
 
 /**
  * Creates the server GameRegistry and registers all available games.
@@ -12,5 +13,6 @@ export function createGameRegistry(): GameRegistry {
   registry.register(drawGame);
   registry.register(mostLikelyGame);
   registry.register(categoriesGame);
+  registry.register(rouletteGame);
   return registry;
 }
