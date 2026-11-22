@@ -4,6 +4,7 @@ import { drawGame } from './draw';
 import { mostLikelyGame } from './mostlikely';
 import { musicQuizGame } from './musicquiz';
 import { rouletteGame } from './roulette';
+import { wikiraceGame } from './wikirace';
 
 /**
  * Creates the server GameRegistry and registers all available games.
@@ -16,5 +17,6 @@ export function createGameRegistry(): GameRegistry {
   registry.register(categoriesGame);
   registry.register(rouletteGame);
   registry.register(musicQuizGame);
+  registry.register(wikiraceGame);
   return registry;
 }
