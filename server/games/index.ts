@@ -1,4 +1,5 @@
 import { GameRegistry } from '../game';
+import { drawGame } from './draw';
 import { sandboxGame } from './sandbox';
 
 /**
@@ -7,6 +8,7 @@ import { sandboxGame } from './sandbox';
  */
 export function createGameRegistry(): GameRegistry {
   const registry = new GameRegistry();
+  registry.register(drawGame);
   registry.register(sandboxGame);
   return registry;
 }
