@@ -1,6 +1,7 @@
 import { GameRegistry } from '../game';
 import { categoriesGame } from './categories';
 import { drawGame } from './draw';
+import { geoGuessGame } from './geoguess';
 import { mostLikelyGame } from './mostlikely';
 import { musicQuizGame } from './musicquiz';
 import { rouletteGame } from './roulette';
@@ -18,5 +19,6 @@ export function createGameRegistry(): GameRegistry {
   registry.register(rouletteGame);
   registry.register(musicQuizGame);
   registry.register(wikiraceGame);
+  registry.register(geoGuessGame);
   return registry;
 }
