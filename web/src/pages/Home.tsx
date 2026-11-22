@@ -23,6 +23,13 @@ export function Home() {
           >
             Join on Phone
           </button>
+
+          <button
+            class="btn"
+            onClick={() => navigate('/debug')}
+          >
+            Debug Mode
+          </button>
         </div>
       </div>
     </main>

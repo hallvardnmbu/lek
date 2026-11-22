@@ -1,5 +1,6 @@
 import { Match, Switch, createSignal, onSettled } from 'solid-js';
 import { render } from '@solidjs/web';
+import { DebugPage } from './debug/DebugPage';
 import { Home } from './pages/Home';
 import { MobilePlay } from './pages/MobilePlay';
 import { TvHost } from './pages/TvHost';
@@ -26,6 +27,9 @@ function App() {
       </Match>
       <Match when={pathname() === '/play' || pathname().startsWith('/play/')}>
         <MobilePlay initialCode={playCodeMatch()} />
+      </Match>
+      <Match when={pathname().startsWith('/debug')}>
+        <DebugPage />
       </Match>
     </Switch>
   );
