@@ -31,6 +31,7 @@ export interface InternalRoom {
   phaseEndsAt: number | null;
   lastActivityAt: number;
   players: Map<string, GamePlayer>;
+  seats: Map<string, number>;
   gameVotes: Map<string, string>;
   phaseTimer?: ReturnType<typeof setTimeout>;
   tickInterval?: ReturnType<typeof setInterval>;
@@ -120,6 +121,7 @@ export class RoomManager {
       phaseEndsAt: null,
       lastActivityAt: Date.now(),
       players: new Map(),
+      seats: new Map(),
       gameVotes: new Map(),
     };
 
@@ -192,6 +194,7 @@ export class RoomManager {
     };
 
     room.players.set(playerId, player);
+    room.seats.set(playerId, this.nextFreeSeat(room));
     room.lastActivityAt = Date.now();
 
     if (room.phase === 'PLAYING') {
@@ -244,6 +247,7 @@ export class RoomManager {
 
     room.lastActivityAt = Date.now();
     room.players.delete(playerId);
+    room.seats.delete(playerId);
     room.gameVotes.delete(playerId);
 
     if (room.phase === 'GAME_SELECT' && this.maybeResolveGameVote(room)) {
@@ -610,12 +614,20 @@ export class RoomManager {
     return { ok: true };
   }
 
+  private nextFreeSeat(room: InternalRoom): number {
+    const taken = new Set(room.seats.values());
+    let seat = 0;
+    while (taken.has(seat)) seat++;
+    return seat;
+  }
+
   buildStateForClient(room: InternalRoom, playerId?: string): RoomState {
     const players: PlayerSummary[] = Array.from(room.players.values()).map((p) => ({
       id: p.id,
       name: p.name,
       score: p.score,
       connected: p.connected,
+      seat: room.seats.get(p.id) ?? 0,
       meta: p.meta,
     }));
 

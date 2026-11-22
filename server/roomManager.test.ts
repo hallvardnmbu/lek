@@ -306,4 +306,27 @@ describe('WebhookManager', () => {
       )
     ).toBe(true);
   });
+
+  it('keeps player seats stable and reuses the lowest free seat', () => {
+    const { manager } = createTestHarness();
+    const { room } = manager.createRoom();
+    const join = (name: string) => {
+      const result = manager.joinRoom(room.code, name);
+      if (!result.ok) throw new Error(result.message);
+      return result.player.id;
+    };
+    const seatOf = (id: string) =>
+      manager.buildStateForClient(room).players.find((p) => p.id === id)?.seat;
+
+    const alice = join('Alice');
+    const bob = join('Bob');
+    const cara = join('Cara');
+    expect([seatOf(alice), seatOf(bob), seatOf(cara)]).toEqual([0, 1, 2]);
+
+    manager.leaveRoom(room.code, bob);
+    expect(seatOf(cara)).toBe(2);
+
+    const dan = join('Dan');
+    expect(seatOf(dan)).toBe(1);
+  });
 });

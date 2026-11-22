@@ -112,7 +112,10 @@ export function TvHost() {
 
   return (
     <div class="tv-viewport">
-      <div class="tv-canvas" ref={(el) => (canvasRef = el)}>
+      <div
+        class={`tv-canvas ${state()?.phase === 'LOBBY' ? 'tv-canvas-lobby' : ''}`}
+        ref={(el) => (canvasRef = el)}
+      >
         <header class="tv-header">
           <div class="tv-brand">
             <span class="tv-logo">Party</span>
@@ -163,6 +166,8 @@ export function TvHost() {
                   state={s()}
                   joinUrl={joinUrl()}
                   canEnterSelector={canEnterSelector()}
+                  muted={lobbyMusic.muted()}
+                  onToggleSound={lobbyMusic.toggleMute}
                   onOpenSelector={handleOpenSelector}
                 />
               </Show>

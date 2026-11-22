@@ -7,6 +7,7 @@ export interface PlayerSummary {
   name: string;
   score: number;
   connected: boolean;
+  seat: number;
   meta?: Record<string, unknown>;
 }
 

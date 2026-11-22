@@ -19,6 +19,7 @@ interface VirtualPlayer {
 interface DebugPhoneProps {
   roomCode: string;
   name: string;
+  leaving: boolean;
   onRemove: () => void;
 }
 
@@ -68,6 +69,13 @@ function DebugPhone(props: DebugPhoneProps) {
     props.onRemove();
   };
 
+  createEffect(
+    () => props.leaving,
+    (leaving) => {
+      if (leaving) handleLeave();
+    }
+  );
+
   return (
     <div class="debug-phone">
       <div class="debug-phone-head">
@@ -94,6 +102,7 @@ function DebugPhone(props: DebugPhoneProps) {
                 <Show when={s().phase === 'LOBBY'}>
                   <MobileLobby
                     state={s()}
+                    me={me() ?? null}
                     onOpenSelector={() =>
                       socket.send({
                         type: 'open_game_selector',
@@ -273,6 +282,8 @@ export function DebugPage() {
     setVirtualPlayers((prev) => [...prev, makePlayer()]);
   };
 
+  const [leavingKey, setLeavingKey] = createSignal<number | null>(null);
+
   const removePlayer = (key: number) => {
     setVirtualPlayers((prev) => prev.filter((p) => p.key !== key));
   };
@@ -373,7 +384,7 @@ export function DebugPage() {
                   disabled={virtualPlayers().length === 0}
                   onClick={() => {
                     const list = virtualPlayers();
-                    if (list.length > 0) removePlayer(list[list.length - 1].key);
+                    if (list.length > 0) setLeavingKey(list[list.length - 1].key);
                   }}
                 >
                   - Player
@@ -412,6 +423,8 @@ export function DebugPage() {
                       state={s()}
                       joinUrl={`${window.location.origin}/play/${s().code}`}
                       canEnterSelector={s().players.length >= s().minPlayers}
+                      muted
+                      onToggleSound={() => {}}
                       onOpenSelector={() =>
                         socket.send({
                           type: 'open_game_selector',
@@ -499,6 +512,7 @@ export function DebugPage() {
                     <DebugPhone
                       roomCode={s().code}
                       name={vp.name}
+                      leaving={leavingKey() === vp.key}
                       onRemove={() => removePlayer(vp.key)}
                     />
                   )}

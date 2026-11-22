@@ -199,6 +199,7 @@ export function MobilePlay(props: MobilePlayProps) {
             <Show when={s().phase === 'LOBBY'}>
               <MobileLobby
                 state={s()}
+                me={me()}
                 onOpenSelector={handleOpenSelector}
                 onLeave={handleLeave}
               />
