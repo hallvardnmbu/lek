@@ -1,5 +1,6 @@
 import { GameRegistry } from '../game';
 import { drawGame } from './draw';
+import { mostLikelyGame } from './mostlikely';
 import { sandboxGame } from './sandbox';
 
 /**
@@ -9,6 +10,7 @@ import { sandboxGame } from './sandbox';
 export function createGameRegistry(): GameRegistry {
   const registry = new GameRegistry();
   registry.register(drawGame);
+  registry.register(mostLikelyGame);
   registry.register(sandboxGame);
   return registry;
 }
