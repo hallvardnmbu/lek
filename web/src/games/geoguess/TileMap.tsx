@@ -1,0 +1,402 @@
+import { For, Show, createEffect, createMemo, createSignal, onCleanup } from 'solid-js';
+import type { GeoPoint } from '../../../../shared/games/geoguess';
+
+export interface MapMarker {
+  id: string;
+  label?: string;
+  color: string;
+  point: GeoPoint;
+  isTarget?: boolean;
+}
+
+export interface TileMapProps {
+  interactive?: boolean;
+  markers?: MapMarker[];
+  target?: GeoPoint | null;
+  selectedPin?: GeoPoint | null;
+  onSelectPin?: (point: GeoPoint) => void;
+  fitAll?: boolean;
+  initialCenter?: GeoPoint;
+  initialZoom?: number;
+  class?: string;
+}
+
+const TILE_SIZE = 256;
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 15;
+const MAX_LAT = 85.0511;
+
+function clampLat(lat: number): number {
+  return Math.max(-MAX_LAT, Math.min(MAX_LAT, lat));
+}
+
+function normalizeLng(lng: number): number {
+  let v = ((lng + 180) % 360 + 360) % 360 - 180;
+  if (v === -180 && lng > 0) v = 180;
+  return v;
+}
+
+function lngToWorldX(lng: number, zoom: number): number {
+  const scale = TILE_SIZE * Math.pow(2, zoom);
+  return ((lng + 180) / 360) * scale;
+}
+
+function latToWorldY(lat: number, zoom: number): number {
+  const rad = (clampLat(lat) * Math.PI) / 180;
+  const scale = TILE_SIZE * Math.pow(2, zoom);
+  const mercN = Math.log(Math.tan(Math.PI / 4 + rad / 2));
+  return (0.5 - mercN / (2 * Math.PI)) * scale;
+}
+
+function worldXToLng(x: number, zoom: number): number {
+  const scale = TILE_SIZE * Math.pow(2, zoom);
+  return normalizeLng((x / scale) * 360 - 180);
+}
+
+function worldYToLat(y: number, zoom: number): number {
+  const scale = TILE_SIZE * Math.pow(2, zoom);
+  const n = Math.PI - (2 * Math.PI * y) / scale;
+  return clampLat((180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))));
+}
+
+function wrapTileX(x: number, zoom: number): number {
+  const count = Math.pow(2, zoom);
+  return ((x % count) + count) % count;
+}
+
+function tileUrl(z: number, x: number, y: number): string {
+  const wrappedX = wrapTileX(x, z);
+  return `https://tile.openstreetmap.org/${z}/${wrappedX}/${y}.png`;
+}
+
+function computeFittedView(
+  points: GeoPoint[],
+  width: number,
+  height: number
+): { center: GeoPoint; zoom: number } {
+  if (points.length === 0) {
+    return { center: { lat: 20, lng: 0 }, zoom: 2 };
+  }
+  if (points.length === 1) {
+    return { center: points[0], zoom: 5 };
+  }
+
+  let minLat = 90;
+  let maxLat = -90;
+  let minLng = 180;
+  let maxLng = -180;
+
+  for (const p of points) {
+    if (p.lat < minLat) minLat = p.lat;
+    if (p.lat > maxLat) maxLat = p.lat;
+    if (p.lng < minLng) minLng = p.lng;
+    if (p.lng > maxLng) maxLng = p.lng;
+  }
+
+  const center: GeoPoint = {
+    lat: (minLat + maxLat) / 2,
+    lng: (minLng + maxLng) / 2,
+  };
+
+  const padW = Math.max(120, width - 96);
+  const padH = Math.max(120, height - 96);
+
+  for (let z = 12; z >= MIN_ZOOM; z--) {
+    const x1 = lngToWorldX(minLng, z);
+    const x2 = lngToWorldX(maxLng, z);
+    const y1 = latToWorldY(maxLat, z);
+    const y2 = latToWorldY(minLat, z);
+    if (Math.abs(x2 - x1) <= padW && Math.abs(y2 - y1) <= padH) {
+      return { center, zoom: z };
+    }
+  }
+
+  return { center, zoom: MIN_ZOOM };
+}
+
+export function TileMap(props: TileMapProps) {
+  const [containerEl, setContainerEl] = createSignal<HTMLDivElement | undefined>(undefined);
+  const [size, setSize] = createSignal({ width: 360, height: 320 });
+  const [center, setCenter] = createSignal<GeoPoint>(
+    props.initialCenter ?? { lat: 25, lng: 10 }
+  );
+  const [zoom, setZoom] = createSignal<number>(props.initialZoom ?? 2);
+
+  let dragging = false;
+  let pointerId: number | null = null;
+  let startX = 0;
+  let startY = 0;
+  let startCenterWorldX = 0;
+  let startCenterWorldY = 0;
+  let movedDistance = 0;
+
+  const updateSize = (el: HTMLDivElement) => {
+    const rect = el.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      setSize({ width: rect.width, height: rect.height });
+    }
+  };
+
+  createEffect(
+    () => containerEl(),
+    (el) => {
+      if (!el) return;
+      updateSize(el);
+      const observer = new ResizeObserver(() => updateSize(el));
+      observer.observe(el);
+      onCleanup(() => observer.disconnect());
+    }
+  );
+
+  createEffect(
+    () => {
+      if (!props.fitAll) return null;
+      const pts: GeoPoint[] = [];
+      if (props.target) pts.push(props.target);
+      for (const m of props.markers ?? []) {
+        pts.push(m.point);
+      }
+      if (pts.length === 0) return null;
+      return computeFittedView(pts, size().width, size().height);
+    },
+    (fitted) => {
+      if (!fitted) return;
+      setCenter(fitted.center);
+      setZoom(fitted.zoom);
+    }
+  );
+
+  const viewMetrics = createMemo(() => {
+    const z = zoom();
+    const c = center();
+    const s = size();
+    const cx = lngToWorldX(c.lng, z);
+    const cy = latToWorldY(c.lat, z);
+    const left = cx - s.width / 2;
+    const top = cy - s.height / 2;
+    return { z, cx, cy, left, top, width: s.width, height: s.height };
+  });
+
+  const tiles = createMemo(() => {
+    const m = viewMetrics();
+    const maxTile = Math.pow(2, m.z);
+    const minTileX = Math.floor(m.left / TILE_SIZE);
+    const maxTileX = Math.floor((m.left + m.width) / TILE_SIZE);
+    const minTileY = Math.max(0, Math.floor(m.top / TILE_SIZE));
+    const maxTileY = Math.min(maxTile - 1, Math.floor((m.top + m.height) / TILE_SIZE));
+
+    const list: Array<{ key: string; url: string; left: number; top: number }> = [];
+    for (let ty = minTileY; ty <= maxTileY; ty++) {
+      for (let tx = minTileX; tx <= maxTileX; tx++) {
+        list.push({
+          key: `${m.z}-${tx}-${ty}`,
+          url: tileUrl(m.z, tx, ty),
+          left: tx * TILE_SIZE - m.left,
+          top: ty * TILE_SIZE - m.top,
+        });
+      }
+    }
+    return list;
+  });
+
+  const project = (point: GeoPoint) => {
+    const m = viewMetrics();
+    const scale = TILE_SIZE * Math.pow(2, m.z);
+    let x = lngToWorldX(point.lng, m.z) - m.left;
+    if (x < -scale / 2) x += scale;
+    if (x > m.width + scale / 2) x -= scale;
+    const y = latToWorldY(point.lat, m.z) - m.top;
+    return { x, y };
+  };
+
+  const changeZoom = (delta: number) => {
+    setZoom((prev) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, prev + delta)));
+  };
+
+  const onPointerDown = (e: PointerEvent) => {
+    const el = containerEl();
+    if (!props.interactive || !el) return;
+    if ((e.target as HTMLElement)?.closest('.geo-map-controls')) return;
+
+    dragging = true;
+    pointerId = e.pointerId;
+    startX = e.clientX;
+    startY = e.clientY;
+    movedDistance = 0;
+    const z = zoom();
+    const c = center();
+    startCenterWorldX = lngToWorldX(c.lng, z);
+    startCenterWorldY = latToWorldY(c.lat, z);
+    el.setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e: PointerEvent) => {
+    if (!dragging || e.pointerId !== pointerId) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    movedDistance = Math.max(movedDistance, Math.hypot(dx, dy));
+    if (movedDistance < 4) return;
+
+    const z = zoom();
+    const nextLat = worldYToLat(startCenterWorldY - dy, z);
+    const nextLng = worldXToLng(startCenterWorldX - dx, z);
+    setCenter({ lat: nextLat, lng: nextLng });
+  };
+
+  const onPointerUp = (e: PointerEvent) => {
+    const el = containerEl();
+    if (!dragging || e.pointerId !== pointerId || !el) return;
+    dragging = false;
+    pointerId = null;
+    if (el.hasPointerCapture(e.pointerId)) {
+      el.releasePointerCapture(e.pointerId);
+    }
+
+    if (movedDistance < 8 && props.onSelectPin) {
+      const rect = el.getBoundingClientRect();
+      const m = viewMetrics();
+      const worldX = m.left + (e.clientX - rect.left);
+      const worldY = m.top + (e.clientY - rect.top);
+      props.onSelectPin({
+        lat: worldYToLat(worldY, m.z),
+        lng: worldXToLng(worldX, m.z),
+      });
+    }
+  };
+
+  const onWheel = (e: WheelEvent) => {
+    if (!props.interactive) return;
+    e.preventDefault();
+    changeZoom(e.deltaY < 0 ? 1 : -1);
+  };
+
+  const targetScreen = createMemo(() => (props.target ? project(props.target) : null));
+  const selectedScreen = createMemo(() =>
+    props.selectedPin ? project(props.selectedPin) : null
+  );
+
+  return (
+    <div
+      ref={setContainerEl}
+      class={`geo-map ${props.interactive ? 'is-interactive' : ''} ${props.class ?? ''}`}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onWheel={onWheel}
+    >
+      <div class="geo-map-tiles">
+        <For each={tiles()}>
+          {(tile) => (
+            <img
+              class="geo-map-tile"
+              src={tile.url}
+              alt=""
+              draggable={false}
+              style={{
+                left: `${tile.left}px`,
+                top: `${tile.top}px`,
+                width: `${TILE_SIZE}px`,
+                height: `${TILE_SIZE}px`,
+              }}
+            />
+          )}
+        </For>
+      </div>
+
+      <Show when={targetScreen() && (props.markers?.length ?? 0) > 0}>
+        <svg class="geo-map-lines" viewBox={`0 0 ${size().width} ${size().height}`}>
+          <For each={props.markers ?? []}>
+            {(marker) => {
+              const pos = () => project(marker.point);
+              return (
+                <line
+                  x1={pos().x}
+                  y1={pos().y}
+                  x2={targetScreen()!.x}
+                  y2={targetScreen()!.y}
+                  stroke={marker.color}
+                  stroke-width="3"
+                  stroke-dasharray="6 5"
+                />
+              );
+            }}
+          </For>
+        </svg>
+      </Show>
+
+      <For each={props.markers ?? []}>
+        {(marker) => {
+          const pos = () => project(marker.point);
+          return (
+            <div
+              class="geo-pin"
+              style={{
+                left: `${pos().x}px`,
+                top: `${pos().y}px`,
+                '--pin-color': marker.color,
+              }}
+            >
+              <div class="geo-pin-dot" />
+              <Show when={marker.label}>
+                <span class="geo-pin-label">{marker.label}</span>
+              </Show>
+            </div>
+          );
+        }}
+      </For>
+
+      <Show when={targetScreen()}>
+        {(pos) => (
+          <div
+            class="geo-pin geo-pin-target"
+            style={{
+              left: `${pos().x}px`,
+              top: `${pos().y}px`,
+            }}
+          >
+            <div class="geo-pin-star">★</div>
+            <span class="geo-pin-label geo-pin-target-label">SPOT</span>
+          </div>
+        )}
+      </Show>
+
+      <Show when={selectedScreen()}>
+        {(pos) => (
+          <div
+            class="geo-pin geo-pin-selected"
+            style={{
+              left: `${pos().x}px`,
+              top: `${pos().y}px`,
+            }}
+          >
+            <div class="geo-pin-dot" />
+          </div>
+        )}
+      </Show>
+
+      <Show when={props.interactive}>
+        <div class="geo-map-controls">
+          <button
+            type="button"
+            class="geo-zoom-btn"
+            aria-label="Zoom in"
+            onClick={() => changeZoom(1)}
+          >
+            +
+          </button>
+          <button
+            type="button"
+            class="geo-zoom-btn"
+            aria-label="Zoom out"
+            onClick={() => changeZoom(-1)}
+          >
+            −
+          </button>
+        </div>
+      </Show>
+
+      <div class="geo-map-attribution">© OpenStreetMap</div>
+    </div>
+  );
+}
