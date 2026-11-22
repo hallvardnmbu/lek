@@ -3,6 +3,7 @@ import type { ServerWebSocket } from 'bun';
 import type { ClientMessage, ServerMessage } from '../shared/protocol';
 import { RoomManager, type RoomBroadcaster } from './roomManager';
 import { verifyWebhookSignature } from './webhooks';
+import { getMusicQuizCatalog, initMusicQuizCatalog } from './games/musicquizCatalog';
 
 interface SocketData {
   roomCode?: string;
@@ -148,6 +149,10 @@ async function handleApiRequest(req: Request, url: URL): Promise<Response | null
     return Response.json({ games: roomManager.registry.list() });
   }
 
+  if (url.pathname === '/api/musicquiz/songs' && req.method === 'GET') {
+    return Response.json({ songs: getMusicQuizCatalog() });
+  }
+
   const roomMatch = url.pathname.match(/^\/api\/rooms\/([A-Za-z]{4})$/);
   if (roomMatch && req.method === 'GET') {
     const room = roomManager.getRoom(roomMatch[1]);
@@ -234,6 +239,8 @@ async function serveStatic(pathname: string): Promise<Response> {
     { status: 404 }
   );
 }
+
+await initMusicQuizCatalog();
 
 const server = Bun.serve<SocketData>({
   hostname: HOST,

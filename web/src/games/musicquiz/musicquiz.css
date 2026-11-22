@@ -1,0 +1,232 @@
+.mq-eq {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.55rem;
+  height: 90px;
+  margin-bottom: 1.5rem;
+}
+
+.mq-eq span {
+  width: 16px;
+  height: 100%;
+  border-radius: 5px;
+  background: var(--accent);
+  transform-origin: bottom;
+  animation: mq-bounce 1s ease-in-out infinite;
+}
+
+.mq-eq span:nth-child(2) { animation-delay: 0.12s; }
+.mq-eq span:nth-child(3) { animation-delay: 0.24s; }
+.mq-eq span:nth-child(4) { animation-delay: 0.36s; }
+.mq-eq span:nth-child(5) { animation-delay: 0.48s; }
+
+@keyframes mq-bounce {
+  0%, 100% { transform: scaleY(0.25); }
+  50% { transform: scaleY(1); }
+}
+
+.mq-progress {
+  margin-top: 1.25rem;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.mq-no-audio {
+  margin-top: 0.5rem;
+  font-size: 1.15rem;
+  color: var(--muted);
+}
+
+.mq-answer-label {
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+  margin: 0.25rem 0 0.5rem;
+}
+
+.mq-answer-title {
+  font-size: 3.25rem;
+  margin: 0.25rem 0;
+}
+
+.mq-answer-artist {
+  font-size: 1.6rem;
+  color: var(--muted);
+  margin: 0 0 1.5rem;
+}
+
+.mq-result-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  max-width: 900px;
+}
+
+.mq-result-pill {
+  display: flex;
+  gap: 0.7rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.6rem 1.1rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.mq-result-pill strong {
+  color: var(--success);
+}
+
+.mq-result-pill.missed strong {
+  color: var(--danger);
+}
+
+.mq-result-pill.ok {
+  border-color: var(--success);
+}
+
+.mq-standings {
+  max-width: 640px;
+}
+
+.mq-tv-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.mq-next-hint {
+  font-size: 1.15rem;
+  color: var(--muted);
+}
+
+.mq-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 800;
+  color: var(--muted);
+  margin-bottom: 1rem;
+}
+
+.mq-phase-tag {
+  color: var(--accent);
+  font-size: 0.85rem;
+}
+
+.mq-stage-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.5rem;
+}
+
+.mq-search-field {
+  margin-bottom: 0.75rem;
+}
+
+.mq-search-list {
+  display: grid;
+  gap: 0.6rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.mq-song-btn {
+  gap: 0.15rem;
+}
+
+.mq-song-title {
+  font-weight: 800;
+}
+
+.mq-song-artist {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.mq-search-hint {
+  margin: 0.9rem 0 0;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+.mq-guessed-progress {
+  margin: 1rem 0 0;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+.mq-locked {
+  text-align: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  padding: 1.5rem 1rem;
+}
+
+.mq-locked-label {
+  margin: 0 0 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: var(--success);
+}
+
+.mq-locked-song {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.mq-locked-artist {
+  margin: 0.15rem 0 0.75rem;
+  color: var(--muted);
+}
+
+.mq-reveal-song {
+  margin: 0.25rem 0 0;
+  font-size: 1.6rem;
+}
+
+.mq-reveal-artist {
+  margin: 0 0 1rem;
+  color: var(--muted);
+}
+
+.mq-verdict {
+  margin: 0 0 1rem;
+  font-weight: 900;
+}
+
+.mq-verdict.mq-correct {
+  color: var(--success);
+}
+
+.mq-verdict.mq-wrong {
+  color: var(--danger);
+}
+
+.mq-round-results {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.mq-round-row {
+  display: flex;
+  justify-content: space-between;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.55rem 0.9rem;
+  font-weight: 700;
+}
+
+.mq-round-row.ok {
+  border-color: var(--success);
+}
+
+.mq-round-row span:last-child {
+  color: var(--success);
+}
