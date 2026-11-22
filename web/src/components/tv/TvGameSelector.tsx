@@ -93,9 +93,6 @@ export function TvGameSelector(props: TvGameSelectorProps) {
                       </span>
                     </Show>
                   </div>
-                  <Show when={game.description}>
-                    <div class="game-card-desc">{game.description}</div>
-                  </Show>
                   <div class="game-card-meta">
                     <span>
                       {game.minPlayers}–{game.maxPlayers} players
