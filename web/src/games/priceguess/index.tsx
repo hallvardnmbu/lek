@@ -12,7 +12,7 @@ import {
 import './priceguess.css';
 
 function formatPrice(value: number | null | undefined): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return '—';
+  if (value === null || value === undefined || !Number.isFinite(value)) return '-';
   return Number.isInteger(value) ? `${value} kr` : `${value.toFixed(2)} kr`;
 }
 
@@ -103,7 +103,7 @@ function PriceGuessTvView(props: TvGameViewProps<PriceGuessHostView>) {
               </Show>
               <Show when={host()?.drinkerName}>
                 <div class="pg-tv-callout is-drinker">
-                  Furthest: <strong>{host()?.drinkerName}</strong> — DRINKS!
+                  Furthest: <strong>{host()?.drinkerName}</strong>. DRINKS!
                 </div>
               </Show>
 
@@ -241,7 +241,7 @@ function PriceGuessMobileView(props: MobileGameViewProps<PriceGuessPlayerView>) 
             <p class="pg-mobile-verdict">CLOSEST! YOU WIN</p>
           </Show>
           <Show when={view()?.drinks}>
-            <p class="pg-mobile-verdict">FURTHEST OFF — DRINK!</p>
+            <p class="pg-mobile-verdict">FURTHEST OFF. DRINK!</p>
           </Show>
           <Show when={!view()?.isWinner && !view()?.drinks}>
             <p class="pg-mobile-verdict">YOU ARE SAFE</p>

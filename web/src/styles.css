@@ -432,6 +432,7 @@ h2,
   margin-top: 2rem;
   display: flex;
   justify-content: center;
+  gap: 1rem;
 }
 
 .btn-tv {

@@ -148,7 +148,7 @@ export function createCortiAgent(options: CortiAgentOptions = {}): CortiAgent {
 
       const avoidNote =
         avoid.length > 0
-          ? ` Already used in this room — do not repeat or closely rephrase: ${avoid.map((p) => `"${p}"`).join(', ')}.`
+          ? ` Already used in this room. Do not repeat or closely rephrase: ${avoid.map((p) => `"${p}"`).join(', ')}.`
           : '';
 
       const userContent = config.userPrompt

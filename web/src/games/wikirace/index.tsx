@@ -30,7 +30,7 @@ function WikiRaceTvView(props: TvGameViewProps<WikiRaceHostView>) {
         }
       >
         <Show when={host()?.phase === 'RESULTS' && host()?.loserName}>
-          <p class="wr-tv-loser">{host()?.loserName} was last to arrive — DRINKS!</p>
+          <p class="wr-tv-loser">{host()?.loserName} was last to arrive. DRINKS!</p>
         </Show>
 
         <div class="wr-tv-board">
@@ -152,7 +152,7 @@ function WikiRaceMobileView(props: MobileGameViewProps<WikiRacePlayerView>) {
               </p>
             }
           >
-            <p class="wr-status-title">LAST TO ARRIVE — DRINK!</p>
+            <p class="wr-status-title">LAST TO ARRIVE. DRINK!</p>
           </Show>
 
           <Show when={view()?.loserName && !view()?.isLoser}>

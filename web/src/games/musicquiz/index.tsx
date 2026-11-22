@@ -91,7 +91,7 @@ function MusicQuizTvView(props: TvGameViewProps<MusicQuizHostView>) {
         <h1 class="tv-hero-title">What's the song?</h1>
         <Show
           when={view()?.audioUrl}
-          fallback={<p class="mq-no-audio">No clip for this song — guess blind!</p>}
+          fallback={<p class="mq-no-audio">No clip for this song. Guess blind!</p>}
         >
           <p class="tv-hero-sub">Search on your phone and lock in your guess.</p>
         </Show>
@@ -276,7 +276,7 @@ function MusicQuizMobileView(props: MobileGameViewProps<MusicQuizPlayerView>) {
               fallback={
                 <p class="mq-verdict mq-wrong">
                   {mine().guessSongId
-                    ? `Wrong — you picked ${songById(mine().guessSongId)?.title}`
+                    ? `Wrong: you picked ${songById(mine().guessSongId)?.title}`
                     : 'No guess this round'}
                 </p>
               }
@@ -291,7 +291,7 @@ function MusicQuizMobileView(props: MobileGameViewProps<MusicQuizPlayerView>) {
             {(result) => (
               <div class={`mq-round-row ${result.correct ? 'ok' : ''}`}>
                 <span>{result.playerName}</span>
-                <span>{result.correct ? `+${result.points}` : '—'}</span>
+                <span>{result.correct ? `+${result.points}` : '-'}</span>
               </div>
             )}
           </For>

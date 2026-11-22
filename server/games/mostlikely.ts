@@ -148,7 +148,7 @@ export function createMostLikelyGame(
   return {
     id: 'most-likely',
     name: 'Most Likely To',
-    description: 'AI-written edgy prompts. Vote who is most likely — the verdict drinks.',
+    description: 'AI-written edgy prompts. Vote who is most likely. The verdict drinks.',
     minPlayers: 2,
     maxPlayers: 12,
 

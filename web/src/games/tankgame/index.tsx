@@ -291,7 +291,7 @@ function TankGameMobileView(props: MobileGameViewProps<TankGamePlayerView>) {
       </Show>
 
       <Show when={view()?.phase === 'PLAYING' && view()?.participating === false}>
-        <p class="tk-status">Joined mid-battle — you're spectating this round.</p>
+        <p class="tk-status">Joined mid-battle. You're spectating this round.</p>
       </Show>
 
       <Show
@@ -304,7 +304,7 @@ function TankGameMobileView(props: MobileGameViewProps<TankGamePlayerView>) {
       </Show>
 
       <Show when={canPlay()}>
-        <p class="tk-hint">Drag the pad to drive — your barrel aims where you move.</p>
+        <p class="tk-hint">Drag the pad to drive. Your barrel aims where you move.</p>
         <div class="tk-controls">
           <div
             class="tk-stick"

@@ -77,7 +77,7 @@ function GeoGuessTvView(props: TvGameViewProps<GeoGuessHostView>) {
             </Show>
             <Show when={host()?.drinkerName}>
               <div class="geo-tv-callout is-drinker">
-                Furthest: <strong>{host()?.drinkerName}</strong> — DRINKS!
+                Furthest: <strong>{host()?.drinkerName}</strong>. DRINKS!
               </div>
             </Show>
 
@@ -196,7 +196,7 @@ function GeoGuessMobileView(props: MobileGameViewProps<GeoGuessPlayerView>) {
             <p class="geo-mobile-verdict">CLOSEST! YOU WIN</p>
           </Show>
           <Show when={view()?.drinks}>
-            <p class="geo-mobile-verdict">FURTHEST OFF — DRINK!</p>
+            <p class="geo-mobile-verdict">FURTHEST OFF. DRINK!</p>
           </Show>
           <Show when={!view()?.isWinner && !view()?.drinks}>
             <p class="geo-mobile-verdict">YOU ARE SAFE</p>
