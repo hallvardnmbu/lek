@@ -8,7 +8,6 @@ Generalized Tizen TV + Phone WebSocket & Webhook foundation for building arbitra
 
 - [`shared/protocol.ts`](shared/protocol.ts) — Shared room, player, action, WebSocket, and webhook types.
 - [`server/game.ts`](server/game.ts) — `GameDefinition` contract, `GameContext`, and `GameRegistry`.
-- [`server/games/sandbox.ts`](server/games/sandbox.ts) — Minimal built-in `sandbox` template game (registered in [`server/games/index.ts`](server/games/index.ts)).
 - [`server/webhooks.ts`](server/webhooks.ts) — `WebhookManager` with HMAC-SHA256 signing (`WEBHOOK_URLS`, `WEBHOOK_SECRET`).
 - [`server/roomManager.ts`](server/roomManager.ts) — Game-agnostic room lifecycle, VIP failover, timers, state versioning, and webhook emission.
 - [`server/index.ts`](server/index.ts) — Bun HTTP/WebSocket server, static SPA host, and `/api/rooms/:code/events` inbound webhook endpoint.
