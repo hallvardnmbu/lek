@@ -5,8 +5,24 @@ import type {
   MostLikelyState,
   MostLikelyTallyEntry,
 } from '../../shared/games/mostlikely';
-import { generateMostLikelyPrompts, type PromptGenerator } from '../cortiModels';
+import { cortiAgent, type PromptGenerator } from '../cortiModels';
 import type { GameContext, GameDefinition } from '../game';
+
+const SYSTEM_PROMPT = [
+  'You write prompts for the adult party drinking game "Most Likely To".',
+  'Every prompt finishes the sentence "Who is most likely to...".',
+  'Style: filthy, degenerate, borderline offensive. Sex, kinks, cheating, crime, drugs, death, toxic exes, shame and terrible life choices are all fair game.',
+  'Each prompt should make the room gasp and then burst out laughing.',
+  'Hard limits: no slurs, no sexual violence, no instructions for real illegal acts, no real named people.',
+  'Each prompt is under 18 words, lowercase, no quotes, no numbering, no trailing period.',
+].join(' ');
+
+const PROMPT_PREFIX_RE = /^\s*who\s+is\s+(?:the\s+)?most\s+likely\s+to\s*/i;
+
+const defaultGeneratePrompts = cortiAgent.createPromptGenerator({
+  systemPrompt: SYSTEM_PROMPT,
+  normalize: (p) => p.replace(PROMPT_PREFIX_RE, '').replace(/\?\s*$/, '').trim(),
+});
 
 const POLL_MS = 500;
 const VOTE_MS = 30_000;
@@ -184,7 +200,7 @@ function nextRound(ctx: GameContext, state: MostLikelyState): MostLikelyState {
 }
 
 export function createMostLikelyGame(
-  generatePrompts: PromptGenerator = generateMostLikelyPrompts
+  generatePrompts: PromptGenerator = defaultGeneratePrompts
 ): GameDefinition<MostLikelyState, MostLikelyHostView, MostLikelyPlayerView> {
   return {
     id: 'most-likely',
