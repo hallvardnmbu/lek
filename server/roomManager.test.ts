@@ -295,7 +295,7 @@ describe('WebhookManager', () => {
     await webhooks.emit('player.joined', 'ABCD', { name: 'Alice' });
     expect(delivered.length).toBe(0);
 
-    await webhooks.emit('room.created', 'ABCD', { gameId: 'sandbox' });
+    await webhooks.emit('room.created', 'ABCD', { gameId: 'draw' });
     expect(delivered.length).toBe(1);
     expect(delivered[0].headers['X-Webhook-Event']).toBe('room.created');
     expect(
