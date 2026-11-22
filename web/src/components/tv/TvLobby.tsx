@@ -1,6 +1,7 @@
-import { For, Show } from 'solid-js';
+import { For } from 'solid-js';
 import type { RoomState } from '../../../../shared/protocol';
 import { QrCode } from '../QrCode';
+import { CocktailCard } from './CocktailCard';
 
 interface TvLobbyProps {
   state: RoomState;
@@ -30,17 +31,7 @@ export function TvLobby(props: TvLobbyProps) {
 
         <div class="player-grid">
           <For each={props.state.players}>
-            {(player) => (
-              <div class={`player-chip ${player.connected ? '' : 'disconnected'}`}>
-                <span class="player-avatar">
-                  {player.name.slice(0, 1).toUpperCase()}
-                </span>
-                <span class="player-name">{player.name}</span>
-                <Show when={player.isVip}>
-                  <span class="vip-tag">VIP</span>
-                </Show>
-              </div>
-            )}
+            {(player) => <CocktailCard player={player} />}
           </For>
         </div>
 

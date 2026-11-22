@@ -79,9 +79,6 @@ describe('RoomManager & GameDefinition foundation', () => {
     expect(p1.ok && p2.ok).toBe(true);
     if (!p1.ok || !p2.ok) return;
 
-    expect(p1.player.isVip).toBe(true);
-    expect(p2.player.isVip).toBe(false);
-
     const selector = manager.openGameSelector(room.code, { playerId: p1.player.id });
     expect(selector.ok).toBe(true);
     expect(room.phase).toBe('GAME_SELECT');
@@ -119,7 +116,7 @@ describe('RoomManager & GameDefinition foundation', () => {
     manager.disposeRoom(room.code);
   });
 
-  it('supports player reconnect and promotes VIP when VIP leaves', () => {
+  it('supports player reconnect and leave', () => {
     const { manager } = createTestHarness();
     const { room } = manager.createRoom();
 
@@ -138,7 +135,7 @@ describe('RoomManager & GameDefinition foundation', () => {
     const left = manager.leaveRoom(room.code, p1.player.id);
     expect(left.ok).toBe(true);
     expect(room.players.has(p1.player.id)).toBe(false);
-    expect(room.players.get(p2.player.id)?.isVip).toBe(true);
+    expect(room.players.has(p2.player.id)).toBe(true);
 
     manager.disposeRoom(room.code);
   });

@@ -199,7 +199,6 @@ export function MobilePlay(props: MobilePlayProps) {
             <Show when={s().phase === 'LOBBY'}>
               <MobileLobby
                 state={s()}
-                isVip={Boolean(me()?.isVip)}
                 onOpenSelector={handleOpenSelector}
                 onLeave={handleLeave}
               />
@@ -209,7 +208,6 @@ export function MobilePlay(props: MobilePlayProps) {
               <MobileGameSelector
                 state={s()}
                 playerId={playerId()!}
-                isVip={Boolean(me()?.isVip)}
                 onVoteGame={handleVoteGame}
                 onReturnToLobby={handleReturnToLobby}
               />
@@ -242,7 +240,6 @@ export function MobilePlay(props: MobilePlayProps) {
             <Show when={s().phase === 'ENDED'}>
               <MobileEnded
                 score={me()?.score ?? 0}
-                isVip={Boolean(me()?.isVip)}
                 onOpenSelector={handleOpenSelector}
                 onReturnToLobby={handleReturnToLobby}
               />

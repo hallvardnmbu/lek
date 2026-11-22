@@ -183,13 +183,11 @@ export class RoomManager {
     }
 
     const playerId = existingPlayerId || crypto.randomUUID();
-    const isVip = room.players.size === 0;
     const player: GamePlayer = {
       id: playerId,
       name,
       score: 0,
       connected: true,
-      isVip,
       meta: {},
     };
 
@@ -206,7 +204,6 @@ export class RoomManager {
     this.emitWebhook('player.joined', room.code, {
       playerId: player.id,
       name: player.name,
-      isVip: player.isVip,
     });
     return { ok: true, room, player };
   }
@@ -246,18 +243,8 @@ export class RoomManager {
     }
 
     room.lastActivityAt = Date.now();
-    const wasVip = player.isVip;
     room.players.delete(playerId);
     room.gameVotes.delete(playerId);
-
-    if (wasVip && room.players.size > 0) {
-      const nextVip =
-        Array.from(room.players.values()).find((p) => p.connected) ??
-        room.players.values().next().value;
-      if (nextVip) {
-        nextVip.isVip = true;
-      }
-    }
 
     if (room.phase === 'GAME_SELECT' && this.maybeResolveGameVote(room)) {
       this.emitWebhook('player.left', room.code, { playerId, name: player.name });
@@ -304,7 +291,7 @@ export class RoomManager {
     const auth = this.requireAuthorizedRoom(
       rawCode,
       actor,
-      'Only the VIP player or TV host can open the game selector.'
+      'Only a room player or TV host can open the game selector.'
     );
     if (!auth.ok) return auth;
     const { room } = auth;
@@ -382,7 +369,7 @@ export class RoomManager {
     const auth = this.requireAuthorizedRoom(
       rawCode,
       actor,
-      'Only the VIP player or TV host can start the game.'
+      'Only a room player or TV host can start the game.'
     );
     if (!auth.ok) return auth;
     const { room } = auth;
@@ -579,7 +566,7 @@ export class RoomManager {
     const auth = this.requireAuthorizedRoom(
       rawCode,
       actor,
-      'Only VIP or TV host can end the game.'
+      'Only a room player or TV host can end the game.'
     );
     if (!auth.ok) return auth;
     const { room } = auth;
@@ -600,7 +587,7 @@ export class RoomManager {
     const auth = this.requireAuthorizedRoom(
       rawCode,
       actor,
-      'Only VIP or TV host can return to lobby.'
+      'Only a room player or TV host can return to lobby.'
     );
     if (!auth.ok) return auth;
     const { room } = auth;
@@ -629,7 +616,6 @@ export class RoomManager {
       name: p.name,
       score: p.score,
       connected: p.connected,
-      isVip: p.isVip,
       meta: p.meta,
     }));
 
@@ -836,11 +822,8 @@ export class RoomManager {
     if (actor.hostToken && actor.hostToken === room.hostToken) {
       return true;
     }
-    if (actor.playerId) {
-      const player = room.players.get(actor.playerId);
-      if (player?.isVip) return true;
-      const vipConnected = Array.from(room.players.values()).some((p) => p.isVip && p.connected);
-      if (!vipConnected && player?.connected) return true;
+    if (actor.playerId && room.players.has(actor.playerId)) {
+      return true;
     }
     return false;
   }

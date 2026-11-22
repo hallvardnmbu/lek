@@ -4,7 +4,6 @@ import type { RoomState } from '../../../../shared/protocol';
 interface MobileGameSelectorProps {
   state: RoomState;
   playerId: string;
-  isVip: boolean;
   onVoteGame: (gameId: string) => void;
   onReturnToLobby: () => void;
 }
@@ -69,15 +68,13 @@ export function MobileGameSelector(props: MobileGameSelectorProps) {
         </For>
       </div>
 
-      <Show when={props.isVip}>
-        <button
-          class="btn btn-block"
-          style={{ 'margin-top': '0.85rem' }}
-          onClick={props.onReturnToLobby}
-        >
-          Back to Lobby
-        </button>
-      </Show>
+      <button
+        class="btn btn-block"
+        style={{ 'margin-top': '0.85rem' }}
+        onClick={props.onReturnToLobby}
+      >
+        Back to Lobby
+      </button>
     </div>
   );
 }
