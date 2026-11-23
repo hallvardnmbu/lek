@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'bun:test';
+import {
+  SPIN_LEAD_MS,
+  buildStepOffsetsMs,
+  computeStepDelayMs,
+  totalSpinDurationMs,
+} from '../../shared/games/roulette';
 import type { GameContext } from '../game';
-import { computeStepDelayMs, rouletteGame } from './roulette';
+import { rouletteGame } from './roulette';
 
 interface TestPlayer {
   id: string;
@@ -59,34 +65,40 @@ describe('Roulette game', () => {
     expect(first).toBeLessThan(mid);
     expect(mid).toBeLessThan(last);
 
-    let sum = 0;
-    for (let i = 0; i < totalSteps; i++) {
-      sum += computeStepDelayMs(i, totalSteps);
-    }
+    const sum = totalSpinDurationMs(totalSteps);
     expect(sum).toBeGreaterThanOrEqual(19_900);
     expect(sum).toBeLessThanOrEqual(20_100);
+
+    const offsets = buildStepOffsetsMs(totalSteps);
+    expect(offsets.length).toBe(totalSteps);
+    expect(offsets[0]).toBe(0);
+    expect(offsets[1]).toBe(first);
   });
 
-  it('cycles active player around the room until stopping on one selected player', () => {
+  it('provides synchronized spin schedule and selects the final step player on timer expiry', () => {
     const { ctx, timers, events, getCleared } = createTestCtx(threePlayers);
     let state = rouletteGame.onStart(ctx);
 
     expect(state.phase).toBe('SPINNING');
     expect(timers.length).toBe(1);
+    expect(timers[0]).toBe(SPIN_LEAD_MS + totalSpinDurationMs(state.totalSteps));
 
-    const seenActive = new Set<string>();
-    while (state.phase === 'SPINNING') {
-      const activeViews = threePlayers.filter(
-        (p) => rouletteGame.getPlayerView(state, p.id, ctx).isActive
-      );
-      expect(activeViews.length).toBe(1);
-      seenActive.add(activeViews[0].id);
-      state = rouletteGame.onTimerExpired!(ctx, state)!;
-    }
+    const hostSpinView = rouletteGame.getHostView(state, ctx);
+    expect(hostSpinView.spin).not.toBeNull();
+    expect(hostSpinView.spin?.playerOrder).toEqual(['p1', 'p2', 'p3']);
+
+    const playerSpinView = rouletteGame.getPlayerView(state, 'p1', ctx);
+    expect(playerSpinView.spin?.spinStartAt).toBe(hostSpinView.spin?.spinStartAt);
+    expect(playerSpinView.spin?.startIndex).toBe(hostSpinView.spin?.startIndex);
+    expect(playerSpinView.spin?.totalSteps).toBe(hostSpinView.spin?.totalSteps);
+
+    const expectedSelectedId =
+      state.playerOrder[(state.startIndex + state.totalSteps - 1) % state.playerOrder.length];
+
+    state = rouletteGame.onTimerExpired!(ctx, state)!;
 
     expect(state.phase).toBe('STOPPED');
-    expect(state.selectedId).not.toBeNull();
-    expect(seenActive.size).toBe(3);
+    expect(state.selectedId).toBe(expectedSelectedId);
     expect(getCleared()).toBe(1);
     expect(events.some((e) => e.event === 'roulette_stopped')).toBe(true);
 
@@ -94,10 +106,11 @@ describe('Roulette game', () => {
       (p) => rouletteGame.getPlayerView(state, p.id, ctx).isSelected
     );
     expect(selectedViews.length).toBe(1);
-    expect(selectedViews[0].id).toBe(state.selectedId!);
+    expect(selectedViews[0].id).toBe(expectedSelectedId);
 
     const hostView = rouletteGame.getHostView(state, ctx);
     expect(hostView.phase).toBe('STOPPED');
+    expect(hostView.spin).toBeNull();
     expect(hostView.selectedName).toBe(selectedViews[0].name);
   });
 
@@ -105,17 +118,13 @@ describe('Roulette game', () => {
     const { ctx } = createTestCtx(threePlayers);
     let state = rouletteGame.onStart(ctx);
 
-    while (state.phase === 'SPINNING') {
-      state = rouletteGame.onTimerExpired!(ctx, state)!;
-    }
+    state = rouletteGame.onTimerExpired!(ctx, state)!;
     expect(state.phase).toBe('STOPPED');
 
     state = rouletteGame.onHostAction!(ctx, state, { type: 'spin' })!;
     expect(state.phase).toBe('SPINNING');
 
-    while (state.phase === 'SPINNING') {
-      state = rouletteGame.onTimerExpired!(ctx, state)!;
-    }
+    state = rouletteGame.onTimerExpired!(ctx, state)!;
     expect(state.phase).toBe('STOPPED');
 
     state = rouletteGame.onPlayerAction(ctx, state, 'p1', { type: 'spin' })!;

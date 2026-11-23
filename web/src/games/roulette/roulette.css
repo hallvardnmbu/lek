@@ -24,9 +24,10 @@
 }
 
 .roulette-tv-chip.is-selected {
-  background: #ff0000;
+  background: var(--bg);
   color: #ffffff;
-  border-color: #ff0000;
+  border-color: #ffffff;
+  animation: roulette-red-flash 0.5s steps(1, end) infinite;
 }
 
 .roulette-tv-winner {
@@ -67,7 +68,7 @@
 }
 
 .roulette-screen-red {
-  background: #ff0000;
+  background: var(--bg);
   color: #ffffff;
   animation: roulette-red-flash 0.5s steps(1, end) infinite;
 }
@@ -75,13 +76,13 @@
 @keyframes roulette-red-flash {
   0%,
   49% {
-    background: #ff0000;
+    background: var(--bg);
     color: #ffffff;
   }
   50%,
   100% {
-    background: #000000;
-    color: #ff0000;
+    background: #ffffff;
+    color: var(--bg);
   }
 }
 
@@ -109,6 +110,13 @@
   background: rgba(255, 255, 255, 0.16);
   color: #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.roulette-screen-red .roulette-spin-again {
+  background: transparent;
+  color: inherit;
+  border: none;
+  text-decoration-color: currentColor;
 }
 
 .debug-phone-body .roulette-screen {
