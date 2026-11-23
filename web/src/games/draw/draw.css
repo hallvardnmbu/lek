@@ -39,13 +39,11 @@
 .draw-vote-badge.best {
   background: rgba(16, 185, 129, 0.2);
   color: #6ee7b7;
-  border: 1px solid #10b981;
 }
 
 .draw-vote-badge.worst {
   background: rgba(239, 68, 68, 0.2);
   color: #fca5a5;
-  border: 1px solid #ef4444;
 }
 
 .draw-tv-grid {
@@ -112,7 +110,6 @@
 
 .draw-mobile-prompt-box {
   background: var(--surface-2);
-  border: 1px solid var(--border-strong);
   border-radius: 12px;
   padding: 0.75rem 1rem;
   margin-bottom: 0.75rem;
@@ -174,7 +171,7 @@
 .draw-size-btn {
   padding: 0.35rem 0.6rem;
   border-radius: 8px;
-  border: 1px solid var(--border-strong);
+  border: 0;
   background: var(--surface-2);
   color: var(--text);
   font-size: 0.8rem;
@@ -183,7 +180,7 @@
 }
 
 .draw-size-btn.active {
-  border-color: var(--accent);
+  background: var(--accent-soft);
   color: var(--accent);
 }
 

@@ -64,7 +64,6 @@
   align-items: center;
   gap: 0.7rem;
   background: var(--surface);
-  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 0.6rem 1.1rem;
   font-size: 1.1rem;
@@ -87,10 +86,6 @@
 
 .mq-result-pill.missed strong {
   color: var(--danger);
-}
-
-.mq-result-pill.ok {
-  border-color: var(--success);
 }
 
 .mq-standings {
@@ -160,7 +155,7 @@
 
 .mq-locked {
   text-align: center;
-  border: 1px solid var(--border-strong);
+  background: var(--surface);
   border-radius: 14px;
   padding: 1.5rem 1rem;
 }

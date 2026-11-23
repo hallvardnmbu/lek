@@ -17,7 +17,7 @@
 .pg-error-banner {
   padding: 0.75rem 1.25rem;
   border-radius: 10px;
-  border: 1px solid var(--danger);
+  background: rgba(239, 68, 68, 0.16);
   color: var(--danger);
   font-weight: 700;
 }
@@ -87,7 +87,6 @@
   padding: 0.25rem 0.65rem;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid var(--border);
   font-size: 0.9rem;
   font-weight: 700;
 }
@@ -108,7 +107,6 @@
   padding: 0.4rem 0.9rem;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid var(--border);
   font-weight: 800;
   font-size: 1rem;
 }

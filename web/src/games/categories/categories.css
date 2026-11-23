@@ -24,7 +24,6 @@
 }
 
 .cat-continue-btn.is-voted {
-  border-color: var(--accent);
   background: var(--accent-soft);
 }
 

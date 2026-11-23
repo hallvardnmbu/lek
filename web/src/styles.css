@@ -1125,16 +1125,13 @@ button {
 .guess-tv-callout {
   border-radius: 10px;
   background: var(--surface);
-  border: 1px solid var(--border);
 }
 
 .guess-tv-callout.is-winner {
-  border-color: var(--accent);
   color: var(--accent);
 }
 
 .guess-tv-callout.is-drinker {
-  border-color: var(--danger);
   color: var(--danger);
 }
 

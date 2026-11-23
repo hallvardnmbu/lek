@@ -51,7 +51,6 @@
 
 .tk-feed-row {
   background: rgba(10, 14, 18, 0.75);
-  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0.25rem 0.7rem;
   font-size: 1.05rem;
