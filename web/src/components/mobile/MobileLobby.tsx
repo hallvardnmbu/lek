@@ -1,6 +1,7 @@
 import { Show } from 'solid-js';
 import type { PlayerSummary, RoomState } from '../../../../shared/protocol';
-import { ARMS, ARM_CANVAS, armSrc } from '../arms';
+import { ArmCrop } from '../ArmCrop';
+import { ARMS } from '../arms';
 
 interface MobileLobbyProps {
   state: RoomState;
@@ -22,20 +23,7 @@ export function MobileLobby(props: MobileLobbyProps) {
       <Show when={arm()}>
         {(a) => (
           <div class={`mobile-arm from-${a().enter}`}>
-            <div
-              class="mobile-arm-crop"
-              style={{ 'aspect-ratio': `${a().box.width} / ${a().box.height}` }}
-            >
-              <img
-                src={armSrc(a())}
-                alt=""
-                style={{
-                  width: `${(ARM_CANVAS.width / a().box.width) * 100}%`,
-                  left: `${(-a().box.x / a().box.width) * 100}%`,
-                  top: `${(-a().box.y / a().box.height) * 100}%`,
-                }}
-              />
-            </div>
+            <ArmCrop arm={a()} class="mobile-arm-crop" />
           </div>
         )}
       </Show>
