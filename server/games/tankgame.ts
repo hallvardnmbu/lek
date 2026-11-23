@@ -196,6 +196,24 @@ function timeLeftMs(state: TankGameState, now: number): number {
   return Math.max(0, GAME_TIMEOUT_MS - (now - state.playingStartedAt));
 }
 
+function nextDelayMs(state: TankGameState, now: number): number {
+  const left = timeLeftMs(state, now);
+  if (Object.keys(state.inputs).length > 0 || state.bullets.length > 0) {
+    return Math.min(TICK_MS, left);
+  }
+  let next = left;
+  for (const tank of Object.values(state.tanks)) {
+    if (!tank.alive || tank.lastFiredAt <= 0) continue;
+    const cdLeft = tank.lastFiredAt + FIRE_COOLDOWN_MS - now;
+    if (cdLeft > 0) next = Math.min(next, cdLeft);
+  }
+  for (const e of state.eliminations) {
+    const feedLeft = e.at + ELIMINATION_FEED_MS - now;
+    if (feedLeft > 0) next = Math.min(next, feedLeft);
+  }
+  return Math.max(1, next);
+}
+
 function destroyTank(ctx: GameContext, state: TankGameState, playerId: string, now: number): void {
   const tank = state.tanks[playerId];
   delete state.inputs[playerId];
@@ -247,26 +265,35 @@ export const tankGame: GameDefinition<TankGameState, TankGameHostView, TankGameP
       state.phase = 'PLAYING';
       state.playingStartedAt = now;
       state.tickAt = now;
-      ctx.setTimer(TICK_MS);
+      ctx.setTimer(nextDelayMs(state, now));
       return state;
     }
     if (state.phase !== 'PLAYING') return state;
     simulate(ctx, state, now);
-    if (!checkGameEnd(ctx, state, now)) ctx.setTimer(TICK_MS);
+    if (!checkGameEnd(ctx, state, now)) ctx.setTimer(nextDelayMs(state, now));
     return state;
   },
 
   onPlayerAction(ctx, state, playerId, action) {
     const tank = state.tanks[playerId];
     if (state.phase !== 'PLAYING' || !tank?.alive) return state;
+    const wasSimulating = Object.keys(state.inputs).length > 0 || state.bullets.length > 0;
     if (action.type === 'input') {
       const raw = action.payload as { x?: unknown; y?: unknown } | undefined;
       const x = Number(raw?.x);
       const y = Number(raw?.y);
       if (!Number.isFinite(x) || !Number.isFinite(y)) return state;
       const mag = Math.hypot(x, y);
-      state.inputs[playerId] =
-        mag <= 1 ? { x, y } : { x: x / mag, y: y / mag };
+      if (mag < INPUT_DEADZONE) {
+        delete state.inputs[playerId];
+      } else {
+        state.inputs[playerId] = mag <= 1 ? { x, y } : { x: x / mag, y: y / mag };
+      }
+      if (!wasSimulating && Object.keys(state.inputs).length > 0) {
+        const now = Date.now();
+        state.tickAt = now;
+        ctx.setTimer(nextDelayMs(state, now));
+      }
       return state;
     }
     if (action.type === 'fire') {
@@ -281,6 +308,10 @@ export const tankGame: GameDefinition<TankGameState, TankGameHostView, TankGameP
         angle: tank.angle,
         firedAt: now,
       });
+      if (!wasSimulating) {
+        state.tickAt = now;
+        ctx.setTimer(nextDelayMs(state, now));
+      }
       return state;
     }
     return state;

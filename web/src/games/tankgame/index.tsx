@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createMemo, createSignal, onSettled } from 'solid-js';
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, onSettled } from 'solid-js';
 import {
   TANK_COLORS,
   TANK_WALLS,
@@ -37,6 +37,38 @@ function clockText(ms: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+function useLiveTimeLeft(
+  getTimeLeftMs: () => number | undefined,
+  getPhase: () => string | undefined
+): () => number {
+  const [now, setNow] = createSignal(Date.now());
+  let syncedAt = Date.now();
+  let syncedLeft = 0;
+
+  createEffect(
+    () => getTimeLeftMs(),
+    (ms) => {
+      if (ms !== undefined) {
+        syncedLeft = ms;
+        syncedAt = Date.now();
+        setNow(syncedAt);
+      }
+    }
+  );
+
+  const timer = setInterval(() => {
+    if (getPhase() === 'PLAYING') setNow(Date.now());
+  }, 500);
+  onCleanup(() => clearInterval(timer));
+
+  return () => {
+    const base = getTimeLeftMs();
+    if (base === undefined) return 0;
+    if (getPhase() !== 'PLAYING') return base;
+    return Math.max(0, syncedLeft - (now() - syncedAt));
+  };
+}
+
 interface TankSnap {
   x: number;
   y: number;
@@ -51,6 +83,7 @@ interface Snapshot {
 
 function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
   const view = () => props.state.hostState;
+  const liveTimeLeftMs = useLiveTimeLeft(() => view()?.timeLeftMs, () => view()?.phase);
   const playersById = createMemo(
     () => new Map(props.state.players.map((p) => [p.id, p.name]))
   );
@@ -179,7 +212,7 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
         />
         <div class="tk-topbar">
           <span>{view()?.aliveCount ?? 0} tanks in play</span>
-          <span class="tk-clock">{clockText(view()?.timeLeftMs ?? 0)}</span>
+          <span class="tk-clock">{clockText(liveTimeLeftMs())}</span>
         </div>
         <div class="tk-feed">
           <For each={view()?.eliminations ?? []}>
@@ -204,6 +237,7 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
 
 function TankGameMobileView(props: MobileGameViewProps<TankGamePlayerView>) {
   const view = () => props.state.playerState;
+  const liveTimeLeftMs = useLiveTimeLeft(() => view()?.timeLeftMs, () => view()?.phase);
   const canPlay = createMemo(
     () =>
       view()?.participating === true &&
@@ -216,15 +250,76 @@ function TankGameMobileView(props: MobileGameViewProps<TankGamePlayerView>) {
   let stickBase: HTMLDivElement | null = null;
   let lastSent: { x: number; y: number } | null = null;
   let lastSentAt = 0;
+  let pending: { x: number; y: number } | null = null;
+  let flushTimer: ReturnType<typeof setTimeout> | undefined;
 
-  const sendInput = (x: number, y: number, force = false) => {
+  const clearFlushTimer = () => {
+    if (flushTimer !== undefined) {
+      clearTimeout(flushTimer);
+      flushTimer = undefined;
+    }
+  };
+
+  onCleanup(clearFlushTimer);
+
+  createEffect(
+    () => canPlay(),
+    (active) => {
+      if (!active) {
+        pending = null;
+        clearFlushTimer();
+        lastSent = null;
+        setKnob(null);
+      }
+    }
+  );
+
+  const transmitInput = (x: number, y: number, now: number) => {
+    const rx = Math.round(x * 1000) / 1000;
+    const ry = Math.round(y * 1000) / 1000;
+    lastSent = { x: rx, y: ry };
+    lastSentAt = now;
+    props.sendAction({ type: 'input', payload: { x: rx, y: ry } });
+  };
+
+  const sendInput = (x: number, y: number) => {
     const now = Date.now();
-    if (!force && lastSent && Math.hypot(x - lastSent.x, y - lastSent.y) < 0.16 && now - lastSentAt < 120) {
+    const isZero = x === 0 && y === 0;
+
+    if (isZero) {
+      pending = null;
+      clearFlushTimer();
+      if (!lastSent || (lastSent.x === 0 && lastSent.y === 0)) return;
+      transmitInput(0, 0, now);
       return;
     }
-    lastSent = { x, y };
-    lastSentAt = now;
-    props.sendAction({ type: 'input', payload: { x, y } });
+
+    const wasStopped = !lastSent || (lastSent.x === 0 && lastSent.y === 0);
+    if (!wasStopped && lastSent && Math.hypot(x - lastSent.x, y - lastSent.y) < 0.16) {
+      pending = null;
+      clearFlushTimer();
+      return;
+    }
+
+    const elapsed = now - lastSentAt;
+    if (wasStopped || elapsed >= 75) {
+      pending = null;
+      clearFlushTimer();
+      transmitInput(x, y, now);
+      return;
+    }
+
+    pending = { x, y };
+    if (flushTimer === undefined) {
+      flushTimer = setTimeout(() => {
+        flushTimer = undefined;
+        const next = pending;
+        pending = null;
+        if (!next || !canPlay()) return;
+        if (lastSent && Math.hypot(next.x - lastSent.x, next.y - lastSent.y) < 0.16) return;
+        transmitInput(next.x, next.y, Date.now());
+      }, 75 - elapsed);
+    }
   };
 
   const stickVector = (e: PointerEvent): { x: number; y: number } => {
@@ -236,6 +331,7 @@ function TankGameMobileView(props: MobileGameViewProps<TankGamePlayerView>) {
     let dx = (e.clientX - cx) / radius;
     let dy = (e.clientY - cy) / radius;
     const mag = Math.hypot(dx, dy);
+    if (mag < 0.14) return { x: 0, y: 0 };
     if (mag > 1) {
       dx /= mag;
       dy /= mag;
@@ -248,22 +344,20 @@ function TankGameMobileView(props: MobileGameViewProps<TankGamePlayerView>) {
     stickBase.setPointerCapture(e.pointerId);
     const v = stickVector(e);
     setKnob(v);
-    sendInput(v.x, v.y, true);
+    sendInput(v.x, v.y);
   };
 
   const onStickMove = (e: PointerEvent) => {
     if (!knob()) return;
     const v = stickVector(e);
-    const mag = Math.hypot(v.x, v.y);
-    const scaled = mag < 0.14 ? { x: 0, y: 0 } : v;
-    setKnob(scaled);
-    sendInput(scaled.x, scaled.y);
+    setKnob(v);
+    sendInput(v.x, v.y);
   };
 
   const onStickUp = () => {
     if (!knob()) return;
     setKnob(null);
-    sendInput(0, 0, true);
+    sendInput(0, 0);
   };
 
   const fire = () => {
@@ -283,7 +377,7 @@ function TankGameMobileView(props: MobileGameViewProps<TankGamePlayerView>) {
     <div class="mobile-card tk-mobile">
       <div class="tk-mobile-head">
         <span class="tk-title">Tank Battle</span>
-        <span class="tk-clock">{clockText(view()?.timeLeftMs ?? 0)}</span>
+        <span class="tk-clock">{clockText(liveTimeLeftMs())}</span>
       </div>
 
       <Show when={view()?.phase !== 'PLAYING'}>

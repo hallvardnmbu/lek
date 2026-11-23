@@ -21,6 +21,7 @@ interface TestPlayer {
 
 function createTestCtx(players: TestPlayer[]) {
   const scores = new Map<string, number>();
+  const timers: number[] = [];
   let ended = false;
 
   const toGamePlayers = () =>
@@ -39,7 +40,9 @@ function createTestCtx(players: TestPlayer[]) {
     setPlayerScore: (id, score) => scores.set(id, score),
     addPlayerScore: (id, delta) => scores.set(id, (scores.get(id) ?? 0) + delta),
     setPlayerMeta: () => {},
-    setTimer: () => {},
+    setTimer: (ms) => {
+      timers.push(ms);
+    },
     clearTimer: () => {},
     broadcastEvent: () => {},
     sendEventToHost: () => {},
@@ -54,6 +57,7 @@ function createTestCtx(players: TestPlayer[]) {
     ctx,
     scoreOf: (id: string) => scores.get(id) ?? 0,
     isEnded: () => ended,
+    lastTimer: () => timers[timers.length - 1],
   };
 }
 
@@ -262,5 +266,26 @@ describe('tank battle', () => {
     expect(own.participating).toBe(true);
     expect(own.alive).toBe(true);
     expect(own.cooldownMs).toBe(0);
+  });
+
+  it('sleeps when idle and only ticks at 50ms while tanks or bullets are active', () => {
+    const test = startPlaying([
+      { id: 'p1', name: 'Alice', connected: true },
+      { id: 'p2', name: 'Bob', connected: true },
+    ]);
+    expect(test.lastTimer()).toBeGreaterThan(100_000);
+
+    game.onPlayerAction(test.ctx, test.state, 'p1', {
+      type: 'input',
+      payload: { x: 1, y: 0 },
+    });
+    expect(test.lastTimer()).toBe(50);
+
+    game.onPlayerAction(test.ctx, test.state, 'p1', {
+      type: 'input',
+      payload: { x: 0, y: 0 },
+    });
+    tick(test.ctx, test.state);
+    expect(test.lastTimer()).toBeGreaterThan(100_000);
   });
 });
