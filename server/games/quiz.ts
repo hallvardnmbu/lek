@@ -7,7 +7,7 @@ import type {
 } from '../../shared/games/quiz';
 import { cortiAgent } from '../cortiModels';
 import type { GameContext, GameDefinition } from '../game';
-import { connectedPlayers, createRoomHistory, shuffle } from './helpers';
+import { connectedPlayers, createRoomHistory, playerName, shuffle, withoutKey } from './helpers';
 
 export type QuestionGenerator = (count: number, avoid?: string[]) => Promise<QuizQuestion[]>;
 
@@ -271,7 +271,7 @@ function baseView(state: QuizState, ctx: GameContext) {
     aliveCount: state.aliveIds.length,
     results: state.results,
     allWrong: state.allWrong,
-    winnerName: winnerId ? (ctx.getPlayer(winnerId)?.name ?? null) : null,
+    winnerName: playerName(ctx, winnerId),
   };
 }
 
@@ -359,8 +359,7 @@ export function createQuizGame(
     },
 
     onPlayerLeave(ctx, state, playerId) {
-      const { [playerId]: _removed, ...answers } = state.answers;
-      state.answers = answers;
+      state.answers = withoutKey(state.answers, playerId);
       state.aliveIds = state.aliveIds.filter((id) => id !== playerId);
 
       if (state.phase === 'QUESTION') {

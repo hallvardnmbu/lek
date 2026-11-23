@@ -64,7 +64,7 @@ function MostLikelyTvView(props: TvGameViewProps<MostLikelyHostView>) {
           <p class="tv-hero-sub">Vote on your phone. Majority verdict drinks.</p>
         </Show>
 
-        <div class="tv-action-bar ml-tv-actions">
+        <div class="tv-action-bar">
           <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'next' })}>
             {host()?.phase === 'VOTING' ? 'Reveal Now' : 'Next Round'}
           </button>

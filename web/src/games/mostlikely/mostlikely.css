@@ -45,10 +45,6 @@
   color: var(--muted);
 }
 
-.ml-tv-actions {
-  gap: 1rem;
-}
-
 .ml-mobile-head {
   display: flex;
   justify-content: space-between;

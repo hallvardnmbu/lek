@@ -7,11 +7,13 @@ import type {
 import { cortiAgent, type PromptGenerator } from '../cortiModels';
 import type { GameContext, GameDefinition } from '../game';
 import {
+  allConnected,
   buildVoteTally,
   connectedPlayers,
   createRoomHistory,
   parseRounds,
   takeUnusedPrompt,
+  withoutKey,
 } from './helpers';
 
 const SYSTEM_PROMPT = [
@@ -133,13 +135,10 @@ function viewCounts(ctx: GameContext, state: CategoriesState) {
 }
 
 function advanceIfReady(ctx: GameContext, state: CategoriesState): CategoriesState {
-  const players = connectedPlayers(ctx);
-  if (players.length === 0) return state;
-
-  if (state.phase === 'PLAYING' && players.every((p) => state.votes[p.id] !== undefined)) {
+  if (state.phase === 'PLAYING' && allConnected(ctx, (id) => state.votes[id] !== undefined)) {
     return reveal(ctx, state);
   }
-  if (state.phase === 'REVEAL' && players.every((p) => state.continueVotes[p.id] === true)) {
+  if (state.phase === 'REVEAL' && allConnected(ctx, (id) => state.continueVotes[id] === true)) {
     return nextRound(ctx, state);
   }
   return state;
@@ -229,10 +228,8 @@ export function createCategoriesGame(
     },
 
     onPlayerLeave(ctx, state, playerId) {
-      const { [playerId]: _removedVote, ...votes } = state.votes;
-      const { [playerId]: _removedContinue, ...continueVotes } = state.continueVotes;
-      state.votes = votes;
-      state.continueVotes = continueVotes;
+      state.votes = withoutKey(state.votes, playerId);
+      state.continueVotes = withoutKey(state.continueVotes, playerId);
       return advanceIfReady(ctx, state);
     },
 

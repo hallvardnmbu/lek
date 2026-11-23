@@ -8,7 +8,7 @@ import type {
 } from '../../shared/games/geoguess';
 import type { GameContext, GameDefinition } from '../game';
 import { fetchRandomGeoSpot, type GeoSpot, type SpotFetcher } from './geoguess-spots';
-import { connectedPlayers } from './helpers';
+import { allConnected, connectedPlayers, playerName } from './helpers';
 
 const POLL_MS = 120;
 const ROUND_DURATION_MS = 45_000;
@@ -184,15 +184,9 @@ function revealRound(ctx: GameContext, state: GeoGuessState): void {
 }
 
 function maybeRevealOnAllGuessed(ctx: GameContext, state: GeoGuessState): void {
-  if (state.phase !== 'GUESSING') return;
-  const connected = connectedPlayers(ctx);
-  if (connected.length > 0 && connected.every((p) => Boolean(state.guesses[p.id]))) {
+  if (state.phase === 'GUESSING' && allConnected(ctx, (id) => Boolean(state.guesses[id]))) {
     revealRound(ctx, state);
   }
-}
-
-function playerName(ctx: GameContext, playerId: string | null): string | null {
-  return playerId ? (ctx.getPlayer(playerId)?.name ?? null) : null;
 }
 
 function buildResultEntries(ctx: GameContext, state: GeoGuessState): GeoGuessResultEntry[] {

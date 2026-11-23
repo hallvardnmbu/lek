@@ -393,10 +393,19 @@ const server = Bun.serve<SocketData>({
           return;
         }
 
-        case 'open_game_selector': {
-          withActorCode(ws, payload, 'open_game_selector requires "code".', (code, actor) =>
-            roomManager.openGameSelector(code, actor)
-          );
+        case 'open_game_selector':
+        case 'start_random_game':
+        case 'stop_randomized':
+        case 'end_game':
+        case 'return_to_lobby': {
+          const handlers = {
+            open_game_selector: roomManager.openGameSelector.bind(roomManager),
+            start_random_game: roomManager.startRandomGame.bind(roomManager),
+            stop_randomized: roomManager.stopRandomized.bind(roomManager),
+            end_game: roomManager.endGame.bind(roomManager),
+            return_to_lobby: roomManager.returnToLobby.bind(roomManager),
+          };
+          withActorCode(ws, payload, `${msg.type} requires "code".`, handlers[msg.type]);
           return;
         }
 
@@ -408,20 +417,6 @@ const server = Bun.serve<SocketData>({
           }
           withActorCode(ws, payload, 'set_game_select_mode requires "code".', (code, actor) =>
             roomManager.setGameSelectMode(code, actor, mode)
-          );
-          return;
-        }
-
-        case 'start_random_game': {
-          withActorCode(ws, payload, 'start_random_game requires "code".', (code, actor) =>
-            roomManager.startRandomGame(code, actor)
-          );
-          return;
-        }
-
-        case 'stop_randomized': {
-          withActorCode(ws, payload, 'stop_randomized requires "code".', (code, actor) =>
-            roomManager.stopRandomized(code, actor)
           );
           return;
         }
@@ -465,20 +460,6 @@ const server = Bun.serve<SocketData>({
                 { type: action.type as string, payload: action.payload },
                 asString(payload.roundId)
               )
-          );
-          return;
-        }
-
-        case 'end_game': {
-          withActorCode(ws, payload, 'end_game requires "code".', (code, actor) =>
-            roomManager.endGame(code, actor)
-          );
-          return;
-        }
-
-        case 'return_to_lobby': {
-          withActorCode(ws, payload, 'return_to_lobby requires "code".', (code, actor) =>
-            roomManager.returnToLobby(code, actor)
           );
           return;
         }

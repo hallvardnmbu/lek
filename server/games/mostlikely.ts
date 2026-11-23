@@ -6,11 +6,13 @@ import type {
 import { cortiAgent, type PromptGenerator } from '../cortiModels';
 import type { GameContext, GameDefinition } from '../game';
 import {
+  allConnected,
   buildVoteTally,
   connectedPlayers,
   createRoomHistory,
   parseRounds,
   takeUnusedPrompt,
+  withoutKey,
 } from './helpers';
 
 const SYSTEM_PROMPT = [
@@ -96,11 +98,8 @@ function voteCounts(ctx: GameContext, state: MostLikelyState) {
 }
 
 function maybeReveal(ctx: GameContext, state: MostLikelyState): MostLikelyState {
-  if (state.phase === 'VOTING') {
-    const { votedCount, connectedCount } = voteCounts(ctx, state);
-    if (connectedCount > 0 && votedCount === connectedCount) {
-      return reveal(ctx, state);
-    }
+  if (state.phase === 'VOTING' && allConnected(ctx, (id) => state.votes[id] !== undefined)) {
+    return reveal(ctx, state);
   }
   return state;
 }
@@ -208,8 +207,7 @@ export function createMostLikelyGame(
     },
 
     onPlayerLeave(ctx, state, playerId) {
-      const { [playerId]: _removed, ...votes } = state.votes;
-      state.votes = votes;
+      state.votes = withoutKey(state.votes, playerId);
       return maybeReveal(ctx, state);
     },
 

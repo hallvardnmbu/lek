@@ -6,7 +6,7 @@ import {
   type MusicQuizState,
 } from '../../shared/games/musicquiz';
 import type { GameContext, GameDefinition } from '../game';
-import { connectedPlayers, createRoomHistory, parseRounds, shuffle } from './helpers';
+import { allConnected, connectedPlayers, createRoomHistory, parseRounds, shuffle, withoutKey } from './helpers';
 import { getMusicQuizCatalog, previewUrlFor, refreshPreviews } from './musicquizCatalog';
 
 const INTRO_MS = 4_000;
@@ -34,9 +34,11 @@ function currentSong(state: MusicQuizState): MusicQuizSong {
   return state.songs[state.round - 1];
 }
 
-function allConnectedGuessed(ctx: GameContext, state: MusicQuizState): boolean {
-  const players = connectedPlayers(ctx);
-  return players.length > 0 && players.every((p) => state.guesses[p.id] !== undefined);
+function maybeReveal(ctx: GameContext, state: MusicQuizState): MusicQuizState {
+  if (state.phase === 'GUESSING' && allConnected(ctx, (id) => state.guesses[id] !== undefined)) {
+    return reveal(ctx, state);
+  }
+  return state;
 }
 
 function sharedView(ctx: GameContext, state: MusicQuizState) {
@@ -83,13 +85,6 @@ function reveal(ctx: GameContext, state: MusicQuizState): MusicQuizState {
   state.lastResults = results;
   if (state.round < state.totalRounds) {
     ctx.setTimer(REVEAL_MS);
-  }
-  return state;
-}
-
-function maybeReveal(ctx: GameContext, state: MusicQuizState): MusicQuizState {
-  if (state.phase === 'GUESSING' && allConnectedGuessed(ctx, state)) {
-    return reveal(ctx, state);
   }
   return state;
 }
@@ -183,8 +178,7 @@ export function createMusicQuizGame(
     },
 
     onPlayerLeave(ctx, state, playerId) {
-      const { [playerId]: _removed, ...guesses } = state.guesses;
-      state.guesses = guesses;
+      state.guesses = withoutKey(state.guesses, playerId);
       return maybeReveal(ctx, state);
     },
 

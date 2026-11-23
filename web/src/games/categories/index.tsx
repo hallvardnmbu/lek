@@ -59,7 +59,7 @@ function CategoriesTvView(props: TvGameViewProps<CategoriesHostView>) {
           </p>
         </Show>
 
-        <div class="tv-action-bar cat-tv-actions">
+        <div class="tv-action-bar">
           <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'next' })}>
             {host()?.phase === 'PLAYING'
               ? 'Reveal Now'

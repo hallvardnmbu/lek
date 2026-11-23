@@ -36,10 +36,6 @@
   color: var(--muted);
 }
 
-.cat-tv-actions {
-  gap: 1rem;
-}
-
 .cat-mobile-head {
   display: flex;
   justify-content: space-between;

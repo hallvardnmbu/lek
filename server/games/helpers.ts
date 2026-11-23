@@ -18,6 +18,20 @@ export function connectedOrAllPlayers(ctx: GameContext): GamePlayer[] {
   return connected.length > 0 ? connected : ctx.getPlayers();
 }
 
+export function allConnected(ctx: GameContext, pred: (playerId: string) => boolean): boolean {
+  const connected = connectedPlayers(ctx);
+  return connected.length > 0 && connected.every((p) => pred(p.id));
+}
+
+export function withoutKey<T>(record: Record<string, T>, key: string): Record<string, T> {
+  const { [key]: _removed, ...rest } = record;
+  return rest;
+}
+
+export function playerName(ctx: GameContext, playerId: string | null): string | null {
+  return playerId ? (ctx.getPlayer(playerId)?.name ?? null) : null;
+}
+
 export function parseRounds(
   config: Record<string, unknown> | undefined,
   min: number,

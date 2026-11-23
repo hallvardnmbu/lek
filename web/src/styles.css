@@ -97,12 +97,6 @@ h2,
   font-size: 1.15rem;
 }
 
-.btn-sub {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--muted);
-}
-
 .dpad-focused {
   outline: 3px solid var(--accent);
   outline-offset: 4px;

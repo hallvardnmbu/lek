@@ -44,9 +44,7 @@ export interface RoomManagerOptions {
   minPlayers?: number;
   maxPlayers?: number;
   enableTickInterval?: boolean;
-  /** Idle room TTL in ms (0 disables automatic cleanup). Defaults to 4 hours. */
   roomTtlMs?: number;
-  /** Interval for pruning idle rooms in ms. Defaults to 15 minutes. */
   cleanupIntervalMs?: number;
   registry?: GameRegistry;
   webhooks?: WebhookManager;
@@ -258,13 +256,7 @@ export class RoomManager {
     room.seats.delete(playerId);
     room.gameVotes.delete(playerId);
 
-    if (room.phase === 'GAME_SELECT' && this.maybeResolveGameVote(room)) {
-      this.emitWebhook('player.left', room.code, { playerId, name: player.name });
-      return { ok: true };
-    }
-
-    this.broadcastState(room);
-    this.emitWebhook('player.left', room.code, { playerId, name: player.name });
+    this.finishPlayerDeparture(room, 'player.left', player);
     return { ok: true };
   }
 
@@ -281,19 +273,7 @@ export class RoomManager {
       );
     }
 
-    if (room.phase === 'GAME_SELECT' && this.maybeResolveGameVote(room)) {
-      this.emitWebhook('player.disconnected', room.code, {
-        playerId: player.id,
-        name: player.name,
-      });
-      return;
-    }
-
-    this.broadcastState(room);
-    this.emitWebhook('player.disconnected', room.code, {
-      playerId: player.id,
-      name: player.name,
-    });
+    this.finishPlayerDeparture(room, 'player.disconnected', player);
   }
 
   openGameSelector(
@@ -490,10 +470,7 @@ export class RoomManager {
   ): void {
     this.clearTimers(room);
     room.gameVotes.clear();
-    for (const p of room.players.values()) {
-      p.score = 0;
-      p.meta = {};
-    }
+    this.resetPlayers(room);
 
     room.lastActivityAt = Date.now();
     room.gameId = game.id;
@@ -681,15 +658,29 @@ export class RoomManager {
 
     room.randomizedMode = false;
     this.resetRoomPhase(room, 'LOBBY');
-
-    for (const p of room.players.values()) {
-      p.score = 0;
-      p.meta = {};
-    }
+    this.resetPlayers(room);
 
     this.broadcastState(room);
     this.emitWebhook('room.lobby', room.code, { gameId: room.gameId });
     return { ok: true };
+  }
+
+  private resetPlayers(room: InternalRoom): void {
+    for (const p of room.players.values()) {
+      p.score = 0;
+      p.meta = {};
+    }
+  }
+
+  private finishPlayerDeparture(
+    room: InternalRoom,
+    event: 'player.left' | 'player.disconnected',
+    player: GamePlayer
+  ): void {
+    if (room.phase !== 'GAME_SELECT' || !this.maybeResolveGameVote(room)) {
+      this.broadcastState(room);
+    }
+    this.emitWebhook(event, room.code, { playerId: player.id, name: player.name });
   }
 
   private nextFreeSeat(room: InternalRoom): number {
@@ -986,16 +977,7 @@ export class RoomManager {
       this.launchGame(room, nextGame);
     }, durationMs);
 
-    if (this.enableTickInterval) {
-      room.tickInterval = setInterval(() => {
-        if (room.phaseEndsAt === null) return;
-        const remainingMs = Math.max(0, room.phaseEndsAt - Date.now());
-        this.broadcaster.broadcastAll(room.code, {
-          type: 'tick',
-          payload: { remainingMs, phaseEndsAt: room.phaseEndsAt },
-        });
-      }, 1000);
-    }
+    this.startTickInterval(room);
   }
 
   private scheduleTimer(room: InternalRoom, durationMs: number): void {
@@ -1012,16 +994,19 @@ export class RoomManager {
       }
     }, durationMs);
 
-    if (this.enableTickInterval) {
-      room.tickInterval = setInterval(() => {
-        if (room.phaseEndsAt === null) return;
-        const remainingMs = Math.max(0, room.phaseEndsAt - Date.now());
-        this.broadcaster.broadcastAll(room.code, {
-          type: 'tick',
-          payload: { remainingMs, phaseEndsAt: room.phaseEndsAt },
-        });
-      }, 1000);
-    }
+    this.startTickInterval(room);
+  }
+
+  private startTickInterval(room: InternalRoom): void {
+    if (!this.enableTickInterval) return;
+    room.tickInterval = setInterval(() => {
+      if (room.phaseEndsAt === null) return;
+      const remainingMs = Math.max(0, room.phaseEndsAt - Date.now());
+      this.broadcaster.broadcastAll(room.code, {
+        type: 'tick',
+        payload: { remainingMs, phaseEndsAt: room.phaseEndsAt },
+      });
+    }, 1000);
   }
 
   private clearTimers(room: InternalRoom): void {

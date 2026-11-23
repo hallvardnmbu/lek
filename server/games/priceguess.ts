@@ -7,7 +7,7 @@ import type {
   PriceGuessResultEntry,
 } from '../../shared/games/priceguess';
 import type { GameContext, GameDefinition } from '../game';
-import { connectedPlayers } from './helpers';
+import { allConnected, connectedPlayers, playerName } from './helpers';
 import {
   fetchRandomProduct,
   type PriceGuessProduct,
@@ -131,15 +131,9 @@ function revealRound(ctx: GameContext, state: PriceGuessState): void {
 }
 
 function maybeRevealOnAllGuessed(ctx: GameContext, state: PriceGuessState): void {
-  if (state.phase !== 'GUESSING') return;
-  const connected = connectedPlayers(ctx);
-  if (connected.length > 0 && connected.every((p) => Boolean(state.guesses[p.id]))) {
+  if (state.phase === 'GUESSING' && allConnected(ctx, (id) => Boolean(state.guesses[id]))) {
     revealRound(ctx, state);
   }
-}
-
-function playerName(ctx: GameContext, playerId: string | null): string | null {
-  return playerId ? (ctx.getPlayer(playerId)?.name ?? null) : null;
 }
 
 function roundMoney(value: number): number {

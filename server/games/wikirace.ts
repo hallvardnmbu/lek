@@ -7,7 +7,7 @@ import type {
   WikiRacePhase,
 } from '../../shared/games/wikirace';
 import type { GameContext, GameDefinition } from '../game';
-import { connectedPlayers } from './helpers';
+import { connectedPlayers, playerName } from './helpers';
 import {
   CURATED_PAIRS,
   fetchWikiArticle,
@@ -288,10 +288,6 @@ function handleAction(
   return state;
 }
 
-function getLoserName(ctx: GameContext, state: WikiRaceState): string | null {
-  return state.loserId ? (ctx.getPlayer(state.loserId)?.name ?? null) : null;
-}
-
 export function createWikiRaceGame(
   fetcher: ArticleFetcher = (title) => fetchWikiArticle(title)
 ): GameDefinition<WikiRaceState, WikiRaceHostView, WikiRacePlayerView> {
@@ -401,7 +397,7 @@ export function createWikiRaceGame(
         targetTitle: state.targetTitle,
         players: buildProgressList(ctx, state),
         loserId: state.loserId,
-        loserName: getLoserName(ctx, state),
+        loserName: playerName(ctx, state.loserId),
         error: state.error,
       };
     },
@@ -430,7 +426,7 @@ export function createWikiRaceGame(
         error: state.error ?? racer?.error ?? null,
         finishedRank: racer?.finishedRank ?? null,
         isLoser: state.phase === 'RESULTS' && state.loserId === playerId,
-        loserName: getLoserName(ctx, state),
+        loserName: playerName(ctx, state.loserId),
         players: buildProgressList(ctx, state),
       };
     },

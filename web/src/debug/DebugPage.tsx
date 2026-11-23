@@ -1,13 +1,6 @@
-import { For, Show, createEffect, createMemo, createSignal, dynamicComponent } from 'solid-js';
-import { MobileEnded } from '../components/mobile/MobileEnded';
-import { MobileGameFallback } from '../components/mobile/MobileGameFallback';
-import { MobileGameSelector } from '../components/mobile/MobileGameSelector';
-import { MobileLobby } from '../components/mobile/MobileLobby';
-import { TvEnded } from '../components/tv/TvEnded';
-import { TvGameFallback } from '../components/tv/TvGameFallback';
-import { TvGameSelector } from '../components/tv/TvGameSelector';
-import { TvLobby } from '../components/tv/TvLobby';
-import { getGameUi } from '../games';
+import { For, Show, createEffect, createMemo, createSignal } from 'solid-js';
+import { MobileStage } from '../components/mobile/MobileStage';
+import { TvStage } from '../components/tv/TvStage';
 import { createGameSocket } from '../lib/ws';
 import './debug.css';
 
@@ -52,14 +45,6 @@ function DebugPhone(props: DebugPhoneProps) {
     return s.players.find((p) => p.id === id) ?? null;
   });
 
-  const activeGameUi = createMemo(() => getGameUi(state()?.gameId));
-  const ActiveMobileView = dynamicComponent(() => activeGameUi()?.MobileView);
-  const activeGameInfo = createMemo(() => {
-    const s = state();
-    if (!s || !s.gameId) return null;
-    return s.games.find((g) => g.id === s.gameId) ?? null;
-  });
-
   const handleLeave = () => {
     const s = state();
     const id = playerId();
@@ -98,59 +83,18 @@ function DebugPhone(props: DebugPhoneProps) {
         <Show when={state() && playerId()} fallback={<p class="muted">Joining...</p>}>
           <Show when={state()}>
             {(s) => (
-              <>
-                <Show when={s().phase === 'LOBBY'}>
-                  <MobileLobby
-                    state={s()}
-                    me={me() ?? null}
-                    onLeave={handleLeave}
-                  />
-                </Show>
-
-                <Show when={s().phase === 'GAME_SELECT'}>
-                  <MobileGameSelector
-                    state={s()}
-                    playerId={playerId()!}
-                    onVoteGame={(gameId) =>
-                      socket.send({
-                        type: 'vote_game',
-                        payload: { code: s().code, playerId: playerId()!, gameId },
-                      })
-                    }
-                  />
-                </Show>
-
-                <Show when={s().phase === 'PLAYING'}>
-                  <Show
-                    when={activeGameUi()}
-                    fallback={
-                      <MobileGameFallback
-                        gameInfo={activeGameInfo()}
-                        onSendAction={(action) =>
-                          socket.sendAction(action, { playerId: playerId()! })
-                        }
-                      />
-                    }
-                  >
-                    <ActiveMobileView
-                      state={s()}
-                      playerId={playerId()!}
-                      remainingMs={socket.remainingMs()}
-                      lastEvent={socket.lastEvent()}
-                      sendAction={(action) =>
-                        socket.sendAction(action, { playerId: playerId()! })
-                      }
-                    />
-                  </Show>
-                </Show>
-
-                <Show when={s().phase === 'ENDED'}>
-                  <MobileEnded
-                    score={me()?.score ?? 0}
-                    randomizedMode={s().randomizedMode}
-                  />
-                </Show>
-              </>
+              <MobileStage
+                state={s()}
+                playerId={playerId()!}
+                me={me()}
+                remainingMs={socket.remainingMs()}
+                lastEvent={socket.lastEvent()}
+                send={socket.send}
+                sendAction={(action) =>
+                  socket.sendAction(action, { playerId: playerId()! })
+                }
+                onLeave={handleLeave}
+              />
             )}
           </Show>
         </Show>
@@ -195,14 +139,6 @@ export function DebugPage() {
   const secondsLeft = createMemo(() => {
     const ms = socket.remainingMs();
     return ms === null ? null : Math.ceil(ms / 1000);
-  });
-
-  const activeGameUi = createMemo(() => getGameUi(state()?.gameId));
-  const ActiveTvView = dynamicComponent(() => activeGameUi()?.TvView);
-  const activeGameInfo = createMemo(() => {
-    const s = state();
-    if (!s || !s.gameId) return null;
-    return s.games.find((g) => g.id === s.gameId) ?? null;
   });
 
   const selectedGame = createMemo(() => {
@@ -395,115 +331,18 @@ export function DebugPage() {
                   <span>v{s().stateVersion}</span>
                 </div>
                 <div class="debug-tv-stage">
-                  <Show when={s().phase === 'LOBBY'}>
-                    <TvLobby
-                      state={s()}
-                      joinUrl={`${window.location.origin}/play/${s().code}`}
-                      canEnterSelector={s().players.length >= s().minPlayers}
-                      muted
-                      onToggleSound={() => {}}
-                      onOpenSelector={() =>
-                        socket.send({
-                          type: 'open_game_selector',
-                          payload: { code: s().code, hostToken: hostToken() },
-                        })
-                      }
-                    />
-                  </Show>
-
-                  <Show when={s().phase === 'GAME_SELECT'}>
-                    <TvGameSelector
-                      state={s()}
-                      onSelectMode={(mode) =>
-                        socket.send({
-                          type: 'set_game_select_mode',
-                          payload: { code: s().code, hostToken: hostToken(), mode },
-                        })
-                      }
-                      onStartRandomGame={() =>
-                        socket.send({
-                          type: 'start_random_game',
-                          payload: { code: s().code, hostToken: hostToken() },
-                        })
-                      }
-                      onStartGame={(gameId) =>
-                        socket.send({
-                          type: 'start_game',
-                          payload: { code: s().code, hostToken: hostToken(), gameId },
-                        })
-                      }
-                      onReturnToLobby={() =>
-                        socket.send({
-                          type: 'return_to_lobby',
-                          payload: { code: s().code, hostToken: hostToken() },
-                        })
-                      }
-                    />
-                  </Show>
-
-                  <Show when={s().phase === 'PLAYING'}>
-                    <Show
-                      when={activeGameUi()}
-                      fallback={
-                        <TvGameFallback
-                          state={s()}
-                          gameInfo={activeGameInfo()}
-                          lastEvent={socket.lastEvent()}
-                          onEndGame={() =>
-                            socket.send({
-                              type: 'end_game',
-                              payload: { code: s().code, hostToken: hostToken() },
-                            })
-                          }
-                        />
-                      }
-                    >
-                      <ActiveTvView
-                        state={s()}
-                        remainingMs={socket.remainingMs()}
-                        lastEvent={socket.lastEvent()}
-                        sendAction={(action) =>
-                          socket.sendAction(action, { hostToken: hostToken() })
-                        }
-                        endGame={() =>
-                          socket.send({
-                            type: 'end_game',
-                            payload: { code: s().code, hostToken: hostToken() },
-                          })
-                        }
-                      />
-                    </Show>
-                  </Show>
-
-                  <Show when={s().phase === 'ENDED'}>
-                    <TvEnded
-                      state={s()}
-                      onNextRandomGame={() =>
-                        socket.send({
-                          type: 'start_random_game',
-                          payload: { code: s().code, hostToken: hostToken() },
-                        })
-                      }
-                      onStopRandomized={() =>
-                        socket.send({
-                          type: 'stop_randomized',
-                          payload: { code: s().code, hostToken: hostToken() },
-                        })
-                      }
-                      onChooseAnotherGame={() =>
-                        socket.send({
-                          type: 'open_game_selector',
-                          payload: { code: s().code, hostToken: hostToken() },
-                        })
-                      }
-                      onReturnToLobby={() =>
-                        socket.send({
-                          type: 'return_to_lobby',
-                          payload: { code: s().code, hostToken: hostToken() },
-                        })
-                      }
-                    />
-                  </Show>
+                  <TvStage
+                    state={s()}
+                    hostToken={hostToken()}
+                    remainingMs={socket.remainingMs()}
+                    lastEvent={socket.lastEvent()}
+                    muted
+                    onToggleSound={() => {}}
+                    send={socket.send}
+                    sendAction={(action) =>
+                      socket.sendAction(action, { hostToken: hostToken() })
+                    }
+                  />
                 </div>
               </section>
 

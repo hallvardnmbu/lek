@@ -1,10 +1,6 @@
-import { Show, createMemo, createSignal, dynamicComponent, onSettled } from 'solid-js';
-import { MobileEnded } from '../components/mobile/MobileEnded';
-import { MobileGameFallback } from '../components/mobile/MobileGameFallback';
-import { MobileGameSelector } from '../components/mobile/MobileGameSelector';
+import { Show, createMemo, createSignal, onSettled } from 'solid-js';
 import { MobileJoinForm } from '../components/mobile/MobileJoinForm';
-import { MobileLobby } from '../components/mobile/MobileLobby';
-import { getGameUi } from '../games';
+import { MobileStage } from '../components/mobile/MobileStage';
 import {
   clearPlayerSession,
   createGameSocket,
@@ -96,14 +92,6 @@ export function MobilePlay(props: MobilePlayProps) {
     return ms === null ? null : Math.ceil(ms / 1000);
   });
 
-  const activeGameUi = createMemo(() => getGameUi(state()?.gameId));
-  const ActiveMobileView = dynamicComponent(() => activeGameUi()?.MobileView);
-  const activeGameInfo = createMemo(() => {
-    const s = state();
-    if (!s || !s.gameId) return null;
-    return s.games.find((g) => g.id === s.gameId) ?? null;
-  });
-
   const handleJoin = (e: Event) => {
     e.preventDefault();
     socket.setError(null);
@@ -114,16 +102,6 @@ export function MobilePlay(props: MobilePlayProps) {
         name: nameInput().trim(),
         playerId: playerId() ?? undefined,
       },
-    });
-  };
-
-  const handleVoteGame = (gameId: string) => {
-    const s = state();
-    const id = playerId();
-    if (!s || !id) return;
-    socket.send({
-      type: 'vote_game',
-      payload: { code: s.code, playerId: id, gameId },
     });
   };
 
@@ -176,52 +154,18 @@ export function MobilePlay(props: MobilePlayProps) {
               <div class="mobile-timer">Time left: {secondsLeft()}s</div>
             </Show>
 
-            <Show when={s().phase === 'LOBBY'}>
-              <MobileLobby
-                state={s()}
-                me={me()}
-                onLeave={handleLeave}
-              />
-            </Show>
-
-            <Show when={s().phase === 'GAME_SELECT'}>
-              <MobileGameSelector
-                state={s()}
-                playerId={playerId()!}
-                onVoteGame={handleVoteGame}
-              />
-            </Show>
-
-            <Show when={s().phase === 'PLAYING'}>
-              <Show
-                when={Boolean(playerId()) && activeGameUi()}
-                fallback={
-                  <MobileGameFallback
-                    gameInfo={activeGameInfo()}
-                    onSendAction={(action) =>
-                      socket.sendAction(action, { playerId: playerId() ?? undefined })
-                    }
-                  />
-                }
-              >
-                <ActiveMobileView
-                  state={s()}
-                  playerId={playerId()!}
-                  remainingMs={socket.remainingMs()}
-                  lastEvent={socket.lastEvent()}
-                  sendAction={(action) =>
-                    socket.sendAction(action, { playerId: playerId() ?? undefined })
-                  }
-                />
-              </Show>
-            </Show>
-
-            <Show when={s().phase === 'ENDED'}>
-              <MobileEnded
-                score={me()?.score ?? 0}
-                randomizedMode={s().randomizedMode}
-              />
-            </Show>
+            <MobileStage
+              state={s()}
+              playerId={playerId()!}
+              me={me()}
+              remainingMs={socket.remainingMs()}
+              lastEvent={socket.lastEvent()}
+              send={socket.send}
+              sendAction={(action) =>
+                socket.sendAction(action, { playerId: playerId() ?? undefined })
+              }
+              onLeave={handleLeave}
+            />
           </div>
         )}
       </Show>

@@ -1,11 +1,6 @@
-import { Show, createMemo, createSignal, dynamicComponent, onSettled } from 'solid-js';
-import type { GameSelectMode } from '../../../shared/protocol';
-import { TvEnded } from '../components/tv/TvEnded';
+import { Show, createMemo, createSignal, onSettled } from 'solid-js';
 import { TvExitModal } from '../components/tv/TvExitModal';
-import { TvGameFallback } from '../components/tv/TvGameFallback';
-import { TvGameSelector } from '../components/tv/TvGameSelector';
-import { TvLobby } from '../components/tv/TvLobby';
-import { getGameUi } from '../games';
+import { TvStage } from '../components/tv/TvStage';
 import { createLobbyMusic } from '../lib/audio';
 import { createDpadNav } from '../lib/dpad';
 import { exitTizenApp, initTizenTv, reloadApp } from '../lib/tizen';
@@ -29,105 +24,15 @@ export function TvHost() {
   });
 
   const state = () => socket.roomState();
-  const joinUrl = createMemo(() => {
-    const code = state()?.code;
-    return code ? `${window.location.origin}/play/${code}` : window.location.origin;
-  });
 
   const secondsLeft = createMemo(() => {
     const ms = socket.remainingMs();
     return ms === null ? null : Math.ceil(ms / 1000);
   });
 
-  const canEnterSelector = createMemo(() => {
-    const s = state();
-    return Boolean(s && s.phase === 'LOBBY' && s.players.length >= s.minPlayers);
-  });
-
-  const activeGameUi = createMemo(() => getGameUi(state()?.gameId));
-  const activeGameInfo = createMemo(() => {
-    const s = state();
-    if (!s || !s.gameId) return null;
-    return s.games.find((g) => g.id === s.gameId) ?? null;
-  });
-
-  const handleOpenSelector = () => {
-    const s = state();
-    if (!s || !canEnterSelector()) return;
-    socket.send({
-      type: 'open_game_selector',
-      payload: { code: s.code, hostToken: hostToken() },
-    });
-  };
-
-  const handleSelectGameMode = (mode: GameSelectMode) => {
-    const s = state();
-    if (!s) return;
-    socket.send({
-      type: 'set_game_select_mode',
-      payload: { code: s.code, hostToken: hostToken(), mode },
-    });
-  };
-
-  const handleStartRandomGame = () => {
-    const s = state();
-    if (!s) return;
-    socket.send({
-      type: 'start_random_game',
-      payload: { code: s.code, hostToken: hostToken() },
-    });
-  };
-
-  const handleStopRandomized = () => {
-    const s = state();
-    if (!s) return;
-    socket.send({
-      type: 'stop_randomized',
-      payload: { code: s.code, hostToken: hostToken() },
-    });
-  };
-
-  const handleStartGame = (gameId: string) => {
-    const s = state();
-    if (!s) return;
-    socket.send({
-      type: 'start_game',
-      payload: { code: s.code, hostToken: hostToken(), gameId },
-    });
-  };
-
-  const handleEndGame = () => {
-    const s = state();
-    if (!s) return;
-    socket.send({
-      type: 'end_game',
-      payload: { code: s.code, hostToken: hostToken() },
-    });
-  };
-
-  const handleReturnToLobby = () => {
-    const s = state();
-    if (!s) return;
-    socket.send({
-      type: 'return_to_lobby',
-      payload: { code: s.code, hostToken: hostToken() },
-    });
-  };
-
-  const handleChooseAnotherGame = () => {
-    const s = state();
-    if (!s) return;
-    socket.send({
-      type: 'open_game_selector',
-      payload: { code: s.code, hostToken: hostToken() },
-    });
-  };
-
   onSettled(() => {
     initTizenTv();
   });
-
-  const ActiveTvView = dynamicComponent(() => activeGameUi()?.TvView);
 
   createDpadNav(() => canvasRef, {
     onReturn: () => setShowExitModal((prev) => !prev),
@@ -188,62 +93,16 @@ export function TvHost() {
           }
         >
           {(s) => (
-            <>
-              <Show when={s().phase === 'LOBBY'}>
-                <TvLobby
-                  state={s()}
-                  joinUrl={joinUrl()}
-                  canEnterSelector={canEnterSelector()}
-                  muted={lobbyMusic.muted()}
-                  onToggleSound={lobbyMusic.toggleMute}
-                  onOpenSelector={handleOpenSelector}
-                />
-              </Show>
-
-              <Show when={s().phase === 'GAME_SELECT'}>
-                <TvGameSelector
-                  state={s()}
-                  onSelectMode={handleSelectGameMode}
-                  onStartRandomGame={handleStartRandomGame}
-                  onStartGame={handleStartGame}
-                  onReturnToLobby={handleReturnToLobby}
-                />
-              </Show>
-
-              <Show when={s().phase === 'PLAYING'}>
-                <Show
-                  when={activeGameUi()}
-                  fallback={
-                    <TvGameFallback
-                      state={s()}
-                      gameInfo={activeGameInfo()}
-                      lastEvent={socket.lastEvent()}
-                      onEndGame={handleEndGame}
-                    />
-                  }
-                >
-                  <ActiveTvView
-                    state={s()}
-                    remainingMs={socket.remainingMs()}
-                    lastEvent={socket.lastEvent()}
-                    sendAction={(action) =>
-                      socket.sendAction(action, { hostToken: hostToken() })
-                    }
-                    endGame={handleEndGame}
-                  />
-                </Show>
-              </Show>
-
-              <Show when={s().phase === 'ENDED'}>
-                <TvEnded
-                  state={s()}
-                  onNextRandomGame={handleStartRandomGame}
-                  onStopRandomized={handleStopRandomized}
-                  onChooseAnotherGame={handleChooseAnotherGame}
-                  onReturnToLobby={handleReturnToLobby}
-                />
-              </Show>
-            </>
+            <TvStage
+              state={s()}
+              hostToken={hostToken()}
+              remainingMs={socket.remainingMs()}
+              lastEvent={socket.lastEvent()}
+              muted={lobbyMusic.muted()}
+              onToggleSound={lobbyMusic.toggleMute}
+              send={socket.send}
+              sendAction={(action) => socket.sendAction(action, { hostToken: hostToken() })}
+            />
           )}
         </Show>
 

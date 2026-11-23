@@ -5,7 +5,7 @@ import type {
   RouletteState,
 } from '../../shared/games/roulette';
 import type { GameContext, GameDefinition } from '../game';
-import { connectedOrAllPlayers } from './helpers';
+import { connectedOrAllPlayers, playerName } from './helpers';
 
 const TOTAL_SPIN_MS = 20_000;
 const WEIGHT_GROWTH = 18;
@@ -62,10 +62,6 @@ function startSpin(ctx: GameContext): RouletteState {
 function activePlayerId(state: RouletteState): string | null {
   if (state.playerOrder.length === 0) return null;
   return state.playerOrder[state.activeIndex % state.playerOrder.length] ?? null;
-}
-
-function selectedPlayerName(ctx: GameContext, selectedId: string | null): string | null {
-  return selectedId ? (ctx.getPlayer(selectedId)?.name ?? null) : null;
 }
 
 function maybeRespin(
@@ -141,7 +137,7 @@ export const rouletteGame: GameDefinition<
     return {
       phase: state.phase,
       players,
-      selectedName: selectedPlayerName(ctx, state.selectedId),
+      selectedName: playerName(ctx, state.selectedId),
     };
   },
 
@@ -152,7 +148,7 @@ export const rouletteGame: GameDefinition<
       phase: state.phase,
       isActive: state.phase === 'SPINNING' && currentId === playerId,
       isSelected: state.phase === 'STOPPED' && state.selectedId === playerId,
-      selectedName: selectedPlayerName(ctx, state.selectedId),
+      selectedName: playerName(ctx, state.selectedId),
     };
   },
 };
