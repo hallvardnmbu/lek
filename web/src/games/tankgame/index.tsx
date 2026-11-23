@@ -376,7 +376,7 @@ function TankGameMobileView(props: MobileGameViewProps<TankGamePlayerView>) {
   return (
     <div class="mobile-card tk-mobile">
       <div class="tk-mobile-head">
-        <span class="tk-title">Tank Battle</span>
+        <span class="tk-title">Tanks</span>
         <span class="tk-clock">{clockText(liveTimeLeftMs())}</span>
       </div>
 
@@ -425,7 +425,7 @@ function TankGameMobileView(props: MobileGameViewProps<TankGamePlayerView>) {
 
 export const tankGameUi = {
   id: 'tank-battle',
-  name: 'Tank Battle',
+  name: 'Tanks',
   TvView: TankGameTvView,
   MobileView: TankGameMobileView,
 };

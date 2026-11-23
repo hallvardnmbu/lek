@@ -223,7 +223,7 @@ export function createGeoGuessGame(
 ): GameDefinition<GeoGuessState, GeoGuessHostView, GeoGuessPlayerView, GeoGuessAction> {
   return {
     id: 'geoguess',
-    name: 'Geo-Guess Roulette',
+    name: 'Pinpoint',
     description: 'Pin the spot on the map. Last place drinks.',
     minPlayers: 2,
     maxPlayers: 12,

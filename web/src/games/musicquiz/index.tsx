@@ -318,7 +318,7 @@ function MusicQuizMobileView(props: MobileGameViewProps<MusicQuizPlayerView>) {
 
 export const musicQuizGameUi: GameUiDefinition<MusicQuizHostView, MusicQuizPlayerView> = {
   id: 'music-quiz',
-  name: 'Music Quiz',
+  name: 'Musiquiz',
   TvView: MusicQuizTvView,
   MobileView: MusicQuizMobileView,
 };

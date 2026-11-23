@@ -8,7 +8,7 @@ function WikiRaceTvView(props: TvGameViewProps<WikiRaceHostView>) {
 
   return (
     <div class="tv-phase-center">
-      <p class="eyebrow">WIKIPEDIA RACE · ROUND {host()?.round ?? 1}</p>
+      <p class="eyebrow">WIKIPEDIA · ROUND {host()?.round ?? 1}</p>
 
       <div class="wr-tv-route">
         <span class="wr-tv-article">{host()?.startTitle}</span>
@@ -207,7 +207,7 @@ function WikiRaceMobileView(props: MobileGameViewProps<WikiRacePlayerView>) {
 
 export const wikiraceGameUi: GameUiDefinition<WikiRaceHostView, WikiRacePlayerView> = {
   id: 'wikirace',
-  name: 'Wikipedia Race',
+  name: 'Wikipedia',
   TvView: WikiRaceTvView,
   MobileView: WikiRaceMobileView,
 };

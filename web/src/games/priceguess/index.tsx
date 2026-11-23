@@ -23,7 +23,7 @@ function PriceGuessTvView(props: TvGameViewProps<PriceGuessHostView>) {
   return (
     <div class="tv-phase-center pg-tv-wrap">
       <div class="pg-tv-header">
-        <p class="eyebrow">PRICE GUESS · ROUND {host()?.round ?? 1}</p>
+        <p class="eyebrow">PRICE · ROUND {host()?.round ?? 1}</p>
         <Show when={host()?.phase === 'GUESSING' && props.remainingMs !== null}>
           <span class="pg-tv-timer">{secondsLeft(props.remainingMs)}s</span>
         </Show>
@@ -269,7 +269,7 @@ function PriceGuessMobileView(props: MobileGameViewProps<PriceGuessPlayerView>) 
 
 export const priceGuessGameUi: GameUiDefinition<PriceGuessHostView, PriceGuessPlayerView> = {
   id: 'priceguess',
-  name: 'Price Guess',
+  name: 'Price',
   TvView: PriceGuessTvView,
   MobileView: PriceGuessMobileView,
 };

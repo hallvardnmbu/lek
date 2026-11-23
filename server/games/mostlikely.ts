@@ -149,7 +149,7 @@ export function createMostLikelyGame(
 ): GameDefinition<MostLikelyState, MostLikelyHostView, MostLikelyPlayerView> {
   return {
     id: 'most-likely',
-    name: 'Most Likely To',
+    name: 'Likely',
     description: 'AI-written edgy prompts. Vote who is most likely. The verdict drinks.',
     minPlayers: 2,
     maxPlayers: 12,

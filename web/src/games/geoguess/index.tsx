@@ -28,7 +28,7 @@ function GeoGuessTvView(props: TvGameViewProps<GeoGuessHostView>) {
     <div class="tv-phase-center geo-tv-wrap">
       <div class="geo-tv-header">
         <p class="eyebrow">
-          GEO-GUESS ROULETTE · ROUND {host()?.round ?? 1} OF {host()?.totalRounds ?? 5}
+          PINPOINT · ROUND {host()?.round ?? 1} OF {host()?.totalRounds ?? 5}
         </p>
         <Show when={host()?.phase === 'GUESSING' && props.remainingMs !== null}>
           <span class="geo-tv-timer">{secondsLeft(props.remainingMs)}s</span>
@@ -245,7 +245,7 @@ function GeoGuessMobileView(props: MobileGameViewProps<GeoGuessPlayerView>) {
 
 export const geoGuessGameUi: GameUiDefinition<GeoGuessHostView, GeoGuessPlayerView> = {
   id: 'geoguess',
-  name: 'Geo-Guess Roulette',
+  name: 'Pinpoint',
   TvView: GeoGuessTvView,
   MobileView: GeoGuessMobileView,
 };

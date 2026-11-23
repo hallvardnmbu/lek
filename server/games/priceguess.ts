@@ -175,7 +175,7 @@ export function createPriceGuessGame(
 ): GameDefinition<PriceGuessState, PriceGuessHostView, PriceGuessPlayerView, PriceGuessAction> {
   return {
     id: 'priceguess',
-    name: 'Price Guess',
+    name: 'Price',
     description: 'Guess the price of a random bottle. Closest wins, furthest drinks!',
     minPlayers: 2,
     maxPlayers: 12,

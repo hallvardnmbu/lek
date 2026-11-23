@@ -169,7 +169,7 @@ function handlePlayerExit(
 
 export const drawGame: GameDefinition<DrawGameState, DrawHostView, DrawPlayerView, DrawAction> = {
   id: 'draw',
-  name: 'Draw It',
+  name: 'Draw',
   description: 'One player picks a prompt, everyone draws, then vote for the best or worst!',
   minPlayers: 2,
   maxPlayers: 12,

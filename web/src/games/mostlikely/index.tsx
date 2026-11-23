@@ -26,7 +26,7 @@ function MostLikelyTvView(props: TvGameViewProps<MostLikelyHostView>) {
         fallback={
           <div class="ml-generating">
             <div class="spinner" />
-            <h1 class="tv-hero-title">Most Likely To</h1>
+            <h1 class="tv-hero-title">Likely</h1>
             <p class="tv-hero-sub">Generating prompt</p>
           </div>
         }
@@ -133,7 +133,7 @@ function MostLikelyMobileView(props: MobileGameViewProps<MostLikelyPlayerView>) 
 
 export const mostLikelyGameUi: GameUiDefinition<MostLikelyHostView, MostLikelyPlayerView> = {
   id: 'most-likely',
-  name: 'Most Likely To',
+  name: 'Likely',
   TvView: MostLikelyTvView,
   MobileView: MostLikelyMobileView,
 };

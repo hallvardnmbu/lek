@@ -293,7 +293,7 @@ export function createWikiRaceGame(
 ): GameDefinition<WikiRaceState, WikiRaceHostView, WikiRacePlayerView> {
   return {
     id: 'wikirace',
-    name: 'Wikipedia Race',
+    name: 'Wikipedia',
     description:
       'Race from the start article to the target using only Wikipedia links. Last to arrive drinks.',
     minPlayers: 2,

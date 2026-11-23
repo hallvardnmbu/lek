@@ -223,7 +223,7 @@ function destroyTank(ctx: GameContext, state: TankGameState, playerId: string, n
 
 export const tankGame: GameDefinition<TankGameState, TankGameHostView, TankGamePlayerView> = {
   id: 'tank-battle',
-  name: 'Tank Battle',
+  name: 'Tanks',
   description: 'Drive, hide behind cover, and be the last tank rolling.',
   minPlayers: 2,
   maxPlayers: TANK_SPAWNS.length,

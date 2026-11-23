@@ -285,7 +285,7 @@ function DrawMobileView(props: MobileGameViewProps<DrawPlayerView>) {
 
 export const drawGameUi: GameUiDefinition<DrawHostView, DrawPlayerView> = {
   id: 'draw',
-  name: 'Draw It',
+  name: 'Draw',
   TvView: DrawTvView,
   MobileView: DrawMobileView,
 };
