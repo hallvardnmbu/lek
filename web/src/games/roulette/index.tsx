@@ -11,7 +11,7 @@ function RouletteTvView(props: TvGameViewProps<RouletteHostView>) {
       <p class="eyebrow">ROULETTE</p>
       <Show
         when={host()?.phase === 'STOPPED'}
-        fallback={<h1 class="tv-hero-title">Spinning…</h1>}
+        fallback={<h1 class="tv-hero-title">Spinning</h1>}
       >
         <h1 class="roulette-tv-winner">{host()?.selectedName ?? 'Stopped'}</h1>
       </Show>
@@ -61,7 +61,7 @@ function RouletteMobileView(props: MobileGameViewProps<RoulettePlayerView>) {
   return (
     <div class={screenClass()}>
       <Show when={view()?.phase === 'SPINNING' && !view()?.isActive}>
-        <p class="roulette-screen-sub">Watch the phones…</p>
+        <p class="roulette-screen-sub">Watch phones</p>
       </Show>
 
       <Show when={view()?.phase === 'STOPPED'}>

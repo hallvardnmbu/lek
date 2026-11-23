@@ -36,7 +36,7 @@ function PriceGuessTvView(props: TvGameViewProps<PriceGuessHostView>) {
       <Show when={host()?.phase === 'LOADING'}>
         <div class="pg-tv-loading">
           <div class="spinner" />
-          <p class="tv-hero-sub">Picking a random bottle…</p>
+          <p class="tv-hero-sub">Picking a bottle</p>
         </div>
       </Show>
 
@@ -191,7 +191,7 @@ function PriceGuessMobileView(props: MobileGameViewProps<PriceGuessPlayerView>) 
       <Show when={view()?.phase === 'LOADING'}>
         <div class="pg-mobile-wait">
           <div class="spinner" />
-          <p>Picking a bottle…</p>
+          <p>Picking a bottle</p>
         </div>
       </Show>
 
@@ -202,7 +202,7 @@ function PriceGuessMobileView(props: MobileGameViewProps<PriceGuessPlayerView>) 
             <div class="pg-mobile-wait">
               <p class="pg-mobile-locked-title">Guess Locked In!</p>
               <p class="pg-mobile-locked-price">{formatPrice(view()?.guess)}</p>
-              <p class="pg-mobile-sub">Waiting for the other players…</p>
+              <p class="pg-mobile-sub">Waiting for others</p>
             </div>
           }
         >

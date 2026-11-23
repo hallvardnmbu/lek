@@ -122,7 +122,7 @@ export function MobilePlay(props: MobilePlayProps) {
   return (
     <main class="mobile-shell">
       <header class="mobile-header">
-        <span class="mobile-brand">Party</span>
+        <span class="brand">Party</span>
         <Show when={joinedCode() && me()}>
           <div class="mobile-player-pill">
             <span>{me()!.name}</span>
@@ -151,7 +151,7 @@ export function MobilePlay(props: MobilePlayProps) {
         {(s) => (
           <div class="mobile-stage">
             <Show when={secondsLeft() !== null}>
-              <div class="mobile-timer">Time left: {secondsLeft()}s</div>
+              <div class="mobile-timer">{secondsLeft()}s</div>
             </Show>
 
             <MobileStage

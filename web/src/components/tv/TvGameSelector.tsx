@@ -12,8 +12,8 @@ interface TvGameSelectorProps {
 export function TvGameSelector(props: TvGameSelectorProps) {
   const mode = () => props.state.gameSelectMode ?? 'CHOOSE';
 
-  const hasEligibleGame = createMemo(() =>
-    props.state.games.some(
+  const availableGames = createMemo(() =>
+    props.state.games.filter(
       (g) =>
         props.state.players.length >= g.minPlayers &&
         props.state.players.length <= g.maxPlayers
@@ -41,51 +41,42 @@ export function TvGameSelector(props: TvGameSelectorProps) {
         fallback={
           <>
             <div class="selector-header">
-              <h1 class="tv-hero-title">Choose a Game</h1>
-              <p class="selector-subtitle">Pick a random game or vote together</p>
+              <h1 class="tv-hero-title">Play</h1>
             </div>
 
-            <div class="game-grid">
+            <div class="tv-choices">
               <button
-                class="btn game-card"
-                disabled={!hasEligibleGame()}
+                class="btn"
+                disabled={availableGames().length === 0}
                 onClick={props.onStartRandomGame}
               >
-                <div class="game-card-top">
-                  <div class="game-card-title">Randomized</div>
-                </div>
-                <div class="game-card-desc">Jump straight into a random game</div>
+                Random
               </button>
 
-              <button class="btn game-card" onClick={() => props.onSelectMode('VOTE')}>
-                <div class="game-card-top">
-                  <div class="game-card-title">Vote</div>
-                </div>
-                <div class="game-card-desc">Everyone votes on their phone</div>
+              <button class="btn" onClick={() => props.onSelectMode('VOTE')}>
+                Vote
               </button>
             </div>
           </>
         }
       >
         <div class="selector-header">
-          <h1 class="tv-hero-title">Vote for a Game</h1>
+          <h1 class="tv-hero-title">Vote</h1>
           <p class="selector-subtitle">
-            {voteCount()} / {connectedCount()} voted · Select on TV to override
+            {voteCount()}/{connectedCount()} voted
           </p>
         </div>
 
         <div class="game-grid">
-          <For each={props.state.games}>
+          <For each={availableGames()}>
             {(game) => {
-              const tooFew = () => props.state.players.length < game.minPlayers;
               const voters = () => votersFor(game.id);
               return (
                 <button
-                  class="btn game-card"
-                  disabled={tooFew()}
+                  class="btn btn-vote game-item"
                   onClick={() => props.onStartGame(game.id)}
                 >
-                  <div class="game-card-top">
+                  <div class="row-between">
                     <div class="game-card-title">{game.name}</div>
                     <Show when={voters().length > 0}>
                       <span class="vote-count-pill">
@@ -93,19 +84,13 @@ export function TvGameSelector(props: TvGameSelectorProps) {
                       </span>
                     </Show>
                   </div>
-                  <div class="game-card-meta">
-                    <span>
-                      {game.minPlayers}–{game.maxPlayers} players
-                      {tooFew() ? ` (need ${game.minPlayers})` : ''}
-                    </span>
-                    <Show when={voters().length > 0}>
-                      <span class="game-card-voters">
-                        {voters()
-                          .map((v) => v.name)
-                          .join(', ')}
-                      </span>
-                    </Show>
-                  </div>
+                  <Show when={voters().length > 0}>
+                    <div class="game-card-meta">
+                      {voters()
+                        .map((v) => v.name)
+                        .join(', ')}
+                    </div>
+                  </Show>
                 </button>
               );
             }}
@@ -115,7 +100,7 @@ export function TvGameSelector(props: TvGameSelectorProps) {
 
       <div class="tv-action-bar">
         <button class="btn" onClick={props.onReturnToLobby}>
-          Back to Lobby
+          Lobby
         </button>
       </div>
     </div>

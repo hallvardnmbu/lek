@@ -5,16 +5,22 @@
   gap: 1.25rem;
 }
 
+.tv-phase-center > .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+}
+
 .ml-ai-tag {
-  margin-left: 0.9rem;
-  padding: 0.15rem 0.6rem;
+  padding: 0.2rem 0.6rem;
   border-radius: 6px;
   background: var(--accent);
   color: var(--on-accent);
   font-size: 0.7rem;
   font-weight: 900;
+  line-height: 1;
   letter-spacing: 0.1em;
-  vertical-align: middle;
 }
 
 .ml-tv-prompt {

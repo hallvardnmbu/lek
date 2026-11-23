@@ -281,7 +281,7 @@ export function createQuizGame(
   return {
     id: 'quiz',
     name: 'Quiz',
-    description: 'AI-written Norwegian trivia. Answer wrong and you are out — last one standing wins.',
+    description: 'Norwegian trivia. Wrong answer eliminates you.',
     minPlayers: 2,
     maxPlayers: 12,
 

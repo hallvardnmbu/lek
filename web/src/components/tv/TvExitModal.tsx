@@ -8,17 +8,16 @@ export function TvExitModal(props: TvExitModalProps) {
   return (
     <div class="modal-backdrop">
       <div class="modal-card">
-        <h2>Leave Room?</h2>
-        <p>Current room session will be paused if you exit.</p>
+        <h2>Leave?</h2>
         <div class="modal-actions">
           <button class="btn" onClick={props.onKeepPlaying}>
-            Keep Playing
+            Stay
           </button>
           <button class="btn" onClick={props.onReload}>
             Reload
           </button>
           <button class="btn" onClick={props.onExit}>
-            Exit App
+            Exit
           </button>
         </div>
       </div>

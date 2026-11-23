@@ -25,7 +25,7 @@ function WikiRaceTvView(props: TvGameViewProps<WikiRaceHostView>) {
         fallback={
           <Show when={!host()?.error}>
             <div class="spinner" />
-            <p class="tv-hero-sub">Loading Wikipedia articles…</p>
+            <p class="tv-hero-sub">Loading articles</p>
           </Show>
         }
       >
@@ -134,7 +134,7 @@ function WikiRaceMobileView(props: MobileGameViewProps<WikiRacePlayerView>) {
             }
           >
             <div class="spinner" />
-            <p class="wr-status-title">Loading {view()?.startTitle}…</p>
+            <p class="wr-status-title">Loading {view()?.startTitle}</p>
           </Show>
         </div>
       </Show>
@@ -183,7 +183,7 @@ function WikiRaceMobileView(props: MobileGameViewProps<WikiRacePlayerView>) {
           <p class="wr-status-title">
             Arrived #{view()?.finishedRank} in {view()?.hops} hops!
           </p>
-          <p>Waiting for the last player to arrive…</p>
+          <p>Waiting for last player</p>
         </div>
       </Show>
 
@@ -191,7 +191,7 @@ function WikiRaceMobileView(props: MobileGameViewProps<WikiRacePlayerView>) {
         <div class="wr-article-header">
           <h1 class="wr-article-title">{view()?.currentTitle}</h1>
           <Show when={view()?.loading}>
-            <span class="wr-loading-pill">Loading…</span>
+            <span class="wr-loading-pill">Loading</span>
           </Show>
         </div>
 

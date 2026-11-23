@@ -61,6 +61,7 @@
 
 .mq-result-pill {
   display: flex;
+  align-items: center;
   gap: 0.7rem;
   background: var(--surface);
   border: 1px solid var(--border);

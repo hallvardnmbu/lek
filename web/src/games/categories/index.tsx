@@ -27,7 +27,7 @@ function CategoriesTvView(props: TvGameViewProps<CategoriesHostView>) {
           <div class="cat-generating">
             <div class="spinner" />
             <h1 class="tv-hero-title">Categories</h1>
-            <p class="tv-hero-sub">The AI is picking a category…</p>
+            <p class="tv-hero-sub">Picking a category</p>
           </div>
         }
       >
@@ -53,9 +53,6 @@ function CategoriesTvView(props: TvGameViewProps<CategoriesHostView>) {
         >
           <p class="cat-vote-progress">
             {host()?.votedCount}/{host()?.connectedCount} voted who failed
-          </p>
-          <p class="tv-hero-sub">
-            Go around the room naming items. When someone fails, vote on your phones.
           </p>
         </Show>
 
@@ -90,7 +87,7 @@ function CategoriesMobileView(props: MobileGameViewProps<CategoriesPlayerView>) 
 
       <Show
         when={view()?.phase !== 'GENERATING'}
-        fallback={<p class="muted cat-waiting">Picking a category… hold tight.</p>}
+        fallback={<p class="muted cat-waiting">Picking a category</p>}
       >
         <p class="cat-mobile-eyebrow">CATEGORY</p>
         <h2 class="cat-mobile-category">{view()?.category}</h2>

@@ -51,20 +51,17 @@ export function TvHost() {
       >
         <header class="tv-header">
           <div class="tv-brand">
-            <span class="tv-logo">Party</span>
+            <span class="brand">Party</span>
             <Show when={!socket.connected()}>
-              <span class="conn-pill offline">RECONNECTING...</span>
+              <span class="conn-pill">Reconnecting</span>
             </Show>
           </div>
 
           <Show when={state()}>
             {(s) => (
               <div class="tv-room-strip">
-                <button
-                  class={`audio-pill ${lobbyMusic.muted() ? 'muted' : ''}`}
-                  onClick={lobbyMusic.toggleMute}
-                >
-                  {lobbyMusic.muted() ? 'Sound: Off' : 'Sound: On'}
+                <button class="btn" onClick={lobbyMusic.toggleMute}>
+                  {lobbyMusic.muted() ? 'Sound on' : 'Sound off'}
                 </button>
                 <Show when={secondsLeft() !== null}>
                   <div class={`timer-pill ${(secondsLeft() ?? 99) <= 5 ? 'urgent' : ''}`}>
@@ -88,7 +85,7 @@ export function TvHost() {
           fallback={
             <div class="tv-center-loading">
               <div class="spinner" />
-              <p>Creating room...</p>
+              <p>Creating room</p>
             </div>
           }
         >

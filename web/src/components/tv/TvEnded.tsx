@@ -17,7 +17,7 @@ export function TvEnded(props: TvEndedProps) {
   return (
     <div class="tv-phase-center">
       <Show when={props.state.randomizedMode}>
-        <p class="eyebrow">RANDOMIZED MODE · NEXT GAME SOON</p>
+        <p class="eyebrow">NEXT GAME SOON</p>
       </Show>
       <h1 class="tv-hero-title">Game Over</h1>
 
@@ -33,27 +33,24 @@ export function TvEnded(props: TvEndedProps) {
         </For>
       </div>
 
-      <div
-        class="tv-action-bar"
-        style={{ display: 'flex', gap: '1rem', 'justify-content': 'center' }}
-      >
+      <div class="tv-action-bar">
         <Show
           when={props.state.randomizedMode}
           fallback={
-            <button class="btn btn-tv" onClick={props.onChooseAnotherGame}>
-              Choose Game
+            <button class="btn btn-lg" onClick={props.onChooseAnotherGame}>
+              Games
             </button>
           }
         >
-          <button class="btn btn-tv" onClick={props.onNextRandomGame}>
-            Next Game
+          <button class="btn btn-lg" onClick={props.onNextRandomGame}>
+            Next
           </button>
-          <button class="btn btn-tv" onClick={props.onStopRandomized}>
+          <button class="btn btn-lg" onClick={props.onStopRandomized}>
             Stop
           </button>
         </Show>
-        <button class="btn btn-tv" onClick={props.onReturnToLobby}>
-          Back to Lobby
+        <button class="btn btn-lg" onClick={props.onReturnToLobby}>
+          Lobby
         </button>
       </div>
     </div>

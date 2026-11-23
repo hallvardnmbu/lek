@@ -48,7 +48,7 @@ export function MobileLobby(props: MobileLobbyProps) {
         </Show>
 
         <button class="btn btn-block" onClick={props.onLeave}>
-          Leave Room
+          Leave
         </button>
       </div>
     </div>

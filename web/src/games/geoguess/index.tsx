@@ -42,7 +42,7 @@ function GeoGuessTvView(props: TvGameViewProps<GeoGuessHostView>) {
       <Show when={host()?.phase === 'LOADING'}>
         <div class="geo-tv-loading">
           <div class="spinner" />
-          <p class="tv-hero-sub">Finding a random spot on Earth…</p>
+          <p class="tv-hero-sub">Finding a spot</p>
         </div>
       </Show>
 
@@ -104,7 +104,7 @@ function GeoGuessTvView(props: TvGameViewProps<GeoGuessHostView>) {
                           ? 'DRINK'
                           : player.roundPoints !== null
                             ? `+${player.roundPoints}`
-                            : '—'}
+                            : '-'}
                     </span>
                     <span class="geo-tv-total">{player.score} pts</span>
                   </div>
@@ -168,7 +168,7 @@ function GeoGuessMobileView(props: MobileGameViewProps<GeoGuessPlayerView>) {
       <Show when={view()?.phase === 'LOADING'}>
         <div class="geo-mobile-wait">
           <div class="spinner" />
-          <p>Loading next location…</p>
+          <p>Loading location</p>
         </div>
       </Show>
 
@@ -178,7 +178,7 @@ function GeoGuessMobileView(props: MobileGameViewProps<GeoGuessPlayerView>) {
           fallback={
             <div class="geo-mobile-wait">
               <p class="geo-mobile-locked-title">Guess Locked In!</p>
-              <p class="geo-mobile-sub">Waiting for the other players…</p>
+              <p class="geo-mobile-sub">Waiting for others</p>
             </div>
           }
         >

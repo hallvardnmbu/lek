@@ -296,7 +296,7 @@ export function createWikiRaceGame(
     name: 'Wikipedia Race',
     description:
       'Race from the start article to the target using only Wikipedia links. Last to arrive drinks.',
-    minPlayers: 1,
+    minPlayers: 2,
     maxPlayers: 12,
 
     onStart(ctx) {

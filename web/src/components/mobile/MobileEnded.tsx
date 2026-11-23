@@ -7,11 +7,8 @@ export function MobileEnded(props: MobileEndedProps) {
   return (
     <div class="mobile-card">
       <h2>Game Over</h2>
-      <p class="muted">Score: {props.score} pts</p>
       <p class="wait-note">
-        {props.randomizedMode
-          ? 'Randomized mode · Next game starting soon...'
-          : 'Waiting for host...'}
+        {props.randomizedMode ? 'Next game soon' : 'Waiting for host'}
       </p>
     </div>
   );

@@ -17,12 +17,12 @@ function QuizTvView(props: TvGameViewProps<QuizHostView>) {
           <div class="qz-generating">
             <div class="spinner" />
             <h1 class="tv-hero-title">Quiz</h1>
-            <p class="tv-hero-sub">The AI is writing Norwegian questions…</p>
+            <p class="tv-hero-sub">Writing questions</p>
           </div>
         }
       >
         <p class="eyebrow">
-          QUESTION {host()?.questionNumber} · {host()?.aliveCount} STILL IN
+          Q{host()?.questionNumber}, {host()?.aliveCount} LEFT
         </p>
 
         <h1 class="qz-question">{host()?.question}</h1>
@@ -54,7 +54,7 @@ function QuizTvView(props: TvGameViewProps<QuizHostView>) {
                 )}
               </For>
               <Show when={host()?.allWrong}>
-                <p class="qz-all-wrong">All wrong — nobody is out!</p>
+                <p class="qz-all-wrong">All wrong. Nobody out.</p>
               </Show>
               <Show when={host()?.winnerName}>
                 <p class="qz-winner">WINNER: {host()?.winnerName}</p>
@@ -96,7 +96,7 @@ function QuizMobileView(props: MobileGameViewProps<QuizPlayerView>) {
 
       <Show
         when={view()?.phase !== 'GENERATING'}
-        fallback={<p class="muted qz-waiting">Writing questions… hold tight.</p>}
+        fallback={<p class="muted qz-waiting">Writing questions</p>}
       >
         <h2 class="qz-mobile-question">{view()?.question}</h2>
 
@@ -104,20 +104,20 @@ function QuizMobileView(props: MobileGameViewProps<QuizPlayerView>) {
           when={view()?.phase === 'QUESTION'}
           fallback={
             <>
-              <Show when={view()?.iAmAlive} fallback={<p class="muted">You're out — spectating.</p>}>
+              <Show when={view()?.iAmAlive} fallback={<p class="muted">Eliminated</p>}>
                 <Show
                   when={view()?.myCorrect === true}
                   fallback={
                     <p class={view()?.iWasEliminated ? 'qz-result-out' : 'qz-result-safe'}>
                       {view()?.iWasEliminated
-                        ? 'Wrong — you are out!'
+                        ? 'Wrong. You are out.'
                         : view()?.allWrong
-                          ? 'Everyone wrong — nobody is out!'
-                          : 'You missed this one — still in.'}
+                          ? 'All wrong. Still in.'
+                          : 'Missed. Still in.'}
                     </p>
                   }
                 >
-                  <p class="qz-result-safe">Correct — you are still in!</p>
+                  <p class="qz-result-safe">Correct. Still in.</p>
                 </Show>
               </Show>
               <p class="qz-correct-answer">Answer: {correctAnswerText()}</p>
@@ -127,7 +127,7 @@ function QuizMobileView(props: MobileGameViewProps<QuizPlayerView>) {
             </>
           }
         >
-          <Show when={view()?.iAmAlive} fallback={<p class="muted">You're out — spectating.</p>}>
+          <Show when={view()?.iAmAlive} fallback={<p class="muted">Eliminated</p>}>
             <div class="qz-answers">
               <For each={view()?.options ?? []}>
                 {(option, idx) => (

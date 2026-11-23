@@ -80,7 +80,6 @@ function MusicQuizTvView(props: TvGameViewProps<MusicQuizHostView>) {
 
       <Show when={view()?.phase === 'INTRO'}>
         <h1 class="tv-hero-title">Song {view()?.round}</h1>
-        <p class="tv-hero-sub">Listen up. Search the song on your phone when the music starts.</p>
       </Show>
 
       <Show when={view()?.phase === 'GUESSING'}>
@@ -92,11 +91,8 @@ function MusicQuizTvView(props: TvGameViewProps<MusicQuizHostView>) {
           <span />
         </div>
         <h1 class="tv-hero-title">What's the song?</h1>
-        <Show
-          when={view()?.audioUrl}
-          fallback={<p class="mq-no-audio">No clip for this song. Guess blind!</p>}
-        >
-          <p class="tv-hero-sub">Search on your phone and lock in your guess.</p>
+        <Show when={!view()?.audioUrl}>
+          <p class="mq-no-audio">No clip</p>
         </Show>
         <p class="mq-progress">
           {view()?.guessedCount}/{view()?.connectedCount} locked in
@@ -233,7 +229,7 @@ function MusicQuizMobileView(props: MobileGameViewProps<MusicQuizPlayerView>) {
               <p class="mq-locked-label">LOCKED IN</p>
               <p class="mq-locked-song">{lockedSong()?.title}</p>
               <p class="mq-locked-artist">{lockedSong()?.artist}</p>
-              <p class="muted">Waiting for the reveal…</p>
+              <p class="muted">Waiting for reveal</p>
             </div>
           }
         >
@@ -241,7 +237,7 @@ function MusicQuizMobileView(props: MobileGameViewProps<MusicQuizPlayerView>) {
             <input
               ref={(el) => (searchInput = el)}
               type="text"
-              placeholder="Search title or artist…"
+              placeholder="Search title or artist"
               value={query()}
               onInput={(e) => setQuery(e.currentTarget.value)}
             />
@@ -313,7 +309,7 @@ function MusicQuizMobileView(props: MobileGameViewProps<MusicQuizPlayerView>) {
         </div>
 
         <Show when={(view()?.round ?? 0) >= (view()?.totalRounds ?? 0)}>
-          <p class="muted mq-guessed-progress">Waiting for the host to show the final scores…</p>
+          <p class="muted mq-guessed-progress">Waiting for host</p>
         </Show>
       </Show>
     </div>

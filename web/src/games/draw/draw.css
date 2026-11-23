@@ -57,17 +57,13 @@
 }
 
 .draw-tv-card {
-  background: var(--surface, #131316);
-  border: 2px solid var(--border, rgba(255, 255, 255, 0.08));
-  border-radius: 16px;
-  padding: 0.75rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-.draw-tv-card.winner {
-  border-color: var(--accent, #f59e0b);
+.draw-tv-card.winner .draw-tv-thumb {
+  outline: 3px solid var(--accent);
 }
 
 .draw-tv-thumb {
@@ -192,9 +188,10 @@
 }
 
 .draw-actions-row {
-  display: grid;
-  grid-template-columns: 1fr 2fr;
-  gap: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
 }
 
 .draw-mobile-vote-grid {
@@ -205,10 +202,9 @@
 }
 
 .draw-vote-option {
-  background: var(--surface-2, #1c1c21);
-  border: 2px solid var(--border-strong, rgba(255, 255, 255, 0.14));
-  border-radius: 12px;
-  padding: 0.4rem;
+  background: transparent;
+  border: 0;
+  padding: 0;
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -218,7 +214,11 @@
 }
 
 .draw-vote-option.selected {
-  border-color: var(--accent, #f59e0b);
+  color: var(--accent);
+}
+
+.draw-vote-option.selected img {
+  outline: 3px solid var(--accent);
 }
 
 .draw-vote-option img {

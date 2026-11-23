@@ -65,10 +65,10 @@ export function TvLobby(props: TvLobbyProps) {
           >
             {props.canEnterSelector
               ? 'Start'
-              : `Waiting for ${Math.max(0, props.state.minPlayers - props.state.players.length)} more...`}
+              : `Need ${Math.max(0, props.state.minPlayers - props.state.players.length)} more`}
           </button>
-          <button class="lobby-card-label lobby-sound-btn" onClick={props.onToggleSound}>
-            {props.muted ? 'SOUND OFF' : 'SOUND ON'}
+          <button class="btn lobby-card-label lobby-sound-btn" onClick={props.onToggleSound}>
+            {props.muted ? 'SOUND ON' : 'SOUND OFF'}
           </button>
         </section>
       </div>

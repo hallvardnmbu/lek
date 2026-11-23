@@ -15,7 +15,7 @@ export function MobileGameFallback(props: MobileGameFallbackProps) {
           props.onSendAction({ type: 'ping_action', payload: { ts: Date.now() } })
         }
       >
-        Send Test Action
+        Send Action
       </button>
     </div>
   );

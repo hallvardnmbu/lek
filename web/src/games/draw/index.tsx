@@ -28,7 +28,7 @@ function DrawTvView(props: TvGameViewProps<DrawHostView>) {
 
               <Show when={view().phase === 'PROMPTING'}>
                 <h1 class="draw-tv-prompt">
-                  {view().prompterName} is picking what to draw...
+                  {view().prompterName} is picking a prompt
                 </h1>
               </Show>
 
@@ -59,7 +59,7 @@ function DrawTvView(props: TvGameViewProps<DrawHostView>) {
                       <DrawingThumb
                         src={entry.imageData}
                         alt={entry.playerName}
-                        placeholder="Drawing..."
+                        placeholder="Drawing"
                         class="draw-tv-thumb"
                       />
                       <div class="draw-tv-card-footer">
@@ -100,7 +100,7 @@ function DrawTvView(props: TvGameViewProps<DrawHostView>) {
                     return (
                       <div class={`status-pill ${voted() ? 'done' : ''}`}>
                         <span>{p.name}</span>
-                        <span>{voted() ? 'Voted' : 'Voting...'}</span>
+                        <span>{voted() ? 'Voted' : 'Voting'}</span>
                       </div>
                     );
                   }}
@@ -171,7 +171,7 @@ function DrawMobileView(props: MobileGameViewProps<DrawPlayerView>) {
                   <>
                     <h2>Get Ready!</h2>
                     <p class="muted">
-                      Waiting for <strong>{view().prompterName}</strong> to choose what to draw...
+                      Waiting for <strong>{view().prompterName}</strong>
                     </p>
                   </>
                 }
@@ -200,7 +200,7 @@ function DrawMobileView(props: MobileGameViewProps<DrawPlayerView>) {
               <div class="draw-mobile-prompt-box">{view().prompt}</div>
               <Show
                 when={!view().hasSubmitted}
-                fallback={<p class="muted">Drawing submitted! Waiting for other players...</p>}
+                fallback={<p class="muted">Submitted. Waiting for others.</p>}
               >
                 <DrawCanvas
                   onSync={(imageData) =>

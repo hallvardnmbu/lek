@@ -176,7 +176,7 @@ export function createPriceGuessGame(
     id: 'priceguess',
     name: 'Price Guess',
     description: 'Guess the price of a random bottle. Closest wins, furthest drinks!',
-    minPlayers: 1,
+    minPlayers: 2,
     maxPlayers: 12,
 
     onStart(ctx) {

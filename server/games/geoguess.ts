@@ -225,9 +225,8 @@ export function createGeoGuessGame(
   return {
     id: 'geoguess',
     name: 'Geo-Guess Roulette',
-    description:
-      'Spot the place on the TV, pin your guess on your phone. Closest scores the most — last place after 5 rounds drinks!',
-    minPlayers: 1,
+    description: 'Pin the spot on the map. Last place drinks.',
+    minPlayers: 2,
     maxPlayers: 12,
 
     onStart(ctx) {

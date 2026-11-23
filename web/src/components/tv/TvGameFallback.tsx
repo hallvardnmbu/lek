@@ -34,7 +34,7 @@ export function TvGameFallback(props: TvGameFallbackProps) {
 
       <div class="tv-action-bar">
         <button class="btn" onClick={props.onEndGame}>
-          End Game
+          End
         </button>
       </div>
     </div>

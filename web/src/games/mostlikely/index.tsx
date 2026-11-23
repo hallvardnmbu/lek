@@ -27,7 +27,7 @@ function MostLikelyTvView(props: TvGameViewProps<MostLikelyHostView>) {
           <div class="ml-generating">
             <div class="spinner" />
             <h1 class="tv-hero-title">Most Likely To</h1>
-            <p class="tv-hero-sub">The AI is cooking up questionable material…</p>
+            <p class="tv-hero-sub">Generating prompt</p>
           </div>
         }
       >
@@ -50,7 +50,7 @@ function MostLikelyTvView(props: TvGameViewProps<MostLikelyHostView>) {
               <p class="ml-next-hint">
                 <Show
                   when={(host()?.round ?? 0) < (host()?.totalRounds ?? 0)}
-                  fallback="Final results coming up…"
+                  fallback="Final results next"
                 >
                   Next round in {secondsLeft(props.remainingMs)}s
                 </Show>
@@ -59,9 +59,8 @@ function MostLikelyTvView(props: TvGameViewProps<MostLikelyHostView>) {
           }
         >
           <p class="ml-vote-progress">
-            {host()?.votedCount}/{host()?.connectedCount} votes in · {secondsLeft(props.remainingMs)}s
+            {host()?.votedCount}/{host()?.connectedCount} voted, {secondsLeft(props.remainingMs)}s
           </p>
-          <p class="tv-hero-sub">Vote on your phone. Majority verdict drinks.</p>
         </Show>
 
         <div class="tv-action-bar">
@@ -91,7 +90,7 @@ function MostLikelyMobileView(props: MobileGameViewProps<MostLikelyPlayerView>) 
 
       <Show
         when={view()?.phase !== 'GENERATING'}
-        fallback={<p class="muted ml-scheming">The AI is scheming… hold tight.</p>}
+        fallback={<p class="muted ml-scheming">Generating prompt</p>}
       >
         <h2 class="ml-mobile-prompt">Who is most likely to {view()?.prompt}?</h2>
 

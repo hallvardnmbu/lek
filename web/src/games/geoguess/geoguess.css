@@ -11,9 +11,15 @@
   gap: 1.5rem;
 }
 
+.geo-tv-header .eyebrow,
+.geo-mobile-header .eyebrow {
+  margin-bottom: 0;
+}
+
 .geo-tv-timer {
   font-size: 1.4rem;
   font-weight: 900;
+  line-height: 1;
   padding: 0.25rem 0.9rem;
   border-radius: 999px;
   background: var(--surface);

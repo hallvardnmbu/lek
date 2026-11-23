@@ -10,10 +10,10 @@ interface MobileJoinFormProps {
 export function MobileJoinForm(props: MobileJoinFormProps) {
   return (
     <form class="join-form" onSubmit={props.onSubmit}>
-      <h1>Join Room</h1>
+      <h1>Join</h1>
 
       <label class="field">
-        <span>Room Code</span>
+        <span>Code</span>
         <input
           type="text"
           maxlength={4}
@@ -27,7 +27,7 @@ export function MobileJoinForm(props: MobileJoinFormProps) {
       </label>
 
       <label class="field">
-        <span>Your Name</span>
+        <span>Name</span>
         <input
           type="text"
           maxlength={16}
@@ -38,12 +38,8 @@ export function MobileJoinForm(props: MobileJoinFormProps) {
         />
       </label>
 
-      <button
-        type="submit"
-        class="btn btn-block"
-        disabled={!props.connected}
-      >
-        {props.connected ? 'Join Room' : 'Connecting...'}
+      <button type="submit" class="btn btn-block" disabled={!props.connected}>
+        {props.connected ? 'Join' : 'Connecting'}
       </button>
     </form>
   );

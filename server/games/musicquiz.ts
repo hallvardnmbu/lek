@@ -116,7 +116,7 @@ export function createMusicQuizGame(
     id: 'music-quiz',
     name: 'Music Quiz',
     description: 'A clip plays on the TV. Search the songs on your phone and lock in fast.',
-    minPlayers: 1,
+    minPlayers: 2,
     maxPlayers: 12,
 
     onStart(ctx, config) {
