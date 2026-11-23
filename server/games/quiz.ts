@@ -7,7 +7,7 @@ import type {
 } from '../../shared/games/quiz';
 import { cortiAgent } from '../cortiModels';
 import type { GameContext, GameDefinition } from '../game';
-import { connectedPlayers, createRoomHistory, playerName, shuffle, withoutKey } from './helpers';
+import { awardCappedScore, connectedPlayers, createRoomHistory, playerName, shuffle, withoutKey } from './helpers';
 
 export type QuestionGenerator = (count: number, avoid?: string[]) => Promise<QuizQuestion[]>;
 
@@ -113,7 +113,7 @@ const REVEAL_MS = 8_000;
 const BATCH_SIZE = 10;
 const PREFETCH_AT = 8;
 const CORRECT_POINTS = 1;
-const WINNER_BONUS = 10;
+const WINNER_BONUS = 2;
 
 const questionHistory = createRoomHistory();
 
@@ -216,7 +216,7 @@ function reveal(ctx: GameContext, state: QuizState): QuizState {
   const allWrong = connected.length > 0 && wrongIds.length === connected.length;
 
   for (const r of results) {
-    if (r.correct) ctx.addPlayerScore(r.playerId, CORRECT_POINTS);
+    if (r.correct) awardCappedScore(ctx, r.playerId, CORRECT_POINTS);
   }
 
   if (!allWrong && wrongIds.length > 0) {
@@ -251,7 +251,7 @@ function maybeReveal(ctx: GameContext, state: QuizState): QuizState {
 
 function finishGame(ctx: GameContext, state: QuizState): void {
   const winnerId = state.aliveIds[0];
-  if (winnerId) ctx.addPlayerScore(winnerId, WINNER_BONUS);
+  if (winnerId) awardCappedScore(ctx, winnerId, WINNER_BONUS);
   ctx.endGame();
 }
 

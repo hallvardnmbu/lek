@@ -21,6 +21,7 @@ function createTestCtx(roomCode: string, players: TestPlayer[]) {
       id: p.id,
       name: p.name,
       score: scores.get(p.id) ?? 0,
+      totalScore: scores.get(p.id) ?? 0,
       connected: p.connected,
       isVip: false,
       meta: {},
@@ -119,7 +120,7 @@ describe('Quiz game', () => {
 
     state = game.onTimerExpired(ctx, state)!;
     expect(isEnded()).toBe(true);
-    expect(score('p1')).toBe(1 + 1 + 10);
+    expect(score('p1')).toBe(1 + 1 + 2);
   });
 
   it('eliminates multiple wrong players in the same round', async () => {
@@ -170,7 +171,7 @@ describe('Quiz game', () => {
 
     state = game.onTimerExpired(ctx, state)!;
     expect(isEnded()).toBe(true);
-    expect(score('p1')).toBe(1 + 10);
+    expect(score('p1')).toBe(1 + 2);
   });
 
   it('locks answers, ignores invalid answers, and ignores eliminated players', async () => {
@@ -366,6 +367,6 @@ describe('Quiz game', () => {
 
     state = game.onPlayerLeave(ctx, state, 'p3')!;
     expect(isEnded()).toBe(true);
-    expect(score('p1')).toBe(10);
+    expect(score('p1')).toBe(2);
   });
 });

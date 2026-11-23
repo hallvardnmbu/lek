@@ -7,7 +7,7 @@ import type {
   PriceGuessResultEntry,
 } from '../../shared/games/priceguess';
 import type { GameContext, GameDefinition } from '../game';
-import { allConnected, connectedPlayers, playerName } from './helpers';
+import { allConnected, awardCappedScore, connectedPlayers, playerName } from './helpers';
 import {
   fetchRandomProduct,
   type PriceGuessProduct,
@@ -16,6 +16,7 @@ import {
 
 const POLL_MS = 120;
 const ROUND_DURATION_MS = 30_000;
+const WIN_POINTS = 2;
 
 interface GuessEntry {
   price: number;
@@ -109,7 +110,7 @@ function revealRound(ctx: GameContext, state: PriceGuessState): void {
   const winner = submitted[0] ?? null;
   state.winnerId = winner ? winner.id : null;
   if (winner) {
-    ctx.addPlayerScore(winner.id, 1);
+    awardCappedScore(ctx, winner.id, WIN_POINTS);
   }
 
   state.drinkerId = null;

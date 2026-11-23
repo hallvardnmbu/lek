@@ -18,12 +18,14 @@ function createTestCtx(players: TestPlayer[]) {
   const timers: number[] = [];
   let cleared = 0;
   const events: Array<{ event: string; payload: unknown }> = [];
+  const scores = new Map<string, number>();
 
   const toGamePlayers = () =>
     players.map((p) => ({
       id: p.id,
       name: p.name,
-      score: 0,
+      score: scores.get(p.id) ?? 0,
+      totalScore: scores.get(p.id) ?? 0,
       connected: p.connected,
       meta: {},
     }));
@@ -32,8 +34,8 @@ function createTestCtx(players: TestPlayer[]) {
     roomCode: 'roulette-test',
     getPlayers: () => toGamePlayers(),
     getPlayer: (id) => toGamePlayers().find((p) => p.id === id),
-    setPlayerScore: () => {},
-    addPlayerScore: () => {},
+    setPlayerScore: (id, score) => scores.set(id, score),
+    addPlayerScore: (id, delta) => scores.set(id, (scores.get(id) ?? 0) + delta),
     setPlayerMeta: () => {},
     setTimer: (ms) => timers.push(ms),
     clearTimer: () => {
@@ -46,7 +48,7 @@ function createTestCtx(players: TestPlayer[]) {
     endGame: () => {},
   };
 
-  return { ctx, timers, events, getCleared: () => cleared };
+  return { ctx, timers, events, getCleared: () => cleared, score: (id: string) => scores.get(id) ?? 0 };
 }
 
 const threePlayers: TestPlayer[] = [
@@ -76,7 +78,7 @@ describe('Roulette game', () => {
   });
 
   it('provides synchronized spin schedule and selects the final step player on timer expiry', () => {
-    const { ctx, timers, events, getCleared } = createTestCtx(threePlayers);
+    const { ctx, timers, events, getCleared, score } = createTestCtx(threePlayers);
     let state = rouletteGame.onStart(ctx);
 
     expect(state.phase).toBe('SPINNING');
@@ -112,6 +114,10 @@ describe('Roulette game', () => {
     expect(hostView.phase).toBe('STOPPED');
     expect(hostView.spin).toBeNull();
     expect(hostView.selectedName).toBe(selectedViews[0].name);
+
+    for (const p of threePlayers) {
+      expect(score(p.id)).toBe(p.id === expectedSelectedId ? 0 : 1);
+    }
   });
 
   it('allows spinning again once stopped via host or player action', () => {

@@ -8,14 +8,14 @@ import type {
   DrawVoteResult,
 } from '../../shared/games/draw';
 import type { GameContext, GameDefinition } from '../game';
-import { buildVoteTally, connectedOrAllPlayers } from './helpers';
+import { awardCappedScore, buildVoteTally, connectedOrAllPlayers } from './helpers';
 
 const PROMPT_DURATION_MS = 45_000;
 export const DRAW_DURATION_MS = 90_000;
 const VOTE_DURATION_MS = 30_000;
 const MAX_PROMPT_LENGTH = 60;
 const MAX_IMAGE_DATA_LENGTH = 200_000;
-const WIN_POINTS = 100;
+const WIN_POINTS = 2;
 
 const FALLBACK_PROMPTS = [
   'A cat riding a skateboard',
@@ -109,7 +109,7 @@ function tallyResults(ctx: GameContext, state: DrawGameState): DrawGameState {
   const results: DrawVoteResult[] = tally.map((entry) => {
     const isWinner = maxVotes > 0 && entry.votes === maxVotes;
     if (isWinner) {
-      ctx.addPlayerScore(entry.playerId, WIN_POINTS);
+      awardCappedScore(ctx, entry.playerId, WIN_POINTS);
     }
     return {
       playerId: entry.playerId,

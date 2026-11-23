@@ -21,6 +21,7 @@ export interface MostLikelyState {
   votes: Record<string, string>;
   tally: MostLikelyTallyEntry[];
   drinkerIds: string[];
+  drinks: Record<string, number>;
   aiInbox: { prompts: string[] | null };
   fallbackPrompts: string[] | null;
 }

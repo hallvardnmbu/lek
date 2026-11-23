@@ -31,6 +31,7 @@ function createTestCtx(roomCode: string, players: TestPlayer[]) {
       id: p.id,
       name: p.name,
       score: scores.get(p.id) ?? 0,
+      totalScore: scores.get(p.id) ?? 0,
       connected: p.connected,
       isVip: false,
       meta: {},
@@ -91,6 +92,7 @@ describe('Most Likely To game', () => {
     state = game.onPlayerAction(ctx, state, 'p2', { type: 'vote', payload: { targetId: 'p2' } })!;
     expect(state.phase).toBe('REVEAL');
     expect(score('p2')).toBe(1);
+    expect(state.drinks.p2).toBe(1);
     expect(state.tally.find((t) => t.playerId === 'p2')?.isDrinker).toBe(true);
 
     const hostView = game.getHostView(state, ctx);
@@ -112,6 +114,7 @@ describe('Most Likely To game', () => {
     expect(state.phase).toBe('REVEAL');
     expect(score('p1')).toBe(0);
     expect(score('p2')).toBe(1);
+    expect(state.drinks.p2).toBe(1);
 
     state = game.onTimerExpired(ctx, state)!;
     expect(state.phase).toBe('VOTING');
@@ -175,6 +178,7 @@ describe('Most Likely To game', () => {
     state = game.onTimerExpired(ctx, state)!;
     expect(state.phase).toBe('REVEAL');
     expect(score('p2')).toBe(1);
+    expect(state.drinks.p2).toBe(1);
     expect(state.drinkerIds).toEqual(['p2']);
   });
 
@@ -205,6 +209,30 @@ describe('Most Likely To game', () => {
     players[2].connected = false;
     state = game.onPlayerDisconnect(ctx, state, 'p3')!;
     expect(state.phase).toBe('REVEAL');
+    expect(score('p2')).toBe(1);
+    expect(state.drinks.p2).toBe(1);
+  });
+
+  it('awards all tied winners and caps score at 5 per game', async () => {
+    const game = makeGame(async () => ['p1', 'p2', 'p3', 'p4', 'p5', 'p6']);
+    const { ctx, score } = createTestCtx('room-cap', twoPlayers);
+
+    let state = game.onStart(ctx, { rounds: 6 });
+    await flush();
+    state = game.onTimerExpired(ctx, state)!;
+
+    state = game.onPlayerAction(ctx, state, 'p1', { type: 'vote', payload: { targetId: 'p1' } })!;
+    state = game.onPlayerAction(ctx, state, 'p2', { type: 'vote', payload: { targetId: 'p2' } })!;
+    expect(state.phase).toBe('REVEAL');
+    expect(score('p1')).toBe(1);
+    expect(score('p2')).toBe(1);
+
+    for (let r = 2; r <= 6; r++) {
+      state = game.onTimerExpired(ctx, state)!;
+      state = game.onPlayerAction(ctx, state, 'p1', { type: 'vote', payload: { targetId: 'p1' } })!;
+      state = game.onPlayerAction(ctx, state, 'p2', { type: 'vote', payload: { targetId: 'p1' } })!;
+    }
+    expect(score('p1')).toBe(5);
     expect(score('p2')).toBe(1);
   });
 

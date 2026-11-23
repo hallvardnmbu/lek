@@ -8,10 +8,11 @@ import {
   type RouletteState,
 } from '../../shared/games/roulette';
 import type { GameContext, GameDefinition } from '../game';
-import { connectedOrAllPlayers, playerName } from './helpers';
+import { awardCappedScore, connectedOrAllPlayers, playerName } from './helpers';
 
 const MIN_STEPS = 54;
 const MIN_LAPS = 6;
+const SAFE_POINTS = 1;
 
 function startSpin(ctx: GameContext): RouletteState {
   const playerOrder = connectedOrAllPlayers(ctx).map((p) => p.id);
@@ -92,6 +93,11 @@ export const rouletteGame: GameDefinition<
     const lastStep = Math.max(0, state.totalSteps - 1);
     const selectedIndex = (state.startIndex + lastStep) % state.playerOrder.length;
     const selectedId = state.playerOrder[selectedIndex] ?? null;
+    for (const id of state.playerOrder) {
+      if (id !== selectedId) {
+        awardCappedScore(ctx, id, SAFE_POINTS);
+      }
+    }
     ctx.clearTimer();
     ctx.broadcastEvent('roulette_stopped', { playerId: selectedId });
     return {

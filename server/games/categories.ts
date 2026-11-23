@@ -8,6 +8,7 @@ import { cortiAgent, type PromptGenerator } from '../cortiModels';
 import type { GameContext, GameDefinition } from '../game';
 import {
   allConnected,
+  awardCappedScore,
   buildVoteTally,
   connectedPlayers,
   createRoomHistory,
@@ -36,6 +37,7 @@ const POLL_MS = 500;
 const MIN_ROUNDS = 1;
 const MAX_ROUNDS = 20;
 const DEFAULT_ROUNDS = 3;
+const SURVIVE_POINTS = 1;
 
 const FALLBACK_CATEGORIES = [
   'Pizza toppings',
@@ -76,7 +78,7 @@ function reveal(ctx: GameContext, state: CategoriesState): CategoriesState {
   if (failedIds.length > 0) {
     for (const p of ctx.getPlayers()) {
       if (!failedSet.has(p.id)) {
-        ctx.addPlayerScore(p.id, 1);
+        awardCappedScore(ctx, p.id, SURVIVE_POINTS);
       }
     }
   }

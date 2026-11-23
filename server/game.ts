@@ -4,6 +4,7 @@ export interface GamePlayer {
   id: string;
   name: string;
   score: number;
+  totalScore: number;
   connected: boolean;
   meta: Record<string, unknown>;
 }

@@ -776,6 +776,13 @@ button {
   color: var(--muted);
 }
 
+.podium-score-total {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-left: 0.25rem;
+}
+
 @keyframes podium-enter {
   from {
     opacity: 0;

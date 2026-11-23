@@ -112,7 +112,7 @@ describe('drawGame', () => {
     expect(hostResults.results.every((r) => r.isWinner)).toBe(true);
 
     const stateAfterResults = manager.buildStateForClient(room);
-    expect(stateAfterResults.players.every((p) => p.score === 100)).toBe(true);
+    expect(stateAfterResults.players.every((p) => p.score === 2)).toBe(true);
 
     manager.handleAction(room.code, { hostToken }, { type: 'next_round' });
     const hostNext = manager.buildStateForClient(room).hostState as DrawHostView;

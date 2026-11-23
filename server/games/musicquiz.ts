@@ -6,7 +6,7 @@ import {
   type MusicQuizState,
 } from '../../shared/games/musicquiz';
 import type { GameContext, GameDefinition } from '../game';
-import { allConnected, connectedPlayers, createRoomHistory, parseRounds, shuffle, withoutKey } from './helpers';
+import { allConnected, awardCappedScore, connectedPlayers, createRoomHistory, parseRounds, shuffle, withoutKey } from './helpers';
 import { getMusicQuizCatalog, previewUrlFor, refreshPreviews } from './musicquizCatalog';
 
 const INTRO_MS = 4_000;
@@ -15,8 +15,8 @@ const REVEAL_MS = 8_000;
 const MIN_ROUNDS = 1;
 const MAX_ROUNDS = 20;
 const DEFAULT_ROUNDS = 5;
-const CORRECT_POINTS = 100;
-const MAX_SPEED_BONUS = 100;
+const CORRECT_POINTS = 1;
+const MAX_SPEED_BONUS = 2;
 
 const songHistory = createRoomHistory();
 
@@ -67,10 +67,8 @@ function reveal(ctx: GameContext, state: MusicQuizState): MusicQuizState {
     .map((p) => {
       const guess = state.guesses[p.id];
       const correct = guess?.songId === song.id;
-      const points = correct && guess ? CORRECT_POINTS + speedBonus(state, guess.at) : 0;
-      if (points > 0) {
-        ctx.addPlayerScore(p.id, points);
-      }
+      const rawPoints = correct && guess ? CORRECT_POINTS + speedBonus(state, guess.at) : 0;
+      const points = awardCappedScore(ctx, p.id, rawPoints);
       return {
         playerId: p.id,
         playerName: p.name,

@@ -11,12 +11,14 @@ interface TestPlayer {
 
 function createTestCtx(players: TestPlayer[]) {
   const events: Array<{ event: string; payload: unknown }> = [];
+  const scores = new Map<string, number>();
 
   const toGamePlayers = () =>
     players.map((p) => ({
       id: p.id,
       name: p.name,
-      score: 0,
+      score: scores.get(p.id) ?? 0,
+      totalScore: scores.get(p.id) ?? 0,
       connected: p.connected,
       meta: {},
     }));
@@ -25,8 +27,8 @@ function createTestCtx(players: TestPlayer[]) {
     roomCode: 'wikirace-test',
     getPlayers: () => toGamePlayers(),
     getPlayer: (id) => toGamePlayers().find((p) => p.id === id),
-    setPlayerScore: () => {},
-    addPlayerScore: () => {},
+    setPlayerScore: (id, score) => scores.set(id, score),
+    addPlayerScore: (id, delta) => scores.set(id, (scores.get(id) ?? 0) + delta),
     setPlayerMeta: () => {},
     setTimer: () => {},
     clearTimer: () => {},
@@ -37,7 +39,7 @@ function createTestCtx(players: TestPlayer[]) {
     endGame: () => {},
   };
 
-  return { ctx, events };
+  return { ctx, events, score: (id: string) => scores.get(id) ?? 0 };
 }
 
 async function flushMicrotasks(): Promise<void> {
@@ -95,7 +97,7 @@ describe('Wikipedia Race game', () => {
       { id: 'p2', name: 'Bob', connected: true },
       { id: 'p3', name: 'Carol', connected: true },
     ];
-    const { ctx, events } = createTestCtx(players);
+    const { ctx, events, score } = createTestCtx(players);
 
     let state: WikiRaceState;
     const gameWithArticles = createWikiRaceGame(async (title) => {
@@ -187,6 +189,9 @@ describe('Wikipedia Race game', () => {
     const p3View = gameWithArticles.getPlayerView(state, 'p3', ctx);
     expect(p3View.isLoser).toBe(true);
     expect(gameWithArticles.getHostView(state, ctx).loserName).toBe('Carol');
+    expect(score('p1')).toBe(5);
+    expect(score('p2')).toBe(4);
+    expect(score('p3')).toBe(3);
   });
 
   it('continues the race after a disconnect until every connected player finishes', async () => {

@@ -8,13 +8,13 @@ import type {
 } from '../../shared/games/geoguess';
 import type { GameContext, GameDefinition } from '../game';
 import { fetchRandomGeoSpot, type GeoSpot, type SpotFetcher } from './geoguess-spots';
-import { allConnected, connectedPlayers, playerName } from './helpers';
+import { allConnected, awardCappedScore, connectedPlayers, playerName } from './helpers';
 
 const POLL_MS = 120;
 const ROUND_DURATION_MS = 45_000;
 const TOTAL_ROUNDS = 5;
 const EARTH_RADIUS_KM = 6371;
-const MAX_ROUND_POINTS = 100;
+const MAX_ROUND_POINTS = 1;
 const POINTS_FALLOFF_KM = 2_000;
 
 const PLAYER_COLORS = [
@@ -157,9 +157,8 @@ function revealRound(ctx: GameContext, state: GeoGuessState): void {
   for (const p of players) {
     const guess = state.guesses[p.id];
     if (!guess) continue;
-    const points = closenessPoints(guess.distanceKm);
+    const points = awardCappedScore(ctx, p.id, closenessPoints(guess.distanceKm));
     state.roundPoints[p.id] = points;
-    ctx.addPlayerScore(p.id, points);
   }
 
   state.drinkerId = null;

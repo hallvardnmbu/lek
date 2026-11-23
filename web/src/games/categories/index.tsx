@@ -98,7 +98,7 @@ function CategoriesMobileView(props: MobileGameViewProps<CategoriesPlayerView>) 
             <>
               <Show
                 when={view()?.iFailed}
-                fallback={<p class="cat-result-safe">You survived! +1 pt.</p>}
+                fallback={<p class="cat-result-safe">You survived! +10 pts.</p>}
               >
                 <p class="cat-result-fail">You failed this round!</p>
               </Show>

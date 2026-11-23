@@ -40,6 +40,7 @@ function createTestCtx(roomCode: string, players: TestPlayer[]) {
       id: p.id,
       name: p.name,
       score: scores.get(p.id) ?? 0,
+      totalScore: scores.get(p.id) ?? 0,
       connected: p.connected,
       isVip: false,
       meta: {},
@@ -69,8 +70,6 @@ function createTestCtx(roomCode: string, players: TestPlayer[]) {
     score: (id: string) => scores.get(id) ?? 0,
   };
 }
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const twoPlayers: TestPlayer[] = [
   { id: 'p1', name: 'Alice', connected: true },
@@ -116,8 +115,8 @@ describe('Music Quiz game', () => {
 
     const p1View = game.getPlayerView(state, 'p1', ctx);
     expect(p1View.myResult?.correct).toBe(true);
-    expect(p1View.myResult?.points).toBeGreaterThanOrEqual(100);
-    expect(p1View.myResult?.points).toBeLessThanOrEqual(200);
+    expect(p1View.myResult?.points).toBeGreaterThanOrEqual(1);
+    expect(p1View.myResult?.points).toBeLessThanOrEqual(5);
 
     const p2View = game.getPlayerView(state, 'p2', ctx);
     expect(p2View.myResult?.correct).toBe(false);
@@ -175,13 +174,14 @@ describe('Music Quiz game', () => {
 
     const answerId = state.songs[0].id;
     state = game.onPlayerAction(ctx, state, 'p1', { type: 'guess', payload: { songId: answerId } })!;
-    await sleep(400);
+    state.roundStartedAt -= 10_000;
+    state.guesses.p1.at -= 10_000;
     state = game.onPlayerAction(ctx, state, 'p2', { type: 'guess', payload: { songId: answerId } })!;
 
     expect(state.phase).toBe('REVEAL');
     expect(score('p1')).toBeGreaterThan(score('p2'));
-    expect(score('p2')).toBeGreaterThanOrEqual(100);
-    expect(score('p1')).toBeLessThanOrEqual(200);
+    expect(score('p2')).toBeGreaterThanOrEqual(1);
+    expect(score('p1')).toBeLessThanOrEqual(5);
   });
 
   it('reveals early once every connected player has guessed, even after a disconnect', () => {
@@ -223,7 +223,8 @@ describe('Music Quiz game', () => {
 
     state = game.onTimerExpired(ctx, state)!;
     expect(state.phase).toBe('REVEAL');
-    expect(score('p1')).toBeGreaterThanOrEqual(100);
+    expect(score('p1')).toBeGreaterThanOrEqual(1);
+    expect(score('p1')).toBeLessThanOrEqual(5);
 
     const hostView = game.getHostView(state, ctx);
     expect(hostView.results).toHaveLength(2);

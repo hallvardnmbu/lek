@@ -126,7 +126,19 @@ export function MobilePlay(props: MobilePlayProps) {
         <Show when={joinedCode() && me()}>
           <div class="mobile-player-pill">
             <span>{me()!.name}</span>
-            <strong>{me()!.score} pts</strong>
+            <Show
+              when={state()?.phase === 'PLAYING' || state()?.phase === 'ENDED'}
+              fallback={
+                <strong>
+                  {me()!.totalScore > 0 ? `${me()!.totalScore} total` : `${me()!.score} pts`}
+                </strong>
+              }
+            >
+              <strong>{me()!.score} pts</strong>
+              <Show when={me()!.totalScore !== me()!.score}>
+                <span class="muted">({me()!.totalScore} total)</span>
+              </Show>
+            </Show>
           </div>
         </Show>
       </header>

@@ -20,6 +20,10 @@ export function TvEnded(props: TvEndedProps) {
     Math.max(0, ...sortedPlayers().map((p) => p.score))
   );
 
+  const hasSessionTotals = createMemo(() =>
+    props.state.players.some((p) => p.totalScore !== p.score)
+  );
+
   return (
     <div class="tv-phase-center">
       <Show when={props.state.randomizedMode}>
@@ -56,6 +60,9 @@ export function TvEnded(props: TvEndedProps) {
                 <span class="podium-score">
                   <span class="podium-score-num">{p.score}</span>
                   <span class="podium-score-unit">pts</span>
+                  <Show when={hasSessionTotals()}>
+                    <span class="podium-score-total">· {p.totalScore} total</span>
+                  </Show>
                 </span>
               </div>
             );

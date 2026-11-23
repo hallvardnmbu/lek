@@ -29,6 +29,7 @@ function createTestCtx(players: TestPlayer[]) {
       id: p.id,
       name: p.name,
       score: scores.get(p.id) ?? 0,
+      totalScore: scores.get(p.id) ?? 0,
       connected: p.connected,
       meta: {},
     }));
@@ -203,7 +204,7 @@ describe('tank battle', () => {
     fireAction(test.ctx, test.state, 'p1');
     tick(test.ctx, test.state);
     expect(test.state.tanks.p2.alive).toBe(false);
-    expect(test.scoreOf('p1')).toBe(500);
+    expect(test.scoreOf('p1')).toBe(1);
     expect(test.state.eliminations).toEqual([
       { playerId: 'p2', byPlayerId: 'p1', at: expect.any(Number) },
     ]);
@@ -225,7 +226,7 @@ describe('tank battle', () => {
     fireAction(test.ctx, test.state, 'p1');
     tick(test.ctx, test.state);
     expect(test.state.tanks.p2.alive).toBe(false);
-    expect(test.scoreOf('p1')).toBe(1000);
+    expect(test.scoreOf('p1')).toBe(3);
     expect(test.isEnded()).toBe(true);
   });
 
@@ -237,7 +238,7 @@ describe('tank battle', () => {
     const next = game.onPlayerDisconnect(test.ctx, test.state, 'p2')!;
     expect(next.tanks.p2.alive).toBe(false);
     expect(next.eliminations[0].byPlayerId).toBeNull();
-    expect(test.scoreOf('p1')).toBe(500);
+    expect(test.scoreOf('p1')).toBe(2);
     expect(test.isEnded()).toBe(true);
   });
 

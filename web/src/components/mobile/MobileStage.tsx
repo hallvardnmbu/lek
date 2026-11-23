@@ -64,6 +64,7 @@ export function MobileStage(props: MobileStageProps) {
       <Show when={props.state.phase === 'ENDED'}>
         <MobileEnded
           score={props.me?.score ?? 0}
+          totalScore={props.me?.totalScore ?? 0}
           randomizedMode={props.state.randomizedMode}
         />
       </Show>

@@ -1,5 +1,5 @@
 import type { GameContext, GameDefinition } from '../game';
-import { connectedOrAllPlayers, shuffle } from './helpers';
+import { awardCappedScore, connectedOrAllPlayers, shuffle } from './helpers';
 import {
   TANK_COLORS,
   TANK_SPAWNS,
@@ -26,8 +26,8 @@ const BULLET_RADIUS = 5;
 const BULLET_LIFETIME_MS = 1600;
 const FIRE_COOLDOWN_MS = 900;
 const INPUT_DEADZONE = 0.18;
-const KILL_POINTS = 500;
-const WIN_POINTS = 500;
+const KILL_POINTS = 1;
+const WIN_POINTS = 2;
 const ELIMINATION_FEED_MS = 3500;
 const BULLET_SUBSTEP_PX = 12;
 
@@ -134,7 +134,7 @@ function eliminateTank(
   delete state.inputs[tank.playerId];
   state.eliminations.push({ playerId: tank.playerId, byPlayerId, at: now });
   if (state.eliminations.length > 10) state.eliminations = state.eliminations.slice(-10);
-  if (byPlayerId) ctx.addPlayerScore(byPlayerId, KILL_POINTS);
+  if (byPlayerId) awardCappedScore(ctx, byPlayerId, KILL_POINTS);
 }
 
 function advanceBullets(ctx: GameContext, state: TankGameState, dtSec: number, now: number): void {
@@ -180,7 +180,7 @@ function checkGameEnd(ctx: GameContext, state: TankGameState, now: number): bool
   if (state.phase !== 'PLAYING') return false;
   const alive = aliveTanks(state);
   if (alive.length <= 1) {
-    if (alive.length === 1) ctx.addPlayerScore(alive[0].playerId, WIN_POINTS);
+    if (alive.length === 1) awardCappedScore(ctx, alive[0].playerId, WIN_POINTS);
     ctx.endGame();
     return true;
   }

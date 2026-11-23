@@ -7,7 +7,7 @@ import type {
   WikiRacePhase,
 } from '../../shared/games/wikirace';
 import type { GameContext, GameDefinition } from '../game';
-import { connectedPlayers, playerName } from './helpers';
+import { awardCappedScore, connectedPlayers, playerName } from './helpers';
 import {
   CURATED_PAIRS,
   fetchWikiArticle,
@@ -151,7 +151,7 @@ function moveRacerToArticle(
   if (normalizeTitle(article.title) === normalizeTitle(state.targetTitle)) {
     state.finishedOrder.push(playerId);
     racer.finishedRank = state.finishedOrder.length;
-    ctx.addPlayerScore(playerId, Math.max(1, 10 - (racer.finishedRank - 1) * 2));
+    awardCappedScore(ctx, playerId, Math.max(1, 5 - (racer.finishedRank - 1)));
     checkRaceCompletion(ctx, state);
   }
 }

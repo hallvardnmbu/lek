@@ -7,6 +7,7 @@ import { cortiAgent, type PromptGenerator } from '../cortiModels';
 import type { GameContext, GameDefinition } from '../game';
 import {
   allConnected,
+  awardCappedScore,
   buildVoteTally,
   connectedPlayers,
   createRoomHistory,
@@ -37,6 +38,7 @@ const REVEAL_MS = 10_000;
 const MIN_ROUNDS = 3;
 const MAX_ROUNDS = 20;
 const DEFAULT_ROUNDS = 3;
+const WIN_POINTS = 1;
 
 const FALLBACK_PROMPTS = [
   'wake up in another country with no memory of how they got there',
@@ -76,7 +78,8 @@ function reveal(ctx: GameContext, state: MostLikelyState): MostLikelyState {
   const drinkerSet = new Set(drinkerIds);
 
   for (const id of drinkerIds) {
-    ctx.addPlayerScore(id, 1);
+    state.drinks[id] = (state.drinks[id] ?? 0) + 1;
+    awardCappedScore(ctx, id, WIN_POINTS);
   }
 
   state.phase = 'REVEAL';
@@ -163,6 +166,7 @@ export function createMostLikelyGame(
         votes: {},
         tally: [],
         drinkerIds: [],
+        drinks: {},
         aiInbox: { prompts: null },
         fallbackPrompts: null,
       };
@@ -231,7 +235,7 @@ export function createMostLikelyGame(
         prompt: state.prompt,
         myVote: state.votes[playerId] ?? null,
         candidates: ctx.getPlayers().map((p) => ({ id: p.id, name: p.name })),
-        myDrinks: ctx.getPlayer(playerId)?.score ?? 0,
+        myDrinks: state.drinks[playerId] ?? 0,
         ...voteCounts(ctx, state),
         tally: state.tally,
         iAmDrinking: state.drinkerIds.includes(playerId),

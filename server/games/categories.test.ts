@@ -32,6 +32,7 @@ function createTestCtx(roomCode: string, players: TestPlayer[]) {
       id: p.id,
       name: p.name,
       score: scores.get(p.id) ?? 0,
+      totalScore: scores.get(p.id) ?? 0,
       connected: p.connected,
       meta: {},
     }));

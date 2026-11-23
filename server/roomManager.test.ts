@@ -101,6 +101,7 @@ describe('RoomManager & GameDefinition foundation', () => {
     const p1View = manager.buildStateForClient(room, p1.player.id);
     expect((p1View.playerState as { myTaps: number }).myTaps).toBe(1);
     expect(p1View.players.find((p) => p.id === p1.player.id)?.score).toBe(10);
+    expect(p1View.players.find((p) => p.id === p1.player.id)?.totalScore).toBe(10);
 
     const ext = manager.handleExternalEvent(room.code, 'bonus_round', { multiplier: 2 });
     expect(ext.ok).toBe(true);
@@ -114,6 +115,18 @@ describe('RoomManager & GameDefinition foundation', () => {
     expect(lobby.ok).toBe(true);
     expect(room.phase).toBe('LOBBY');
     expect(room.players.get(p1.player.id)?.score).toBe(0);
+    expect(room.players.get(p1.player.id)?.totalScore).toBe(10);
+
+    const secondStart = manager.startGame(
+      room.code,
+      { playerId: p1.player.id },
+      { gameId: 'tap-race' }
+    );
+    expect(secondStart.ok).toBe(true);
+    manager.handleAction(room.code, { playerId: p1.player.id }, { type: 'tap' }, room.roundId);
+    const secondView = manager.buildStateForClient(room, p1.player.id);
+    expect(secondView.players.find((p) => p.id === p1.player.id)?.score).toBe(10);
+    expect(secondView.players.find((p) => p.id === p1.player.id)?.totalScore).toBe(20);
 
     manager.disposeRoom(room.code);
   });

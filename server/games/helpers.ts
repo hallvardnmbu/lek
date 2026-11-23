@@ -23,6 +23,23 @@ export function allConnected(ctx: GameContext, pred: (playerId: string) => boole
   return connected.length > 0 && connected.every((p) => pred(p.id));
 }
 
+export const MAX_GAME_SCORE = 5;
+
+export function awardCappedScore(
+  ctx: GameContext,
+  playerId: string,
+  delta: number,
+  maxScore = MAX_GAME_SCORE
+): number {
+  if (delta <= 0) return 0;
+  const current = ctx.getPlayer(playerId)?.score ?? 0;
+  const awarded = Math.max(0, Math.min(delta, maxScore - current));
+  if (awarded > 0) {
+    ctx.addPlayerScore(playerId, awarded);
+  }
+  return awarded;
+}
+
 export function withoutKey<T>(record: Record<string, T>, key: string): Record<string, T> {
   const { [key]: _removed, ...rest } = record;
   return rest;

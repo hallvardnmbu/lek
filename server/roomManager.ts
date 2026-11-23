@@ -195,6 +195,7 @@ export class RoomManager {
       id: playerId,
       name,
       score: 0,
+      totalScore: 0,
       connected: true,
       meta: {},
     };
@@ -695,6 +696,7 @@ export class RoomManager {
       id: p.id,
       name: p.name,
       score: p.score,
+      totalScore: p.totalScore,
       connected: p.connected,
       seat: room.seats.get(p.id) ?? 0,
       meta: p.meta,
@@ -825,7 +827,7 @@ export class RoomManager {
     this.broadcastState(room);
 
     const standings = Array.from(room.players.values())
-      .map((p) => ({ id: p.id, name: p.name, score: p.score }))
+      .map((p) => ({ id: p.id, name: p.name, score: p.score, totalScore: p.totalScore }))
       .sort((a, b) => b.score - a.score);
 
     this.emitWebhook('game.ended', room.code, {
@@ -865,11 +867,18 @@ export class RoomManager {
       getPlayer: (playerId) => room.players.get(playerId),
       setPlayerScore: (playerId, score) => {
         const p = room.players.get(playerId);
-        if (p) p.score = score;
+        if (p) {
+          const prev = p.score;
+          p.score = score;
+          p.totalScore += score - prev;
+        }
       },
       addPlayerScore: (playerId, delta) => {
         const p = room.players.get(playerId);
-        if (p) p.score += delta;
+        if (p) {
+          p.score += delta;
+          p.totalScore += delta;
+        }
       },
       setPlayerMeta: (playerId, meta) => {
         const p = room.players.get(playerId);

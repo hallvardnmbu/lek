@@ -27,6 +27,7 @@ function createTestCtx(players: Array<{ id: string; name: string; connected: boo
       id: p.id,
       name: p.name,
       score: scores[p.id] ?? 0,
+      totalScore: scores[p.id] ?? 0,
       connected: p.connected,
       meta: {},
     }));
@@ -92,7 +93,7 @@ describe('priceguess game', () => {
       payload: { price: 400 },
     })!;
     expect(state.phase).toBe('REVEAL');
-    expect(scores.p1).toBe(1);
+    expect(scores.p1).toBe(2);
     expect(scores.p2).toBe(0);
 
     const hostView = game.getHostView(state, ctx);

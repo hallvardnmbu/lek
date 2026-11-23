@@ -8,6 +8,7 @@ function makeContext(playersInput: Array<{ id: string; name: string; connected?:
     id: p.id,
     name: p.name,
     score: 0,
+    totalScore: 0,
     connected: p.connected ?? true,
     meta: {},
   }));
@@ -106,9 +107,9 @@ describe('geoguess game', () => {
     }) ?? state;
 
     expect(state.phase).toBe('REVEAL');
-    expect(players.find((p) => p.id === 'p1')?.score).toBeGreaterThan(95);
-    expect(players.find((p) => p.id === 'p2')?.score).toBeLessThan(5);
-    expect(players.find((p) => p.id === 'p3')?.score).toBeGreaterThanOrEqual(80);
+    expect(players.find((p) => p.id === 'p1')?.score).toBe(1);
+    expect(players.find((p) => p.id === 'p2')?.score).toBe(0);
+    expect(players.find((p) => p.id === 'p3')?.score).toBe(1);
     expect(events.some((e) => e.event === 'geoguess_reveal')).toBe(true);
 
     const hostReveal = game.getHostView(state, ctx);
@@ -116,7 +117,7 @@ describe('geoguess game', () => {
     expect(hostReveal.drinkerName).toBeNull();
     expect(hostReveal.spotLabel).toBe('Paris, France');
     expect(hostReveal.target).toEqual(TEST_SPOT.coords);
-    expect(hostReveal.players.find((p) => p.playerId === 'p1')?.roundPoints).toBeGreaterThan(95);
+    expect(hostReveal.players.find((p) => p.playerId === 'p1')?.roundPoints).toBe(1);
 
     const bobView = game.getPlayerView(state, 'p2', ctx);
     expect(bobView.drinks).toBe(false);
@@ -125,7 +126,7 @@ describe('geoguess game', () => {
     const aliceView = game.getPlayerView(state, 'p1', ctx);
     expect(aliceView.isWinner).toBe(true);
     expect(aliceView.drinks).toBe(false);
-    expect(aliceView.roundPoints).toBeGreaterThan(95);
+    expect(aliceView.roundPoints).toBe(1);
   });
 
   test('non-submitter scores nothing and no one drinks mid-game', async () => {
