@@ -11,29 +11,41 @@ function stepWeight(step: number, totalSteps: number): number {
   return 1 + WEIGHT_GROWTH * Math.pow(progress, WEIGHT_POWER);
 }
 
-export function computeStepDelayMs(step: number, totalSteps: number): number {
-  if (totalSteps <= 0) return TOTAL_SPIN_MS;
+function totalStepWeight(totalSteps: number): number {
   let totalWeight = 0;
   for (let i = 0; i < totalSteps; i++) {
     totalWeight += stepWeight(i, totalSteps);
   }
+  return totalWeight;
+}
+
+function stepDelayFromTotal(step: number, totalSteps: number, totalWeight: number): number {
   return Math.max(50, Math.round((TOTAL_SPIN_MS * stepWeight(step, totalSteps)) / totalWeight));
+}
+
+export function computeStepDelayMs(step: number, totalSteps: number): number {
+  if (totalSteps <= 0) return TOTAL_SPIN_MS;
+  return stepDelayFromTotal(step, totalSteps, totalStepWeight(totalSteps));
 }
 
 export function buildStepOffsetsMs(totalSteps: number): number[] {
   const offsets: number[] = [];
+  if (totalSteps <= 0) return offsets;
+  const totalWeight = totalStepWeight(totalSteps);
   let elapsed = 0;
   for (let i = 0; i < totalSteps; i++) {
     offsets.push(elapsed);
-    elapsed += computeStepDelayMs(i, totalSteps);
+    elapsed += stepDelayFromTotal(i, totalSteps, totalWeight);
   }
   return offsets;
 }
 
 export function totalSpinDurationMs(totalSteps: number): number {
+  if (totalSteps <= 0) return 0;
+  const totalWeight = totalStepWeight(totalSteps);
   let total = 0;
   for (let i = 0; i < totalSteps; i++) {
-    total += computeStepDelayMs(i, totalSteps);
+    total += stepDelayFromTotal(i, totalSteps, totalWeight);
   }
   return total;
 }
@@ -50,15 +62,6 @@ export interface RouletteSpinSchedule {
   startIndex: number;
   totalSteps: number;
   playerOrder: string[];
-}
-
-export interface RouletteState {
-  phase: RoulettePhase;
-  playerOrder: string[];
-  startIndex: number;
-  totalSteps: number;
-  spinStartAt: number;
-  selectedId: string | null;
 }
 
 export interface RouletteHostView {

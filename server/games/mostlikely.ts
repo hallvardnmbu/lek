@@ -1,7 +1,8 @@
 import type {
   MostLikelyHostView,
+  MostLikelyPhase,
   MostLikelyPlayerView,
-  MostLikelyState,
+  MostLikelyTallyEntry,
 } from '../../shared/games/mostlikely';
 import { cortiAgent, type PromptGenerator } from '../cortiModels';
 import type { GameContext, GameDefinition } from '../game';
@@ -9,12 +10,26 @@ import {
   allConnected,
   awardCappedScore,
   buildVoteTally,
-  connectedPlayers,
+  countConnectedActed,
   createRoomHistory,
   parseRounds,
   takeUnusedPrompt,
   withoutKey,
 } from './helpers';
+
+export interface MostLikelyState {
+  phase: MostLikelyPhase;
+  round: number;
+  totalRounds: number;
+  prompt: string | null;
+  promptIsAi: boolean;
+  votes: Record<string, string>;
+  tally: MostLikelyTallyEntry[];
+  drinkerIds: string[];
+  drinks: Record<string, number>;
+  aiPrompts: string[] | null;
+  fallbackPrompts: string[] | null;
+}
 
 const SYSTEM_PROMPT = [
   'You write prompts for the adult party drinking game "Most Likely To".',
@@ -32,7 +47,6 @@ const defaultGeneratePrompts = cortiAgent.createPromptGenerator({
   normalize: (p) => p.replace(PROMPT_PREFIX_RE, '').replace(/\?\s*$/, '').trim(),
 });
 
-const POLL_MS = 500;
 const VOTE_MS = 30_000;
 const REVEAL_MS = 10_000;
 const MIN_ROUNDS = 3;
@@ -95,9 +109,11 @@ function reveal(ctx: GameContext, state: MostLikelyState): MostLikelyState {
 }
 
 function voteCounts(ctx: GameContext, state: MostLikelyState) {
-  const connected = connectedPlayers(ctx);
-  const votedCount = connected.filter((p) => state.votes[p.id] !== undefined).length;
-  return { votedCount, connectedCount: connected.length };
+  const { acted: votedCount, total: connectedCount } = countConnectedActed(
+    ctx,
+    (id) => state.votes[id] !== undefined
+  );
+  return { votedCount, connectedCount };
 }
 
 function maybeReveal(ctx: GameContext, state: MostLikelyState): MostLikelyState {
@@ -112,7 +128,7 @@ function startRound(ctx: GameContext, state: MostLikelyState): MostLikelyState {
   const { text: prompt, isAi } = takeUnusedPrompt(
     ctx.roomCode,
     promptHistory,
-    state.aiInbox.prompts,
+    state.aiPrompts,
     fallbackRef,
     FALLBACK_PROMPTS
   );
@@ -167,26 +183,24 @@ export function createMostLikelyGame(
         tally: [],
         drinkerIds: [],
         drinks: {},
-        aiInbox: { prompts: null },
+        aiPrompts: null,
         fallbackPrompts: null,
       };
 
-      void generatePrompts(totalRounds, promptHistory.recent(ctx.roomCode)).then((prompts) => {
-        state.aiInbox.prompts = prompts;
-      });
+      void generatePrompts(totalRounds, promptHistory.recent(ctx.roomCode))
+        .catch(() => [])
+        .then((prompts) => {
+          ctx.dispatch<MostLikelyState>((current) => {
+            if (current.phase !== 'GENERATING') return;
+            current.aiPrompts = prompts;
+            return startRound(ctx, current);
+          });
+        });
 
-      ctx.setTimer(POLL_MS);
       return state;
     },
 
     onTimerExpired(ctx, state) {
-      if (state.phase === 'GENERATING') {
-        if (state.aiInbox.prompts !== null) {
-          return startRound(ctx, state);
-        }
-        ctx.setTimer(POLL_MS);
-        return state;
-      }
       return advancePhase(ctx, state);
     },
 

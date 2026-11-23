@@ -2,11 +2,20 @@ import {
   SPIN_LEAD_MS,
   totalSpinDurationMs,
   type RouletteHostView,
+  type RoulettePhase,
   type RoulettePlayerEntry,
   type RoulettePlayerView,
   type RouletteSpinSchedule,
-  type RouletteState,
 } from '../../shared/games/roulette';
+
+export interface RouletteState {
+  phase: RoulettePhase;
+  playerOrder: string[];
+  startIndex: number;
+  totalSteps: number;
+  spinStartAt: number;
+  selectedId: string | null;
+}
 import type { GameContext, GameDefinition } from '../game';
 import { awardCappedScore, connectedOrAllPlayers, playerName } from './helpers';
 
@@ -113,6 +122,27 @@ export const rouletteGame: GameDefinition<
 
   onHostAction(ctx, state, action) {
     return maybeRespin(ctx, state, action);
+  },
+
+  onPlayerLeave(ctx, state, playerId) {
+    const playerOrder = state.playerOrder.filter((id) => id !== playerId);
+    const selectedId = state.selectedId === playerId ? null : state.selectedId;
+    if (playerOrder.length === 0) {
+      ctx.clearTimer();
+      ctx.endGame();
+      return {
+        ...state,
+        phase: 'STOPPED',
+        playerOrder,
+        selectedId,
+      };
+    }
+    return {
+      ...state,
+      playerOrder,
+      startIndex: state.startIndex % playerOrder.length,
+      selectedId,
+    };
   },
 
   getHostView(state, ctx): RouletteHostView {

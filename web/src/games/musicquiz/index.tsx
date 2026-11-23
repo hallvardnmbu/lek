@@ -4,6 +4,7 @@ import {
   type MusicQuizPlayerView,
   type MusicQuizSong,
 } from '../../../../shared/games/musicquiz';
+import { PodiumList } from '../../components/tv/PodiumList';
 import { secondsLeft, type GameUiDefinition, type MobileGameViewProps, type TvGameViewProps } from '../registry';
 import { loadQuizCatalog, quizCatalog, songById } from './catalog';
 import './musicquiz.css';
@@ -120,20 +121,14 @@ function MusicQuizTvView(props: TvGameViewProps<MusicQuizHostView>) {
           </For>
         </div>
 
-        <div class="podium-list mq-standings">
-          <For each={standings()}>
-            {(player, idx) => (
-              <div class={`podium-row rank-${idx() + 1}`}>
-                <span class="rank-num">#{idx() + 1}</span>
-                <span class="podium-name">{player.name}</span>
-                <span class="podium-score">{player.score} pts</span>
-              </div>
-            )}
-          </For>
-        </div>
+        <PodiumList players={standings()} compact class="mq-standings" />
       </Show>
 
-      <div class="tv-action-bar mq-tv-actions">
+      <Show when={nextHint()}>
+        {(hint) => <p class="mq-next-hint">{hint()}</p>}
+      </Show>
+
+      <div class="tv-action-bar">
         <Show when={view()?.phase === 'GUESSING'}>
           <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'reveal' })}>
             Reveal Now
@@ -143,9 +138,6 @@ function MusicQuizTvView(props: TvGameViewProps<MusicQuizHostView>) {
           <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'next' })}>
             Finish
           </button>
-        </Show>
-        <Show when={nextHint()}>
-          {(hint) => <p class="mq-next-hint">{hint()}</p>}
         </Show>
         <button class="btn btn-tv" onClick={props.endGame}>
           End Game

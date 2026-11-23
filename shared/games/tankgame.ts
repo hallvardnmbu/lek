@@ -86,18 +86,6 @@ export interface TankGameElimination {
   at: number;
 }
 
-export interface TankGameState {
-  phase: TankGamePhase;
-  countdownEndsAt: number;
-  playingStartedAt: number;
-  tickAt: number;
-  nextBulletId: number;
-  tanks: Record<string, TankGameTank>;
-  bullets: TankGameBullet[];
-  inputs: Record<string, TankInput>;
-  eliminations: TankGameElimination[];
-}
-
 export interface TankGameHostView {
   phase: TankGamePhase;
   timeLeftMs: number;

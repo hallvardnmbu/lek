@@ -18,6 +18,18 @@ export function connectedOrAllPlayers(ctx: GameContext): GamePlayer[] {
   return connected.length > 0 ? connected : ctx.getPlayers();
 }
 
+export function countConnectedActed(
+  ctx: GameContext,
+  pred: (playerId: string) => boolean
+): { acted: number; total: number } {
+  const connected = connectedPlayers(ctx);
+  let acted = 0;
+  for (const p of connected) {
+    if (pred(p.id)) acted++;
+  }
+  return { acted, total: connected.length };
+}
+
 export function allConnected(ctx: GameContext, pred: (playerId: string) => boolean): boolean {
   const connected = connectedPlayers(ctx);
   return connected.length > 0 && connected.every((p) => pred(p.id));
@@ -67,7 +79,7 @@ export interface RoomHistory {
   recent(roomCode: string): string[];
 }
 
-export function createRoomHistory(maxRooms = 100, avoidWindow = 30): RoomHistory {
+export function createRoomHistory(maxRooms = 100, avoidWindow = 30, maxPerRoom = 200): RoomHistory {
   const history = new Map<string, string[]>();
 
   return {
@@ -78,6 +90,9 @@ export function createRoomHistory(maxRooms = 100, avoidWindow = 30): RoomHistory
       }
       const used = history.get(roomCode) ?? [];
       used.push(item.toLowerCase());
+      if (used.length > maxPerRoom) {
+        used.splice(0, used.length - maxPerRoom);
+      }
       history.set(roomCode, used);
     },
     isUsed(roomCode: string, item: string) {
@@ -89,18 +104,19 @@ export function createRoomHistory(maxRooms = 100, avoidWindow = 30): RoomHistory
   };
 }
 
-export function takeUnusedPrompt(
+export function takeUnusedItem<T>(
   roomCode: string,
   history: RoomHistory,
-  aiPool: string[] | null,
-  fallbackPoolRef: { current: string[] | null },
-  fallbacks: readonly string[]
-): { text: string; isAi: boolean } {
+  keyOf: (item: T) => string,
+  aiPool: T[] | null,
+  fallbackPoolRef: { current: T[] | null },
+  fallbacks: readonly T[]
+): { item: T; isAi: boolean } {
   if (aiPool) {
     while (aiPool.length > 0) {
       const candidate = aiPool.shift()!;
-      if (!history.isUsed(roomCode, candidate)) {
-        return { text: candidate, isAi: true };
+      if (!history.isUsed(roomCode, keyOf(candidate))) {
+        return { item: candidate, isAi: true };
       }
     }
   }
@@ -110,15 +126,33 @@ export function takeUnusedPrompt(
       fallbackPoolRef.current = shuffle(fallbacks);
     }
     const candidate = fallbackPoolRef.current.pop()!;
-    if (!history.isUsed(roomCode, candidate)) {
-      return { text: candidate, isAi: false };
+    if (!history.isUsed(roomCode, keyOf(candidate))) {
+      return { item: candidate, isAi: false };
     }
   }
 
   return {
-    text: fallbacks[Math.floor(Math.random() * fallbacks.length)],
+    item: fallbacks[Math.floor(Math.random() * fallbacks.length)],
     isAi: false,
   };
+}
+
+export function takeUnusedPrompt(
+  roomCode: string,
+  history: RoomHistory,
+  aiPool: string[] | null,
+  fallbackPoolRef: { current: string[] | null },
+  fallbacks: readonly string[]
+): { text: string; isAi: boolean } {
+  const { item, isAi } = takeUnusedItem(
+    roomCode,
+    history,
+    (text) => text,
+    aiPool,
+    fallbackPoolRef,
+    fallbacks
+  );
+  return { text: item, isAi };
 }
 
 export interface BaseVoteTally {

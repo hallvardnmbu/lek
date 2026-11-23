@@ -24,17 +24,17 @@ function CategoriesTvView(props: TvGameViewProps<CategoriesHostView>) {
       <Show
         when={host()?.phase !== 'GENERATING'}
         fallback={
-          <div class="cat-generating">
+          <div class="vote-generating">
             <div class="spinner" />
             <h1 class="tv-hero-title">Categories</h1>
             <p class="tv-hero-sub">Picking a category</p>
           </div>
         }
       >
-        <p class="eyebrow">
+        <p class="eyebrow vote-eyebrow">
           ROUND {host()?.round} OF {host()?.totalRounds}
           <Show when={host()?.categoryIsAi}>
-            <span class="cat-ai-tag">AI CATEGORY</span>
+            <span class="vote-ai-tag">AI CATEGORY</span>
           </Show>
         </p>
 
@@ -45,13 +45,13 @@ function CategoriesTvView(props: TvGameViewProps<CategoriesHostView>) {
           fallback={
             <>
               <TallyList entries={toTallyEntries(host()?.tally ?? [])} badgeLabel="FAILED" tone="danger" />
-              <p class="cat-next-hint">
+              <p class="vote-next-hint">
                 {host()?.continueCount}/{host()?.connectedCount} ready to continue
               </p>
             </>
           }
         >
-          <p class="cat-vote-progress">
+          <p class="vote-progress">
             {host()?.votedCount}/{host()?.connectedCount} voted who failed
           </p>
         </Show>
@@ -78,16 +78,16 @@ function CategoriesMobileView(props: MobileGameViewProps<CategoriesPlayerView>) 
 
   return (
     <div class="mobile-card cat-mobile">
-      <div class="cat-mobile-head">
+      <div class="vote-mobile-head">
         <span>
           Round {view()?.round}/{view()?.totalRounds}
         </span>
-        <span class="cat-score-count">{view()?.myScore ?? 0} pts</span>
+        <span class="vote-head-stat">{view()?.myScore ?? 0} pts</span>
       </div>
 
       <Show
         when={view()?.phase !== 'GENERATING'}
-        fallback={<p class="muted cat-waiting">Picking a category</p>}
+        fallback={<p class="muted vote-waiting">Picking a category</p>}
       >
         <p class="cat-mobile-eyebrow">CATEGORY</p>
         <h2 class="cat-mobile-category">{view()?.category}</h2>
@@ -104,25 +104,25 @@ function CategoriesMobileView(props: MobileGameViewProps<CategoriesPlayerView>) 
               </Show>
               <TallyList entries={toTallyEntries(view()?.tally ?? [])} badgeLabel="FAILED" tone="danger" compact />
               <button
-                class={`btn cat-continue-btn ${view()?.myContinueVote ? 'cat-voted' : ''}`}
+                class={`btn cat-continue-btn ${view()?.myContinueVote ? 'is-voted' : ''}`}
                 onClick={() => props.sendAction({ type: 'continue' })}
               >
                 {view()?.myContinueVote ? 'Ready for Next Category' : 'Continue'}
               </button>
-              <p class="muted cat-vote-tally">
+              <p class="muted vote-tally-note">
                 {view()?.continueCount}/{view()?.connectedCount} ready
               </p>
             </>
           }
         >
-          <p class="muted cat-vote-hint">
+          <p class="muted vote-hint">
             Go around until someone fails, then vote who failed.
           </p>
-          <div class="cat-candidates">
+          <div class="vote-candidates">
             <For each={view()?.candidates ?? []}>
               {(candidate) => (
                 <button
-                  class={`btn btn-block btn-vote cat-candidate ${view()?.myVote === candidate.id ? 'cat-voted' : ''}`}
+                  class={`btn btn-block btn-vote vote-candidate ${view()?.myVote === candidate.id ? 'is-voted' : ''}`}
                   onClick={() =>
                     props.sendAction({ type: 'vote', payload: { targetId: candidate.id } })
                   }
@@ -132,7 +132,7 @@ function CategoriesMobileView(props: MobileGameViewProps<CategoriesPlayerView>) 
               )}
             </For>
           </div>
-          <p class="muted cat-vote-tally">
+          <p class="muted vote-tally-note">
             {view()?.votedCount}/{view()?.connectedCount} voted
           </p>
         </Show>

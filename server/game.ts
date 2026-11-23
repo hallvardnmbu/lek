@@ -16,8 +16,9 @@ export interface GameContext {
   setPlayerScore(playerId: string, score: number): void;
   addPlayerScore(playerId: string, delta: number): void;
   setPlayerMeta(playerId: string, meta: Record<string, unknown>): void;
-  setTimer(durationMs: number): void;
+  setTimer(durationMs: number, showCountdown?: boolean): void;
   clearTimer(): void;
+  dispatch<TState = unknown>(fn: (state: TState) => TState | void): void;
   broadcastEvent(event: string, payload?: unknown): void;
   sendEventToHost(event: string, payload?: unknown): void;
   sendEventToPlayer(playerId: string, event: string, payload?: unknown): void;

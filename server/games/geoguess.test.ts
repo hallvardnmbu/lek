@@ -15,6 +15,8 @@ function makeContext(playersInput: Array<{ id: string; name: string; connected?:
 
   const events: Array<{ event: string; payload: unknown }> = [];
   let ended = false;
+  let currentState: any;
+  let timerCleared = false;
 
   const ctx: GameContext = {
     roomCode: 'ABCD',
@@ -29,8 +31,17 @@ function makeContext(playersInput: Array<{ id: string; name: string; connected?:
       if (p) p.score += delta;
     },
     setPlayerMeta: () => {},
-    setTimer: () => {},
-    clearTimer: () => {},
+    setTimer: () => {
+      timerCleared = false;
+    },
+    clearTimer: () => {
+      timerCleared = true;
+    },
+    dispatch: (fn) => {
+      if (currentState === undefined) return;
+      const next = fn(currentState);
+      if (next !== undefined) currentState = next;
+    },
     broadcastEvent: (event, payload) => {
       events.push({ event, payload });
     },
@@ -46,6 +57,10 @@ function makeContext(playersInput: Array<{ id: string; name: string; connected?:
     ctx,
     players,
     events,
+    setState: (s: unknown) => {
+      currentState = s;
+    },
+    isTimerCleared: () => timerCleared,
     isEnded: () => ended,
   };
 }
@@ -69,18 +84,22 @@ describe('geoguess game', () => {
 
   test('loads spot, accepts guesses and awards closeness points', async () => {
     const game = createGeoGuessGame(async () => TEST_SPOT);
-    const { ctx, players, events } = makeContext([
+    const { ctx, players, events, setState } = makeContext([
       { id: 'p1', name: 'Alice' },
       { id: 'p2', name: 'Bob' },
       { id: 'p3', name: 'Charlie' },
     ]);
 
     let state = game.onStart(ctx);
+    setState(state);
     expect(state.phase).toBe('LOADING');
     expect(state.totalRounds).toBe(5);
 
+    state = game.onHostAction!(ctx, state, { type: 'skip_spot' }) ?? state;
+    expect(state.phase).toBe('LOADING');
+    expect(state.round).toBe(1);
+
     await Promise.resolve();
-    state = game.onTimerExpired!(ctx, state) ?? state;
     expect(state.phase).toBe('GUESSING');
 
     const hostGuessing = game.getHostView(state, ctx);
@@ -131,14 +150,14 @@ describe('geoguess game', () => {
 
   test('non-submitter scores nothing and no one drinks mid-game', async () => {
     const game = createGeoGuessGame(async () => TEST_SPOT);
-    const { ctx, players } = makeContext([
+    const { ctx, players, setState } = makeContext([
       { id: 'p1', name: 'Alice' },
       { id: 'p2', name: 'Bob' },
     ]);
 
     let state = game.onStart(ctx);
+    setState(state);
     await Promise.resolve();
-    state = game.onTimerExpired!(ctx, state) ?? state;
 
     state = game.onPlayerAction(ctx, state, 'p1', {
       type: 'submit_guess',
@@ -157,11 +176,11 @@ describe('geoguess game', () => {
 
   test('host can advance to next round', async () => {
     const game = createGeoGuessGame(async () => TEST_SPOT);
-    const { ctx } = makeContext([{ id: 'p1', name: 'Alice' }]);
+    const { ctx, setState } = makeContext([{ id: 'p1', name: 'Alice' }]);
 
     let state = game.onStart(ctx);
+    setState(state);
     await Promise.resolve();
-    state = game.onTimerExpired!(ctx, state) ?? state;
     state = game.onPlayerAction(ctx, state, 'p1', {
       type: 'submit_guess',
       payload: { lat: 48.8, lng: 2.3 },
@@ -169,20 +188,21 @@ describe('geoguess game', () => {
     expect(state.phase).toBe('REVEAL');
 
     state = game.onHostAction!(ctx, state, { type: 'next_round' }) ?? state;
+    setState(state);
     expect(state.phase).toBe('LOADING');
     expect(state.round).toBe(2);
   });
 
   test('ends the game after the final round and the lowest score drinks', async () => {
     const game = createGeoGuessGame(async () => TEST_SPOT);
-    const { ctx, players, isEnded } = makeContext([
+    const { ctx, players, isEnded, setState } = makeContext([
       { id: 'p1', name: 'Alice' },
       { id: 'p2', name: 'Bob' },
     ]);
 
     let state = game.onStart(ctx);
+    setState(state);
     await Promise.resolve();
-    state = game.onTimerExpired!(ctx, state) ?? state;
 
     for (let round = 1; round <= 5; round++) {
       state = game.onPlayerAction(ctx, state, 'p1', {
@@ -198,9 +218,9 @@ describe('geoguess game', () => {
       if (round < 5) {
         expect(game.getHostView(state, ctx).drinkerName).toBeNull();
         state = game.onHostAction!(ctx, state, { type: 'next_round' }) ?? state;
+        setState(state);
         expect(state.phase).toBe('LOADING');
         await Promise.resolve();
-        state = game.onTimerExpired!(ctx, state) ?? state;
       }
     }
 

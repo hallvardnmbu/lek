@@ -3,9 +3,8 @@ import type { GameContext, GameDefinition } from '../game';
 import type {
   TankGameHostView,
   TankGamePlayerView,
-  TankGameState,
 } from '../../shared/games/tankgame';
-import { tankGame } from './tankgame';
+import { type TankGameState, tankGame } from './tankgame';
 
 type FullTankGame = Required<
   GameDefinition<TankGameState, TankGameHostView, TankGamePlayerView>
@@ -21,7 +20,7 @@ interface TestPlayer {
 
 function createTestCtx(players: TestPlayer[]) {
   const scores = new Map<string, number>();
-  const timers: number[] = [];
+  const timers: Array<{ ms: number; showCountdown?: boolean }> = [];
   let ended = false;
 
   const toGamePlayers = () =>
@@ -41,10 +40,11 @@ function createTestCtx(players: TestPlayer[]) {
     setPlayerScore: (id, score) => scores.set(id, score),
     addPlayerScore: (id, delta) => scores.set(id, (scores.get(id) ?? 0) + delta),
     setPlayerMeta: () => {},
-    setTimer: (ms) => {
-      timers.push(ms);
+    setTimer: (ms, showCountdown) => {
+      timers.push({ ms, showCountdown });
     },
     clearTimer: () => {},
+    dispatch: () => {},
     broadcastEvent: () => {},
     sendEventToHost: () => {},
     sendEventToPlayer: () => {},
@@ -58,7 +58,8 @@ function createTestCtx(players: TestPlayer[]) {
     ctx,
     scoreOf: (id: string) => scores.get(id) ?? 0,
     isEnded: () => ended,
-    lastTimer: () => timers[timers.length - 1],
+    lastTimer: () => timers[timers.length - 1]?.ms,
+    lastTimerCall: () => timers[timers.length - 1],
   };
 }
 
@@ -274,13 +275,13 @@ describe('tank battle', () => {
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
     ]);
-    expect(test.lastTimer()).toBeGreaterThan(100_000);
+    expect(test.lastTimerCall()).toEqual({ ms: 120_000, showCountdown: true });
 
     game.onPlayerAction(test.ctx, test.state, 'p1', {
       type: 'input',
       payload: { x: 1, y: 0 },
     });
-    expect(test.lastTimer()).toBe(50);
+    expect(test.lastTimerCall()).toEqual({ ms: 50, showCountdown: false });
 
     game.onPlayerAction(test.ctx, test.state, 'p1', {
       type: 'input',
@@ -288,5 +289,6 @@ describe('tank battle', () => {
     });
     tick(test.ctx, test.state);
     expect(test.lastTimer()).toBeGreaterThan(100_000);
+    expect(test.lastTimerCall()?.showCountdown).toBe(false);
   });
 });

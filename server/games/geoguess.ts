@@ -8,9 +8,8 @@ import type {
 } from '../../shared/games/geoguess';
 import type { GameContext, GameDefinition } from '../game';
 import { fetchRandomGeoSpot, type GeoSpot, type SpotFetcher } from './geoguess-spots';
-import { allConnected, awardCappedScore, connectedPlayers, playerName } from './helpers';
+import { allConnected, awardCappedScore, countConnectedActed, playerName } from './helpers';
 
-const POLL_MS = 120;
 const ROUND_DURATION_MS = 45_000;
 const TOTAL_ROUNDS = 5;
 const EARTH_RADIUS_KM = 6371;
@@ -34,12 +33,6 @@ interface GuessEntry {
   distanceKm: number;
 }
 
-interface GeoGuessInbox {
-  round: number;
-  spot?: GeoSpot;
-  error?: string;
-}
-
 interface GeoGuessState {
   phase: GeoGuessPhase;
   round: number;
@@ -51,7 +44,6 @@ interface GeoGuessState {
   winnerId: string | null;
   drinkerId: string | null;
   error: string | null;
-  inbox: GeoGuessInbox;
 }
 
 export function haversineKm(a: GeoPoint, b: GeoPoint): number {
@@ -91,22 +83,25 @@ function startRound(
   round: number,
   previousUsedIds: string[]
 ): GeoGuessState {
-  const inbox: GeoGuessInbox = { round };
   const usedIds = previousUsedIds.length >= 40 ? [] : [...previousUsedIds];
 
   fetcher(usedIds)
     .then((spot) => {
-      if (inbox.round === round) {
-        inbox.spot = spot;
-      }
+      ctx.dispatch<GeoGuessState>((state) => {
+        if (state.phase !== 'LOADING' || state.round !== round) return;
+        state.spot = spot;
+        state.usedIds.push(spot.id);
+        state.phase = 'GUESSING';
+        ctx.setTimer(ROUND_DURATION_MS);
+      });
     })
     .catch((err) => {
-      if (inbox.round === round) {
-        inbox.error = err instanceof Error ? err.message : 'Failed to load location.';
-      }
+      ctx.dispatch<GeoGuessState>((state) => {
+        if (state.phase !== 'LOADING' || state.round !== round) return;
+        state.error = err instanceof Error ? err.message : 'Failed to load location.';
+        ctx.clearTimer();
+      });
     });
-
-  ctx.setTimer(POLL_MS);
 
   return {
     phase: 'LOADING',
@@ -119,7 +114,6 @@ function startRound(
     winnerId: null,
     drinkerId: null,
     error: null,
-    inbox,
   };
 }
 
@@ -134,6 +128,19 @@ function advanceRound(
   }
   ctx.clearTimer();
   return startRound(ctx, fetcher, state.round + 1, state.usedIds);
+}
+
+function handleRoundAdvance(
+  ctx: GameContext,
+  fetcher: SpotFetcher,
+  state: GeoGuessState,
+  action: GeoGuessAction
+): GeoGuessState | null {
+  if (action.type !== 'next_round' && action.type !== 'skip_spot') return null;
+  if (state.phase === 'REVEAL' || (action.type === 'skip_spot' && state.phase !== 'LOADING')) {
+    return advanceRound(ctx, fetcher, state);
+  }
+  return state;
 }
 
 function revealRound(ctx: GameContext, state: GeoGuessState): void {
@@ -234,13 +241,8 @@ export function createGeoGuessGame(
 
     onPlayerAction(ctx, state, playerId, action) {
       const a = action as GeoGuessAction;
-
-      if (a.type === 'next_round' || a.type === 'skip_spot') {
-        if (state.phase === 'REVEAL' || (a.type === 'skip_spot' && state.phase !== 'LOADING')) {
-          return advanceRound(ctx, fetcher, state);
-        }
-        return state;
-      }
+      const advanced = handleRoundAdvance(ctx, fetcher, state, a);
+      if (advanced) return advanced;
 
       if (a.type !== 'submit_guess') return state;
       if (state.phase !== 'GUESSING' || !state.spot) return state;
@@ -266,29 +268,10 @@ export function createGeoGuessGame(
     },
 
     onHostAction(ctx, state, action) {
-      if (action.type === 'next_round' || action.type === 'skip_spot') {
-        return advanceRound(ctx, fetcher, state);
-      }
-      return state;
+      return handleRoundAdvance(ctx, fetcher, state, action) ?? state;
     },
 
     onTimerExpired(ctx, state) {
-      if (state.phase === 'LOADING') {
-        if (state.inbox.error) {
-          state.error = state.inbox.error;
-          return state;
-        }
-        if (state.inbox.spot) {
-          state.spot = state.inbox.spot;
-          state.usedIds.push(state.inbox.spot.id);
-          state.phase = 'GUESSING';
-          ctx.setTimer(ROUND_DURATION_MS);
-          return state;
-        }
-        ctx.setTimer(POLL_MS);
-        return state;
-      }
-
       if (state.phase === 'GUESSING') {
         revealRound(ctx, state);
       }
@@ -308,8 +291,9 @@ export function createGeoGuessGame(
     },
 
     getHostView(state, ctx): GeoGuessHostView {
-      const connected = connectedPlayers(ctx);
-      const lockedCount = connected.filter((p) => Boolean(state.guesses[p.id])).length;
+      const { acted: lockedCount, total: totalCount } = countConnectedActed(ctx, (id) =>
+        Boolean(state.guesses[id])
+      );
       const isReveal = state.phase === 'REVEAL';
 
       return {
@@ -320,7 +304,7 @@ export function createGeoGuessGame(
         spotLabel: isReveal ? (state.spot?.label ?? null) : null,
         target: isReveal ? (state.spot?.coords ?? null) : null,
         lockedCount,
-        totalCount: connected.length,
+        totalCount,
         players: buildResultEntries(ctx, state),
         winnerName: playerName(ctx, state.winnerId),
         drinkerName: playerName(ctx, state.drinkerId),

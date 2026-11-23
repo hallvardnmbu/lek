@@ -4,9 +4,8 @@ import type { PromptGenerator } from '../cortiModels';
 import type {
   MostLikelyHostView,
   MostLikelyPlayerView,
-  MostLikelyState,
 } from '../../shared/games/mostlikely';
-import { createMostLikelyGame } from './mostlikely';
+import { createMostLikelyGame, type MostLikelyState } from './mostlikely';
 
 type FullMostLikelyGame = Required<
   GameDefinition<MostLikelyState, MostLikelyHostView, MostLikelyPlayerView>
@@ -25,6 +24,7 @@ interface TestPlayer {
 function createTestCtx(roomCode: string, players: TestPlayer[]) {
   const scores = new Map<string, number>();
   let ended = false;
+  let currentState: MostLikelyState;
 
   const toGamePlayers = () =>
     players.map((p) => ({
@@ -46,6 +46,10 @@ function createTestCtx(roomCode: string, players: TestPlayer[]) {
     setPlayerMeta: () => {},
     setTimer: () => {},
     clearTimer: () => {},
+    dispatch: (fn) => {
+      const next = fn(currentState as never);
+      if (next !== undefined) currentState = next as MostLikelyState;
+    },
     broadcastEvent: () => {},
     sendEventToHost: () => {},
     sendEventToPlayer: () => {},
@@ -57,6 +61,11 @@ function createTestCtx(roomCode: string, players: TestPlayer[]) {
 
   return {
     ctx,
+    bindState: (s: MostLikelyState) => {
+      currentState = s;
+      return s;
+    },
+    getState: () => currentState,
     isEnded: () => ended,
     score: (id: string) => scores.get(id) ?? 0,
   };
@@ -72,15 +81,14 @@ const twoPlayers: TestPlayer[] = [
 describe('Most Likely To game', () => {
   it('runs generate -> vote -> reveal rounds and ends after totalRounds', async () => {
     const game = makeGame(async () => ['prompt a', 'prompt b', 'prompt c']);
-    const { ctx, isEnded, score } = createTestCtx('room-lifecycle', twoPlayers);
+    const { ctx, bindState, getState, isEnded, score } = createTestCtx('room-lifecycle', twoPlayers);
 
-    let state = game.onStart(ctx, { rounds: 3 });
+    let state = bindState(game.onStart(ctx, { rounds: 3 }));
     expect(state.phase).toBe('GENERATING');
     expect(state.totalRounds).toBe(3);
 
     await flush();
-
-    state = game.onTimerExpired(ctx, state)!;
+    state = getState();
     expect(state.phase).toBe('VOTING');
     expect(state.round).toBe(1);
     expect(state.prompt).toBe('prompt a');
@@ -127,36 +135,44 @@ describe('Most Likely To game', () => {
     expect(isEnded()).toBe(true);
   });
 
-  it('polls until prompts arrive and falls back to built-in prompts', async () => {
+  it('dispatches round start when prompts arrive asynchronously', async () => {
     const game = makeGame(
       () => new Promise<string[]>((resolve) => setTimeout(() => resolve(['late prompt']), 5))
     );
-    const { ctx } = createTestCtx('room-poll', twoPlayers);
+    const { ctx, bindState, getState } = createTestCtx('room-poll', twoPlayers);
 
-    let state = game.onStart(ctx, { rounds: 3 });
-    state = game.onTimerExpired(ctx, state)!;
+    let state = bindState(game.onStart(ctx, { rounds: 3 }));
     expect(state.phase).toBe('GENERATING');
 
     await flush();
-    state = game.onTimerExpired(ctx, state)!;
+    state = getState();
     expect(state.phase).toBe('VOTING');
     expect(state.prompt).toBe('late prompt');
     expect(state.promptIsAi).toBe(true);
   });
 
-  it('uses fallback prompts when the generator fails', async () => {
-    const game = makeGame(async () => []);
-    const { ctx } = createTestCtx('room-fallback', twoPlayers);
+  it('uses fallback prompts when the generator fails or rejects', async () => {
+    const emptyGame = makeGame(async () => []);
+    const emptyCtx = createTestCtx('room-fallback', twoPlayers);
 
-    let state = game.onStart(ctx);
-    expect(state.totalRounds).toBe(3);
+    emptyCtx.bindState(emptyGame.onStart(emptyCtx.ctx));
+    expect(emptyCtx.getState().totalRounds).toBe(3);
 
     await flush();
-    state = game.onTimerExpired(ctx, state)!;
-    expect(state.phase).toBe('VOTING');
-    expect(typeof state.prompt).toBe('string');
-    expect(state.prompt!.length).toBeGreaterThan(0);
-    expect(state.promptIsAi).toBe(false);
+    const emptyState = emptyCtx.getState();
+    expect(emptyState.phase).toBe('VOTING');
+    expect(typeof emptyState.prompt).toBe('string');
+    expect(emptyState.prompt!.length).toBeGreaterThan(0);
+    expect(emptyState.promptIsAi).toBe(false);
+
+    const rejectGame = makeGame(async () => {
+      throw new Error('boom');
+    });
+    const rejectCtx = createTestCtx('room-reject', twoPlayers);
+    rejectCtx.bindState(rejectGame.onStart(rejectCtx.ctx));
+    await flush();
+    expect(rejectCtx.getState().phase).toBe('VOTING');
+    expect(rejectCtx.getState().promptIsAi).toBe(false);
   });
 
   it('reveals on vote timer expiry with only partial votes', async () => {
@@ -166,11 +182,11 @@ describe('Most Likely To game', () => {
       { id: 'p2', name: 'Bob', connected: true },
       { id: 'p3', name: 'Carol', connected: true },
     ];
-    const { ctx, score } = createTestCtx('room-expiry', players);
+    const { ctx, bindState, getState, score } = createTestCtx('room-expiry', players);
 
-    let state = game.onStart(ctx, { rounds: 3 });
+    let state = bindState(game.onStart(ctx, { rounds: 3 }));
     await flush();
-    state = game.onTimerExpired(ctx, state)!;
+    state = getState();
 
     state = game.onPlayerAction(ctx, state, 'p1', { type: 'vote', payload: { targetId: 'p2' } })!;
     expect(state.phase).toBe('VOTING');
@@ -189,11 +205,11 @@ describe('Most Likely To game', () => {
       { id: 'p2', name: 'Bob', connected: true },
       { id: 'p3', name: 'Carol', connected: true },
     ];
-    const { ctx, score } = createTestCtx('room-votes', players);
+    const { ctx, bindState, getState, score } = createTestCtx('room-votes', players);
 
-    let state = game.onStart(ctx, { rounds: 3 });
+    let state = bindState(game.onStart(ctx, { rounds: 3 }));
     await flush();
-    state = game.onTimerExpired(ctx, state)!;
+    state = getState();
 
     state = game.onPlayerAction(ctx, state, 'p1', { type: 'vote', payload: { targetId: 'ghost' } })!;
     expect(state.votes).toEqual({});
@@ -215,11 +231,11 @@ describe('Most Likely To game', () => {
 
   it('awards all tied winners and caps score at 5 per game', async () => {
     const game = makeGame(async () => ['p1', 'p2', 'p3', 'p4', 'p5', 'p6']);
-    const { ctx, score } = createTestCtx('room-cap', twoPlayers);
+    const { ctx, bindState, getState, score } = createTestCtx('room-cap', twoPlayers);
 
-    let state = game.onStart(ctx, { rounds: 6 });
+    let state = bindState(game.onStart(ctx, { rounds: 6 }));
     await flush();
-    state = game.onTimerExpired(ctx, state)!;
+    state = getState();
 
     state = game.onPlayerAction(ctx, state, 'p1', { type: 'vote', payload: { targetId: 'p1' } })!;
     state = game.onPlayerAction(ctx, state, 'p2', { type: 'vote', payload: { targetId: 'p2' } })!;
@@ -242,11 +258,11 @@ describe('Most Likely To game', () => {
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
     ];
-    const { ctx } = createTestCtx('room-leave', players);
+    const { ctx, bindState, getState } = createTestCtx('room-leave', players);
 
-    let state = game.onStart(ctx, { rounds: 3 });
+    let state = bindState(game.onStart(ctx, { rounds: 3 }));
     await flush();
-    state = game.onTimerExpired(ctx, state)!;
+    state = getState();
 
     state = game.onPlayerAction(ctx, state, 'p1', { type: 'vote', payload: { targetId: 'p2' } })!;
     state = game.onPlayerLeave(ctx, state, 'p2')!;
@@ -260,14 +276,14 @@ describe('Most Likely To game', () => {
 
   it('never repeats a prompt within the same room across games', async () => {
     const game = makeGame(async () => ['same prompt', 'other prompt', 'third prompt']);
-    const { ctx } = createTestCtx('room-dupes', [
+    const { ctx, bindState, getState } = createTestCtx('room-dupes', [
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
     ]);
 
-    let state = game.onStart(ctx, { rounds: 3 });
+    let state = bindState(game.onStart(ctx, { rounds: 3 }));
     await flush();
-    state = game.onTimerExpired(ctx, state)!;
+    state = getState();
     expect(state.prompt).toBe('same prompt');
 
     for (let round = 0; round < 3; round++) {
@@ -275,9 +291,9 @@ describe('Most Likely To game', () => {
       state = game.onHostAction(ctx, state, { type: 'next' })!;
     }
 
-    const secondGame = game.onStart(ctx, { rounds: 3 });
+    bindState(game.onStart(ctx, { rounds: 3 }));
     await flush();
-    const round1 = game.onTimerExpired(ctx, secondGame)!;
+    const round1 = getState();
     expect(round1.promptIsAi).toBe(false);
     expect(round1.prompt).not.toBe('same prompt');
     expect(round1.prompt).not.toBe('other prompt');

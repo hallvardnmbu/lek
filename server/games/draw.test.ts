@@ -131,4 +131,61 @@ describe('drawGame', () => {
     const updated = manager.buildStateForClient(room).hostState as DrawHostView;
     expect(updated.prompterId).toBe(expectedNext);
   });
+
+  it('rejects votes for players who never submitted a drawing and cleans up on leave', () => {
+    const { manager, room, p1, p2 } = setupDrawRoom();
+    const p3 = manager.joinRoom(room.code, 'Cara');
+    if (!p3.ok) throw new Error('Failed to join Cara');
+
+    const initial = manager.buildStateForClient(room).hostState as DrawHostView;
+    manager.handleAction(
+      room.code,
+      { playerId: initial.prompterId },
+      { type: 'submit_prompt', payload: { text: 'Robot' } }
+    );
+
+    manager.handleAction(
+      room.code,
+      { playerId: p1.id },
+      { type: 'submit_drawing', payload: { imageData: 'data:image/jpeg;base64,AAA' } }
+    );
+    manager.handleAction(
+      room.code,
+      { playerId: p2.id },
+      { type: 'submit_drawing', payload: { imageData: 'data:image/jpeg;base64,BBB' } }
+    );
+
+    manager.leaveRoom(room.code, p3.player.id);
+    expect((manager.buildStateForClient(room).hostState as DrawHostView).phase).toBe('VOTING');
+
+    manager.handleAction(
+      room.code,
+      { playerId: p1.id },
+      { type: 'cast_vote', payload: { targetPlayerId: p3.player.id } }
+    );
+    expect((manager.buildStateForClient(room, p1.id).playerState as DrawPlayerView).hasVoted).toBe(
+      false
+    );
+
+    manager.handleAction(
+      room.code,
+      { playerId: p1.id },
+      { type: 'cast_vote', payload: { targetPlayerId: p2.id } }
+    );
+    manager.leaveRoom(room.code, p2.id);
+
+    const p1AfterLeave = manager.buildStateForClient(room, p1.id).playerState as DrawPlayerView;
+    expect(p1AfterLeave.hasVoted).toBe(false);
+  });
+
+  it('ends game if prompter disconnects during PROMPTING with no other connected players', () => {
+    const { manager, room, p1, p2 } = setupDrawRoom();
+    const initial = manager.buildStateForClient(room).hostState as DrawHostView;
+    const otherId = initial.prompterId === p1.id ? p2.id : p1.id;
+
+    manager.markPlayerDisconnected(room.code, otherId);
+    manager.markPlayerDisconnected(room.code, initial.prompterId);
+
+    expect(manager.buildStateForClient(room).phase).toBe('ENDED');
+  });
 });

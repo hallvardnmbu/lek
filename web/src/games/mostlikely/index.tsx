@@ -24,17 +24,17 @@ function MostLikelyTvView(props: TvGameViewProps<MostLikelyHostView>) {
       <Show
         when={host()?.phase !== 'GENERATING'}
         fallback={
-          <div class="ml-generating">
+          <div class="vote-generating">
             <div class="spinner" />
             <h1 class="tv-hero-title">Likely</h1>
             <p class="tv-hero-sub">Generating prompt</p>
           </div>
         }
       >
-        <p class="eyebrow">
+        <p class="eyebrow vote-eyebrow">
           ROUND {host()?.round} OF {host()?.totalRounds}
           <Show when={host()?.promptIsAi}>
-            <span class="ml-ai-tag">AI PROMPT</span>
+            <span class="vote-ai-tag">AI PROMPT</span>
           </Show>
         </p>
         <h1 class="ml-tv-prompt">
@@ -47,7 +47,7 @@ function MostLikelyTvView(props: TvGameViewProps<MostLikelyHostView>) {
           fallback={
             <>
               <TallyList entries={toTallyEntries(host()?.tally ?? [])} badgeLabel="DRINKS" />
-              <p class="ml-next-hint">
+              <p class="vote-next-hint">
                 <Show
                   when={(host()?.round ?? 0) < (host()?.totalRounds ?? 0)}
                   fallback="Final results next"
@@ -58,7 +58,7 @@ function MostLikelyTvView(props: TvGameViewProps<MostLikelyHostView>) {
             </>
           }
         >
-          <p class="ml-vote-progress">
+          <p class="vote-progress">
             {host()?.votedCount}/{host()?.connectedCount} voted, {secondsLeft(props.remainingMs)}s
           </p>
         </Show>
@@ -81,16 +81,16 @@ function MostLikelyMobileView(props: MobileGameViewProps<MostLikelyPlayerView>) 
 
   return (
     <div class="mobile-card">
-      <div class="ml-mobile-head">
+      <div class="vote-mobile-head">
         <span>
           Round {view()?.round}/{view()?.totalRounds}
         </span>
-        <span class="ml-drinks-count">{view()?.myDrinks ?? 0} drinks</span>
+        <span class="vote-head-stat">{view()?.myDrinks ?? 0} drinks</span>
       </div>
 
       <Show
         when={view()?.phase !== 'GENERATING'}
-        fallback={<p class="muted ml-scheming">Generating prompt</p>}
+        fallback={<p class="muted vote-waiting">Generating prompt</p>}
       >
         <h2 class="ml-mobile-prompt">Who is most likely to {view()?.prompt}?</h2>
 
@@ -105,14 +105,14 @@ function MostLikelyMobileView(props: MobileGameViewProps<MostLikelyPlayerView>) 
             </>
           }
         >
-          <p class="muted ml-vote-hint">
+          <p class="muted vote-hint">
             Tap the guilty one. You can change your mind until reveal.
           </p>
-          <div class="ml-candidates">
+          <div class="vote-candidates">
             <For each={view()?.candidates ?? []}>
               {(candidate) => (
                 <button
-                  class={`btn btn-block btn-vote ml-candidate ${view()?.myVote === candidate.id ? 'ml-voted' : ''}`}
+                  class={`btn btn-block btn-vote vote-candidate ${view()?.myVote === candidate.id ? 'is-voted' : ''}`}
                   onClick={() =>
                     props.sendAction({ type: 'vote', payload: { targetId: candidate.id } })
                   }
@@ -122,7 +122,7 @@ function MostLikelyMobileView(props: MobileGameViewProps<MostLikelyPlayerView>) 
               )}
             </For>
           </div>
-          <p class="muted ml-voted-progress">
+          <p class="muted vote-tally-note">
             {view()?.votedCount}/{view()?.connectedCount} voted
           </p>
         </Show>

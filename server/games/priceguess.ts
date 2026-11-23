@@ -7,26 +7,19 @@ import type {
   PriceGuessResultEntry,
 } from '../../shared/games/priceguess';
 import type { GameContext, GameDefinition } from '../game';
-import { allConnected, awardCappedScore, connectedPlayers, playerName } from './helpers';
+import { allConnected, awardCappedScore, countConnectedActed, playerName } from './helpers';
 import {
   fetchRandomProduct,
   type PriceGuessProduct,
   type ProductFetcher,
 } from './priceguess-db';
 
-const POLL_MS = 120;
 const ROUND_DURATION_MS = 30_000;
 const WIN_POINTS = 2;
 
 interface GuessEntry {
   price: number;
   diff: number;
-}
-
-interface PriceGuessInbox {
-  round: number;
-  product?: PriceGuessProduct;
-  error?: string;
 }
 
 interface PriceGuessState {
@@ -38,7 +31,6 @@ interface PriceGuessState {
   winnerId: string | null;
   drinkerId: string | null;
   error: string | null;
-  inbox: PriceGuessInbox;
 }
 
 function toProductInfo(product: PriceGuessProduct | null): PriceGuessProductInfo | null {
@@ -62,22 +54,25 @@ function startRound(
   round: number,
   previousUsedIds: string[]
 ): PriceGuessState {
-  const inbox: PriceGuessInbox = { round };
   const usedIds = previousUsedIds.length >= 100 ? [] : [...previousUsedIds];
 
   fetcher(usedIds)
     .then((product) => {
-      if (inbox.round === round) {
-        inbox.product = product;
-      }
+      ctx.dispatch<PriceGuessState>((state) => {
+        if (state.phase !== 'LOADING' || state.round !== round) return;
+        state.product = product;
+        state.usedIds.push(product.id);
+        state.phase = 'GUESSING';
+        ctx.setTimer(ROUND_DURATION_MS);
+      });
     })
     .catch((err) => {
-      if (inbox.round === round) {
-        inbox.error = err instanceof Error ? err.message : 'Failed to load product.';
-      }
+      ctx.dispatch<PriceGuessState>((state) => {
+        if (state.phase !== 'LOADING' || state.round !== round) return;
+        state.error = err instanceof Error ? err.message : 'Failed to load product.';
+        ctx.clearTimer();
+      });
     });
-
-  ctx.setTimer(POLL_MS);
 
   return {
     phase: 'LOADING',
@@ -88,8 +83,21 @@ function startRound(
     winnerId: null,
     drinkerId: null,
     error: null,
-    inbox,
   };
+}
+
+function handleRoundAdvance(
+  ctx: GameContext,
+  fetcher: ProductFetcher,
+  state: PriceGuessState,
+  action: PriceGuessAction
+): PriceGuessState | null {
+  if (action.type !== 'next_round' && action.type !== 'skip_product') return null;
+  if (state.phase === 'REVEAL' || (action.type === 'skip_product' && state.phase !== 'LOADING')) {
+    ctx.clearTimer();
+    return startRound(ctx, fetcher, state.round + 1, state.usedIds);
+  }
+  return state;
 }
 
 function revealRound(ctx: GameContext, state: PriceGuessState): void {
@@ -118,7 +126,7 @@ function revealRound(ctx: GameContext, state: PriceGuessState): void {
   if (activePlayers.length >= 2) {
     const nonSubmitters = activePlayers.filter((p) => !state.guesses[p.id]);
     if (nonSubmitters.length > 0) {
-      state.drinkerId = nonSubmitters[0].id;
+      state.drinkerId = nonSubmitters[Math.floor(Math.random() * nonSubmitters.length)].id;
     } else if (submitted.length >= 2) {
       state.drinkerId = submitted[submitted.length - 1].id;
     }
@@ -186,14 +194,8 @@ export function createPriceGuessGame(
 
     onPlayerAction(ctx, state, playerId, action) {
       const a = action as PriceGuessAction;
-
-      if (a.type === 'next_round' || a.type === 'skip_product') {
-        if (state.phase === 'REVEAL' || (a.type === 'skip_product' && state.phase !== 'LOADING')) {
-          ctx.clearTimer();
-          return startRound(ctx, fetcher, state.round + 1, state.usedIds);
-        }
-        return state;
-      }
+      const advanced = handleRoundAdvance(ctx, fetcher, state, a);
+      if (advanced) return advanced;
 
       if (a.type !== 'submit_guess') return state;
       if (state.phase !== 'GUESSING' || !state.product) return state;
@@ -211,30 +213,10 @@ export function createPriceGuessGame(
     },
 
     onHostAction(ctx, state, action) {
-      if (action.type === 'next_round' || action.type === 'skip_product') {
-        ctx.clearTimer();
-        return startRound(ctx, fetcher, state.round + 1, state.usedIds);
-      }
-      return state;
+      return handleRoundAdvance(ctx, fetcher, state, action) ?? state;
     },
 
     onTimerExpired(ctx, state) {
-      if (state.phase === 'LOADING') {
-        if (state.inbox.error) {
-          state.error = state.inbox.error;
-          return state;
-        }
-        if (state.inbox.product) {
-          state.product = state.inbox.product;
-          state.usedIds.push(state.inbox.product.id);
-          state.phase = 'GUESSING';
-          ctx.setTimer(ROUND_DURATION_MS);
-          return state;
-        }
-        ctx.setTimer(POLL_MS);
-        return state;
-      }
-
       if (state.phase === 'GUESSING') {
         revealRound(ctx, state);
       }
@@ -254,8 +236,9 @@ export function createPriceGuessGame(
     },
 
     getHostView(state, ctx): PriceGuessHostView {
-      const connected = connectedPlayers(ctx);
-      const lockedCount = connected.filter((p) => Boolean(state.guesses[p.id])).length;
+      const { acted: lockedCount, total: totalCount } = countConnectedActed(ctx, (id) =>
+        Boolean(state.guesses[id])
+      );
       const isReveal = state.phase === 'REVEAL';
 
       return {
@@ -264,7 +247,7 @@ export function createPriceGuessGame(
         product: toProductInfo(state.product),
         actualPrice: isReveal && state.product ? roundMoney(state.product.price) : null,
         lockedCount,
-        totalCount: connected.length,
+        totalCount,
         players: buildResultEntries(ctx, state),
         winnerName: playerName(ctx, state.winnerId),
         drinkerName: playerName(ctx, state.drinkerId),

@@ -144,13 +144,17 @@ export function sanitizeWikiHtml(rawHtml: string): { html: string; links: string
   };
 }
 
-function setCachedArticle(requestedTitle: string, article: WikiArticle): void {
-  if (articleCache.size >= CACHE_LIMIT) {
+function cacheSet(key: string, article: WikiArticle): void {
+  if (!articleCache.has(key) && articleCache.size >= CACHE_LIMIT) {
     const oldest = articleCache.keys().next().value;
     if (oldest !== undefined) articleCache.delete(oldest);
   }
-  articleCache.set(normalizeTitle(requestedTitle), article);
-  articleCache.set(normalizeTitle(article.title), article);
+  articleCache.set(key, article);
+}
+
+function setCachedArticle(requestedTitle: string, article: WikiArticle): void {
+  cacheSet(normalizeTitle(requestedTitle), article);
+  cacheSet(normalizeTitle(article.title), article);
 }
 
 export async function fetchWikiArticle(

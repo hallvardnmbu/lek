@@ -1,13 +1,36 @@
 import type {
+  QuizAnswer,
   QuizHostView,
+  QuizPhase,
   QuizPlayerView,
   QuizQuestion,
   QuizRevealEntry,
-  QuizState,
 } from '../../shared/games/quiz';
 import { cortiAgent } from '../cortiModels';
 import type { GameContext, GameDefinition } from '../game';
-import { awardCappedScore, connectedPlayers, createRoomHistory, playerName, shuffle, withoutKey } from './helpers';
+import {
+  awardCappedScore,
+  connectedPlayers,
+  createRoomHistory,
+  playerName,
+  shuffle,
+  takeUnusedItem,
+  withoutKey,
+} from './helpers';
+
+export interface QuizState {
+  phase: QuizPhase;
+  questionNumber: number;
+  questions: QuizQuestion[];
+  answers: Record<string, QuizAnswer>;
+  aliveIds: string[];
+  results: QuizRevealEntry[];
+  allWrong: boolean;
+  aiQuestions: QuizQuestion[];
+  aiFailed: boolean;
+  pendingBatch: boolean;
+  fallbackPool: QuizQuestion[] | null;
+}
 
 export type QuestionGenerator = (count: number, avoid?: string[]) => Promise<QuizQuestion[]>;
 
@@ -107,7 +130,6 @@ export const FALLBACK_QUESTIONS: readonly QuizQuestion[] = [
   { question: 'Hvor mange spillere har et fotballag på banen?', options: ['9', '11', '10', '12'], correctIndex: 1 },
 ];
 
-const POLL_MS = 500;
 const QUESTION_MS = 30_000;
 const REVEAL_MS = 8_000;
 const BATCH_SIZE = 10;
@@ -135,27 +157,17 @@ function reshuffleOptions(question: QuizQuestion): QuizQuestion {
 }
 
 function takeQuestion(roomCode: string, state: QuizState): QuizQuestion {
-  const inbox = state.aiInbox.questions;
-  if (inbox !== null) {
-    while (inbox.length > 0) {
-      const candidate = inbox.shift()!;
-      if (!questionHistory.isUsed(roomCode, candidate.question)) return candidate;
-    }
-  }
-
-  for (let attempt = 0; attempt < FALLBACK_QUESTIONS.length; attempt++) {
-    if (!state.fallbackPool || state.fallbackPool.length === 0) {
-      state.fallbackPool = shuffle(FALLBACK_QUESTIONS);
-    }
-    const candidate = state.fallbackPool.pop()!;
-    if (!questionHistory.isUsed(roomCode, candidate.question)) {
-      return reshuffleOptions(candidate);
-    }
-  }
-
-  return reshuffleOptions(
-    FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)]
+  const fallbackRef = { current: state.fallbackPool };
+  const { item, isAi } = takeUnusedItem(
+    roomCode,
+    questionHistory,
+    (q) => q.question,
+    state.aiQuestions,
+    fallbackRef,
+    FALLBACK_QUESTIONS
   );
+  state.fallbackPool = fallbackRef.current;
+  return isAi ? item : reshuffleOptions(item);
 }
 
 function maybeKickBackgroundBatch(
@@ -163,15 +175,27 @@ function maybeKickBackgroundBatch(
   state: QuizState,
   generateQuestions: QuestionGenerator
 ): void {
-  const stock = state.aiInbox.questions?.length ?? 0;
-  if (state.questionNumber < PREFETCH_AT || state.pendingBatch || stock > BATCH_SIZE - PREFETCH_AT) {
+  if (
+    state.aiFailed ||
+    state.questionNumber < PREFETCH_AT ||
+    state.pendingBatch ||
+    state.aiQuestions.length > BATCH_SIZE - PREFETCH_AT
+  ) {
     return;
   }
   state.pendingBatch = true;
-  void generateQuestions(BATCH_SIZE, questionHistory.recent(ctx.roomCode)).then((batch) => {
-    state.aiInbox.questions = [...(state.aiInbox.questions ?? []), ...batch];
-    state.pendingBatch = false;
-  });
+  void generateQuestions(BATCH_SIZE, questionHistory.recent(ctx.roomCode))
+    .catch(() => [])
+    .then((batch) => {
+      ctx.dispatch<QuizState>((current) => {
+        current.pendingBatch = false;
+        if (batch.length === 0) {
+          current.aiFailed = true;
+          return;
+        }
+        current.aiQuestions = [...current.aiQuestions, ...batch];
+      });
+    });
 }
 
 function serveNextQuestion(
@@ -202,6 +226,10 @@ function reveal(ctx: GameContext, state: QuizState): QuizState {
   if (!question) return state;
 
   const connected = aliveConnectedIds(ctx, state);
+  if (connected.length === 0) {
+    finishGame(ctx, state);
+    return state;
+  }
   const results: QuizRevealEntry[] = connected.map((id) => {
     const answer = state.answers[id];
     return {
@@ -294,31 +322,37 @@ export function createQuizGame(
         aliveIds: connectedPlayers(ctx).map((p) => p.id),
         results: [],
         allWrong: false,
-        aiInbox: { questions: null },
+        aiQuestions: [],
+        aiFailed: false,
         pendingBatch: false,
         fallbackPool: null,
       };
 
-      void generateQuestions(BATCH_SIZE, questionHistory.recent(ctx.roomCode)).then((batch) => {
-        state.aiInbox.questions = batch;
-      });
+      void generateQuestions(BATCH_SIZE, questionHistory.recent(ctx.roomCode))
+        .catch(() => [])
+        .then((batch) => {
+          ctx.dispatch<QuizState>((current) => {
+            if (current.phase !== 'GENERATING') return;
+            if (batch.length === 0) {
+              current.aiFailed = true;
+            } else {
+              current.aiQuestions = batch;
+            }
+            return serveNextQuestion(ctx, current, generateQuestions);
+          });
+        });
 
-      ctx.setTimer(POLL_MS);
       return state;
     },
 
     onTimerExpired(ctx, state) {
-      if (state.phase === 'GENERATING') {
-        if (state.aiInbox.questions === null) {
-          ctx.setTimer(POLL_MS);
-          return state;
-        }
-        return serveNextQuestion(ctx, state, generateQuestions);
-      }
       if (state.phase === 'QUESTION') {
         return reveal(ctx, state);
       }
-      return serveNextQuestion(ctx, state, generateQuestions);
+      if (state.phase === 'REVEAL') {
+        return serveNextQuestion(ctx, state, generateQuestions);
+      }
+      return state;
     },
 
     onPlayerAction(ctx, state, playerId, action) {

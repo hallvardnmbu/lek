@@ -1,8 +1,9 @@
 import type {
   CategoriesCandidate,
   CategoriesHostView,
+  CategoriesPhase,
   CategoriesPlayerView,
-  CategoriesState,
+  CategoriesTallyEntry,
 } from '../../shared/games/categories';
 import { cortiAgent, type PromptGenerator } from '../cortiModels';
 import type { GameContext, GameDefinition } from '../game';
@@ -10,12 +11,26 @@ import {
   allConnected,
   awardCappedScore,
   buildVoteTally,
-  connectedPlayers,
+  countConnectedActed,
   createRoomHistory,
   parseRounds,
   takeUnusedPrompt,
   withoutKey,
 } from './helpers';
+
+export interface CategoriesState {
+  phase: CategoriesPhase;
+  round: number;
+  totalRounds: number;
+  category: string | null;
+  categoryIsAi: boolean;
+  votes: Record<string, string>;
+  continueVotes: Record<string, boolean>;
+  tally: CategoriesTallyEntry[];
+  failedIds: string[];
+  aiCategories: string[] | null;
+  fallbackCategories: string[] | null;
+}
 
 const SYSTEM_PROMPT = [
   'You generate categories for the spoken party game "Categories".',
@@ -33,7 +48,6 @@ const defaultGenerateCategories = cortiAgent.createPromptGenerator({
   normalize: (p) => p.replace(/\.+$/, '').trim(),
 });
 
-const POLL_MS = 500;
 const MIN_ROUNDS = 1;
 const MAX_ROUNDS = 20;
 const DEFAULT_ROUNDS = 3;
@@ -101,7 +115,7 @@ function startRound(ctx: GameContext, state: CategoriesState): CategoriesState {
   const { text: category, isAi } = takeUnusedPrompt(
     ctx.roomCode,
     categoryHistory,
-    state.aiInbox.categories,
+    state.aiCategories,
     fallbackRef,
     FALLBACK_CATEGORIES
   );
@@ -128,12 +142,15 @@ function nextRound(ctx: GameContext, state: CategoriesState): CategoriesState {
 }
 
 function viewCounts(ctx: GameContext, state: CategoriesState) {
-  const connected = connectedPlayers(ctx);
-  return {
-    votedCount: connected.filter((p) => state.votes[p.id] !== undefined).length,
-    continueCount: connected.filter((p) => state.continueVotes[p.id] === true).length,
-    connectedCount: connected.length,
-  };
+  const { acted: votedCount, total: connectedCount } = countConnectedActed(
+    ctx,
+    (id) => state.votes[id] !== undefined
+  );
+  const { acted: continueCount } = countConnectedActed(
+    ctx,
+    (id) => state.continueVotes[id] === true
+  );
+  return { votedCount, continueCount, connectedCount };
 }
 
 function advanceIfReady(ctx: GameContext, state: CategoriesState): CategoriesState {
@@ -169,24 +186,20 @@ export function createCategoriesGame(
         continueVotes: {},
         tally: [],
         failedIds: [],
-        aiInbox: { categories: null },
+        aiCategories: null,
         fallbackCategories: null,
       };
 
-      void generateCategories(totalRounds, categoryHistory.recent(ctx.roomCode)).then((categories) => {
-        state.aiInbox.categories = categories;
-      });
+      void generateCategories(totalRounds, categoryHistory.recent(ctx.roomCode))
+        .catch(() => [])
+        .then((categories) => {
+          ctx.dispatch<CategoriesState>((current) => {
+            if (current.phase !== 'GENERATING') return;
+            current.aiCategories = categories;
+            return startRound(ctx, current);
+          });
+        });
 
-      ctx.setTimer(POLL_MS);
-      return state;
-    },
-
-    onTimerExpired(ctx, state) {
-      if (state.phase !== 'GENERATING') return state;
-      if (state.aiInbox.categories !== null) {
-        return startRound(ctx, state);
-      }
-      ctx.setTimer(POLL_MS);
       return state;
     },
 

@@ -24,10 +24,9 @@
 }
 
 .roulette-tv-chip.is-selected {
-  background: var(--bg);
+  background: var(--danger);
   color: #ffffff;
   border-color: #ffffff;
-  animation: roulette-red-flash 0.5s steps(1, end) infinite;
 }
 
 .roulette-tv-winner {
@@ -35,13 +34,6 @@
   font-weight: 900;
   color: #ff3b3b;
   margin: 0.5rem 0;
-}
-
-.roulette-tv-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-  margin-top: 1rem;
 }
 
 .roulette-screen {
@@ -70,20 +62,6 @@
 .roulette-screen-red {
   background: var(--bg);
   color: #ffffff;
-  animation: roulette-red-flash 0.5s steps(1, end) infinite;
-}
-
-@keyframes roulette-red-flash {
-  0%,
-  49% {
-    background: var(--bg);
-    color: #ffffff;
-  }
-  50%,
-  100% {
-    background: #ffffff;
-    color: var(--bg);
-  }
 }
 
 .roulette-screen-label {

@@ -132,10 +132,10 @@ function DrawTvView(props: TvGameViewProps<DrawHostView>) {
               </div>
 
               <div class="tv-action-bar">
-                <button class="btn btn-lg" onClick={() => props.sendAction({ type: 'next_round' })}>
+                <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'next_round' })}>
                   Next Round
                 </button>
-                <button class="btn btn-lg" onClick={props.endGame}>
+                <button class="btn btn-tv" onClick={props.endGame}>
                   End Game
                 </button>
               </div>

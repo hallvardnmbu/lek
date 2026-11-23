@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import type { GameContext, GameDefinition } from '../game';
-import type { QuizHostView, QuizPlayerView, QuizQuestion, QuizState } from '../../shared/games/quiz';
-import type { QuestionGenerator } from './quiz';
+import type { QuizHostView, QuizPlayerView, QuizQuestion } from '../../shared/games/quiz';
+import type { QuestionGenerator, QuizState } from './quiz';
 import { createQuizGame, FALLBACK_QUESTIONS } from './quiz';
 
 type FullQuizGame = Required<GameDefinition<QuizState, QuizHostView, QuizPlayerView>>;
@@ -15,6 +15,7 @@ interface TestPlayer {
 function createTestCtx(roomCode: string, players: TestPlayer[]) {
   const scores = new Map<string, number>();
   let ended = false;
+  let currentState: QuizState;
 
   const toGamePlayers = () =>
     players.map((p) => ({
@@ -36,6 +37,10 @@ function createTestCtx(roomCode: string, players: TestPlayer[]) {
     setPlayerMeta: () => {},
     setTimer: () => {},
     clearTimer: () => {},
+    dispatch: (fn) => {
+      const next = fn(currentState as never);
+      if (next !== undefined) currentState = next as QuizState;
+    },
     broadcastEvent: () => {},
     sendEventToHost: () => {},
     sendEventToPlayer: () => {},
@@ -47,6 +52,11 @@ function createTestCtx(roomCode: string, players: TestPlayer[]) {
 
   return {
     ctx,
+    bindState: (s: QuizState) => {
+      currentState = s;
+      return s;
+    },
+    getState: () => currentState,
     isEnded: () => ended,
     score: (id: string) => scores.get(id) ?? 0,
   };
@@ -77,14 +87,14 @@ describe('Quiz game', () => {
       { id: 'p2', name: 'Bob', connected: true },
       { id: 'p3', name: 'Carol', connected: true },
     ];
-    const { ctx, isEnded, score } = createTestCtx('quiz-lifecycle', players);
+    const { ctx, bindState, getState, isEnded, score } = createTestCtx('quiz-lifecycle', players);
 
-    let state = game.onStart(ctx)!;
+    let state = bindState(game.onStart(ctx)!);
     expect(state.phase).toBe('GENERATING');
     expect(state.aliveIds).toEqual(['p1', 'p2', 'p3']);
 
     await flush();
-    state = game.onTimerExpired(ctx, state)!;
+    state = getState();
     expect(state.phase).toBe('QUESTION');
     expect(state.questionNumber).toBe(1);
 
@@ -131,11 +141,11 @@ describe('Quiz game', () => {
       { id: 'p3', name: 'Carol', connected: true },
       { id: 'p4', name: 'Dave', connected: true },
     ];
-    const { ctx } = createTestCtx('quiz-multi-out', players);
+    const { ctx, bindState, getState } = createTestCtx('quiz-multi-out', players);
 
-    let state = game.onStart(ctx)!;
+    let state = bindState(game.onStart(ctx)!);
     await flush();
-    state = game.onTimerExpired(ctx, state)!;
+    state = getState();
 
     state = answer(game, ctx, state, 'p1', 0);
     state = answer(game, ctx, state, 'p2', 1);
@@ -155,11 +165,11 @@ describe('Quiz game', () => {
       { id: 'p2', name: 'Bob', connected: true },
       { id: 'p3', name: 'Carol', connected: true },
     ];
-    const { ctx, isEnded, score } = createTestCtx('quiz-timeout', players);
+    const { ctx, bindState, getState, isEnded, score } = createTestCtx('quiz-timeout', players);
 
-    let state = game.onStart(ctx)!;
+    let state = bindState(game.onStart(ctx)!);
     await flush();
-    state = game.onTimerExpired(ctx, state)!;
+    state = getState();
 
     state = answer(game, ctx, state, 'p1', 0);
     state = answer(game, ctx, state, 'p2', 1);
@@ -181,11 +191,11 @@ describe('Quiz game', () => {
       { id: 'p2', name: 'Bob', connected: true },
       { id: 'p3', name: 'Carol', connected: true },
     ];
-    const { ctx } = createTestCtx('quiz-answers', players);
+    const { ctx, bindState, getState } = createTestCtx('quiz-answers', players);
 
-    let state = game.onStart(ctx)!;
+    let state = bindState(game.onStart(ctx)!);
     await flush();
-    state = game.onTimerExpired(ctx, state)!;
+    state = getState();
 
     state = answer(game, ctx, state, 'p1', 0);
     expect(state.answers.p1.optionIndex).toBe(0);
@@ -221,11 +231,11 @@ describe('Quiz game', () => {
       { id: 'p2', name: 'Bob', connected: true },
       { id: 'p3', name: 'Carol', connected: true },
     ];
-    const { ctx } = createTestCtx('quiz-prefetch', players);
+    const { ctx, bindState, getState } = createTestCtx('quiz-prefetch', players);
 
-    let state = game.onStart(ctx)!;
+    let state = bindState(game.onStart(ctx)!);
     await flush();
-    state = game.onTimerExpired(ctx, state)!;
+    state = getState();
     expect(calls).toBe(1);
 
     for (let round = 1; round <= 7; round++) {
@@ -242,7 +252,7 @@ describe('Quiz game', () => {
 
     await flush();
     expect(state.pendingBatch).toBe(false);
-    expect(state.aiInbox.questions!.length).toBe(12);
+    expect(state.aiQuestions.length).toBe(12);
 
     state = answer(game, ctx, state, 'p1', 0);
     state = answer(game, ctx, state, 'p2', 0);
@@ -264,60 +274,82 @@ describe('Quiz game', () => {
     expect(state.questions[10].question).toBe('batch2 1');
   });
 
-  it('polls until the first batch arrives and serves question 1', async () => {
+  it('dispatches question 1 when the first batch arrives asynchronously', async () => {
     const game = createQuizGame(
       () => new Promise<QuizQuestion[]>((resolve) => setTimeout(() => resolve(makeQuestions(10, 'q')), 5))
     ) as FullQuizGame;
-    const { ctx } = createTestCtx('quiz-poll', [
+    const { ctx, bindState, getState } = createTestCtx('quiz-poll', [
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
     ]);
 
-    let state = game.onStart(ctx)!;
-    state = game.onTimerExpired(ctx, state)!;
+    let state = bindState(game.onStart(ctx)!);
     expect(state.phase).toBe('GENERATING');
 
     await flush();
-    state = game.onTimerExpired(ctx, state)!;
+    state = getState();
     expect(state.phase).toBe('QUESTION');
     expect(state.questionNumber).toBe(1);
     expect(state.questions[0].question).toBe('q 1');
   });
 
-  it('falls back to built-in Norwegian questions when the generator fails', async () => {
-    const game = createQuizGame(async () => []) as FullQuizGame;
-    const { ctx } = createTestCtx('quiz-fallback', [
+  it('falls back to built-in Norwegian questions when the generator fails or rejects', async () => {
+    let calls = 0;
+    const game = createQuizGame(async () => {
+      calls += 1;
+      return [];
+    }) as FullQuizGame;
+    const { ctx, bindState, getState } = createTestCtx('quiz-fallback', [
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
     ]);
 
-    let state = game.onStart(ctx)!;
+    let state = bindState(game.onStart(ctx)!);
     await flush();
-    state = game.onTimerExpired(ctx, state)!;
+    state = getState();
 
     expect(state.phase).toBe('QUESTION');
+    expect(state.aiFailed).toBe(true);
     const served = state.questions[0];
     const original = FALLBACK_QUESTIONS.find((f) => f.question === served.question);
     expect(original).toBeDefined();
     expect(served.options.length).toBe(4);
     expect(served.options[served.correctIndex]).toBe(original!.options[original!.correctIndex]);
+
+    for (let round = 1; round <= 9; round++) {
+      state = game.onHostAction(ctx, state, { type: 'next' })!;
+      state = game.onHostAction(ctx, state, { type: 'next' })!;
+    }
+    expect(calls).toBe(1);
+
+    const rejectGame = createQuizGame(async () => {
+      throw new Error('boom');
+    }) as FullQuizGame;
+    const rejectCtx = createTestCtx('quiz-reject', [
+      { id: 'p1', name: 'Alice', connected: true },
+      { id: 'p2', name: 'Bob', connected: true },
+    ]);
+    rejectCtx.bindState(rejectGame.onStart(rejectCtx.ctx)!);
+    await flush();
+    expect(rejectCtx.getState().phase).toBe('QUESTION');
+    expect(rejectCtx.getState().aiFailed).toBe(true);
   });
 
   it('skips questions already used in the same room', async () => {
     const game = createQuizGame(async () => makeQuestions(10, 'q')) as FullQuizGame;
-    const { ctx } = createTestCtx('quiz-norepeat', [
+    const { ctx, bindState, getState } = createTestCtx('quiz-norepeat', [
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
     ]);
 
-    const first = game.onStart(ctx)!;
+    bindState(game.onStart(ctx)!);
     await flush();
-    let state = game.onTimerExpired(ctx, first)!;
+    let state = getState();
     expect(state.questions[0].question).toBe('q 1');
 
-    const second = game.onStart(ctx)!;
+    bindState(game.onStart(ctx)!);
     await flush();
-    state = game.onTimerExpired(ctx, second)!;
+    state = getState();
     expect(state.phase).toBe('QUESTION');
     expect(state.questions[0].question).not.toBe('q 1');
   });
@@ -329,11 +361,11 @@ describe('Quiz game', () => {
       { id: 'p2', name: 'Bob', connected: true },
       { id: 'p3', name: 'Carol', connected: true },
     ];
-    const { ctx, score } = createTestCtx('quiz-disconnect', players);
+    const { ctx, bindState, getState, score } = createTestCtx('quiz-disconnect', players);
 
-    let state = game.onStart(ctx)!;
+    let state = bindState(game.onStart(ctx)!);
     await flush();
-    state = game.onTimerExpired(ctx, state)!;
+    state = getState();
 
     state = answer(game, ctx, state, 'p1', 0);
     state = answer(game, ctx, state, 'p2', 1);
@@ -347,6 +379,24 @@ describe('Quiz game', () => {
     expect(state.results.some((r) => r.playerId === 'p3')).toBe(false);
   });
 
+  it('ends the game cleanly on reveal when no alive players are connected', async () => {
+    const game = createQuizGame(async () => makeQuestions(10, 'q')) as FullQuizGame;
+    const players: TestPlayer[] = [
+      { id: 'p1', name: 'Alice', connected: true },
+      { id: 'p2', name: 'Bob', connected: true },
+    ];
+    const { ctx, bindState, getState, isEnded } = createTestCtx('quiz-all-dc', players);
+
+    let state = bindState(game.onStart(ctx)!);
+    await flush();
+    state = getState();
+
+    players[0].connected = false;
+    players[1].connected = false;
+    game.onTimerExpired(ctx, state);
+    expect(isEnded()).toBe(true);
+  });
+
   it('ends the game with a winner bonus when players leave until one remains', async () => {
     const game = createQuizGame(async () => makeQuestions(10, 'q')) as FullQuizGame;
     const players: TestPlayer[] = [
@@ -354,11 +404,11 @@ describe('Quiz game', () => {
       { id: 'p2', name: 'Bob', connected: true },
       { id: 'p3', name: 'Carol', connected: true },
     ];
-    const { ctx, isEnded, score } = createTestCtx('quiz-leave', players);
+    const { ctx, bindState, getState, isEnded, score } = createTestCtx('quiz-leave', players);
 
-    let state = game.onStart(ctx)!;
+    let state = bindState(game.onStart(ctx)!);
     await flush();
-    state = game.onTimerExpired(ctx, state)!;
+    state = getState();
 
     state = answer(game, ctx, state, 'p1', 0);
     state = game.onPlayerLeave(ctx, state, 'p2')!;

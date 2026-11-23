@@ -26,7 +26,7 @@ function GeoGuessTvView(props: TvGameViewProps<GeoGuessHostView>) {
 
   return (
     <div class="tv-phase-center geo-tv-wrap">
-      <div class="geo-tv-header">
+      <div class="guess-tv-header">
         <p class="eyebrow">
           PINPOINT · ROUND {host()?.round ?? 1} OF {host()?.totalRounds ?? 5}
         </p>
@@ -40,7 +40,7 @@ function GeoGuessTvView(props: TvGameViewProps<GeoGuessHostView>) {
       </Show>
 
       <Show when={host()?.phase === 'LOADING'}>
-        <div class="geo-tv-loading">
+        <div class="guess-tv-loading geo-tv-loading">
           <div class="spinner" />
           <p class="tv-hero-sub">Finding a spot</p>
         </div>
@@ -71,23 +71,23 @@ function GeoGuessTvView(props: TvGameViewProps<GeoGuessHostView>) {
             </Show>
           </div>
 
-          <div class="geo-tv-results">
+          <div class="guess-tv-results">
             <Show when={host()?.winnerName}>
-              <div class="geo-tv-callout is-winner">
+              <div class="guess-tv-callout geo-tv-callout is-winner">
                 Closest: <strong>{host()?.winnerName}</strong>
               </div>
             </Show>
             <Show when={host()?.drinkerName}>
-              <div class="geo-tv-callout is-drinker">
+              <div class="guess-tv-callout geo-tv-callout is-drinker">
                 Last place: <strong>{host()?.drinkerName}</strong>. DRINKS!
               </div>
             </Show>
 
-            <div class="geo-tv-board">
+            <div class="guess-tv-board geo-tv-board">
               <For each={host()?.players ?? []}>
                 {(player) => (
                   <div
-                    class={`geo-tv-row ${player.isWinner ? 'is-winner' : ''} ${player.drinks ? 'is-drinker' : ''}`}
+                    class={`guess-tv-row geo-tv-row ${player.isWinner ? 'is-winner' : ''} ${player.drinks ? 'is-drinker' : ''}`}
                   >
                     <span
                       class="geo-tv-swatch"
@@ -97,7 +97,7 @@ function GeoGuessTvView(props: TvGameViewProps<GeoGuessHostView>) {
                     <span class="geo-tv-dist">
                       {player.distanceKm !== null ? `${player.distanceKm} km` : 'No guess'}
                     </span>
-                    <span class="geo-tv-badge">
+                    <span class="guess-tv-badge">
                       {player.isWinner
                         ? `WIN +${player.roundPoints ?? 0}`
                         : player.drinks
@@ -155,18 +155,18 @@ function GeoGuessMobileView(props: MobileGameViewProps<GeoGuessPlayerView>) {
   };
 
   return (
-    <div class="geo-mobile-wrap">
-      <div class="geo-mobile-header">
+    <div class="guess-mobile-wrap geo-mobile-wrap">
+      <div class="guess-mobile-header">
         <span class="eyebrow">
           ROUND {view()?.round ?? 1} OF {view()?.totalRounds ?? 5}
         </span>
         <Show when={view()?.phase === 'GUESSING' && props.remainingMs !== null}>
-          <span class="geo-mobile-timer">{secondsLeft(props.remainingMs)}s</span>
+          <span class="guess-mobile-timer">{secondsLeft(props.remainingMs)}s</span>
         </Show>
       </div>
 
       <Show when={view()?.phase === 'LOADING'}>
-        <div class="geo-mobile-wait">
+        <div class="guess-mobile-wait geo-mobile-wait">
           <div class="spinner" />
           <p>Loading location</p>
         </div>
@@ -176,9 +176,9 @@ function GeoGuessMobileView(props: MobileGameViewProps<GeoGuessPlayerView>) {
         <Show
           when={!view()?.lockedIn}
           fallback={
-            <div class="geo-mobile-wait">
-              <p class="geo-mobile-locked-title">Guess Locked In!</p>
-              <p class="geo-mobile-sub">Waiting for others</p>
+            <div class="guess-mobile-wait geo-mobile-wait">
+              <p class="guess-mobile-locked-title geo-mobile-locked-title">Guess Locked In!</p>
+              <p class="guess-mobile-sub">Waiting for others</p>
             </div>
           }
         >
@@ -201,13 +201,13 @@ function GeoGuessMobileView(props: MobileGameViewProps<GeoGuessPlayerView>) {
 
       <Show when={view()?.phase === 'REVEAL'}>
         <div
-          class={`geo-mobile-result ${view()?.isWinner ? 'is-winner' : ''} ${view()?.drinks ? 'is-drinker' : ''}`}
+          class={`guess-mobile-result geo-mobile-result ${view()?.isWinner ? 'is-winner' : ''} ${view()?.drinks ? 'is-drinker' : ''}`}
         >
           <Show when={view()?.isWinner}>
-            <p class="geo-mobile-verdict">CLOSEST! YOU WIN</p>
+            <p class="guess-mobile-verdict geo-mobile-verdict">CLOSEST! YOU WIN</p>
           </Show>
           <Show when={view()?.drinks}>
-            <p class="geo-mobile-verdict">LAST PLACE. DRINK!</p>
+            <p class="guess-mobile-verdict geo-mobile-verdict">LAST PLACE. DRINK!</p>
           </Show>
 
           <p class="geo-mobile-spot">{view()?.spotLabel ?? 'Location revealed'}</p>

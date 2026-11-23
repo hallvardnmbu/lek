@@ -21,6 +21,7 @@ function createTestCtx(players: Array<{ id: string; name: string; connected: boo
   const scores: Record<string, number> = Object.fromEntries(players.map((p) => [p.id, 0]));
   const events: Array<{ event: string; payload: unknown }> = [];
   let timerMs: number | null = null;
+  let currentState: any;
 
   const toGamePlayers = () =>
     players.map((p) => ({
@@ -49,6 +50,11 @@ function createTestCtx(players: Array<{ id: string; name: string; connected: boo
     clearTimer: () => {
       timerMs = null;
     },
+    dispatch: (fn) => {
+      if (currentState === undefined) return;
+      const next = fn(currentState);
+      if (next !== undefined) currentState = next;
+    },
     broadcastEvent: (event, payload) => {
       events.push({ event, payload });
     },
@@ -58,7 +64,15 @@ function createTestCtx(players: Array<{ id: string; name: string; connected: boo
     endGame: () => {},
   };
 
-  return { ctx, scores, events, getTimer: () => timerMs };
+  return {
+    ctx,
+    scores,
+    events,
+    setState: (s: unknown) => {
+      currentState = s;
+    },
+    getTimer: () => timerMs,
+  };
 }
 
 async function flushMicrotasks(): Promise<void> {
@@ -67,17 +81,21 @@ async function flushMicrotasks(): Promise<void> {
 
 describe('priceguess game', () => {
   it('loads product, hides price while guessing, awards closest and marks furthest to drink', async () => {
-    const { ctx, scores, events } = createTestCtx([
+    const { ctx, scores, events, setState } = createTestCtx([
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
     ]);
 
     const game = createPriceGuessGame(async () => SAMPLE_PRODUCT);
     let state = game.onStart(ctx);
+    setState(state);
     expect(state.phase).toBe('LOADING');
 
+    state = game.onHostAction!(ctx, state, { type: 'skip_product' })!;
+    expect(state.phase).toBe('LOADING');
+    expect(state.round).toBe(1);
+
     await flushMicrotasks();
-    state = game.onTimerExpired!(ctx, state)!;
     expect(state.phase).toBe('GUESSING');
     expect(game.getHostView(state, ctx).actualPrice).toBeNull();
     expect(game.getPlayerView(state, 'p1', ctx).actualPrice).toBeNull();
@@ -104,15 +122,15 @@ describe('priceguess game', () => {
   });
 
   it('marks non-submitter to drink when timer expires', async () => {
-    const { ctx } = createTestCtx([
+    const { ctx, setState } = createTestCtx([
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
     ]);
 
     const game = createPriceGuessGame(async () => SAMPLE_PRODUCT);
     let state = game.onStart(ctx);
+    setState(state);
     await flushMicrotasks();
-    state = game.onTimerExpired!(ctx, state)!;
 
     state = game.onPlayerAction(ctx, state, 'p1', {
       type: 'submit_guess',
@@ -128,7 +146,7 @@ describe('priceguess game', () => {
 
   it('ignores invalid guesses and advances on next_round', async () => {
     let roundCalls = 0;
-    const { ctx } = createTestCtx([{ id: 'p1', name: 'Alice', connected: true }]);
+    const { ctx, setState } = createTestCtx([{ id: 'p1', name: 'Alice', connected: true }]);
 
     const game = createPriceGuessGame(async (excludeIds) => {
       roundCalls += 1;
@@ -140,8 +158,8 @@ describe('priceguess game', () => {
     });
 
     let state = game.onStart(ctx);
+    setState(state);
     await flushMicrotasks();
-    state = game.onTimerExpired!(ctx, state)!;
 
     state = game.onPlayerAction(ctx, state, 'p1', {
       type: 'submit_guess',
@@ -156,10 +174,10 @@ describe('priceguess game', () => {
     expect(state.phase).toBe('REVEAL');
 
     state = game.onHostAction!(ctx, state, { type: 'next_round' })!;
+    setState(state);
     expect(state.phase).toBe('LOADING');
     expect(state.round).toBe(2);
     await flushMicrotasks();
-    state = game.onTimerExpired!(ctx, state)!;
     expect(state.phase).toBe('GUESSING');
     expect(game.getHostView(state, ctx).product?.name).toBe('Bottle 2 (excluded 1)');
   });

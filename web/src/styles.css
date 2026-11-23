@@ -722,10 +722,6 @@ button {
   max-width: 100%;
 }
 
-.podium-row.is-winner .podium-arm-crop {
-  animation: podium-cheers 2.4s ease-in-out infinite;
-}
-
 .podium-name {
   flex: 1;
   min-width: 0;
@@ -791,16 +787,6 @@ button {
   to {
     opacity: 1;
     transform: none;
-  }
-}
-
-@keyframes podium-cheers {
-  0%,
-  100% {
-    transform: rotate(-4deg);
-  }
-  50% {
-    transform: rotate(6deg);
   }
 }
 
@@ -1030,4 +1016,219 @@ button {
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--peach);
+}
+
+/* Shared Vote Games */
+.vote-generating {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.vote-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+}
+
+.vote-ai-tag {
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 0.7rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.1em;
+}
+
+.vote-progress {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.vote-next-hint {
+  margin-top: 1.5rem;
+  font-size: 1.15rem;
+  color: var(--muted);
+}
+
+.vote-mobile-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 800;
+  color: var(--muted);
+  margin-bottom: 1rem;
+}
+
+.vote-head-stat {
+  color: var(--accent);
+}
+
+.vote-waiting {
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.vote-hint {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+}
+
+.vote-candidates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.vote-candidate.is-voted {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.vote-tally-note {
+  margin: 0.9rem 0 0;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+/* Shared Guess Games */
+.guess-tv-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+}
+
+.guess-tv-header .eyebrow,
+.guess-mobile-header .eyebrow {
+  margin-bottom: 0;
+}
+
+.guess-tv-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.guess-tv-results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.guess-tv-callout {
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.guess-tv-callout.is-winner {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.guess-tv-callout.is-drinker {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.guess-tv-board {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.guess-tv-row {
+  display: grid;
+  align-items: center;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.guess-tv-row.is-winner {
+  border-color: var(--accent);
+}
+
+.guess-tv-row.is-drinker {
+  border-color: var(--danger);
+}
+
+.guess-tv-badge {
+  font-size: 0.85rem;
+  font-weight: 900;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  white-space: nowrap;
+}
+
+.guess-mobile-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.guess-mobile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.guess-mobile-timer {
+  font-weight: 900;
+  color: var(--accent);
+}
+
+.guess-mobile-wait {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: center;
+}
+
+.guess-mobile-locked-title {
+  margin: 0;
+  font-weight: 900;
+  color: var(--accent);
+}
+
+.guess-mobile-sub {
+  margin: 0;
+  color: var(--muted);
+}
+
+.guess-mobile-result {
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  text-align: center;
+}
+
+.guess-mobile-result.is-winner {
+  border-color: var(--accent);
+}
+
+.guess-mobile-result.is-drinker {
+  border-color: var(--danger);
+}
+
+.guess-mobile-verdict {
+  font-weight: 900;
+}
+
+.guess-mobile-result.is-winner .guess-mobile-verdict {
+  color: var(--accent);
+}
+
+.guess-mobile-result.is-drinker .guess-mobile-verdict {
+  color: var(--danger);
 }

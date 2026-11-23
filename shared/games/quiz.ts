@@ -17,19 +17,6 @@ export interface QuizRevealEntry {
   eliminated: boolean;
 }
 
-export interface QuizState {
-  phase: QuizPhase;
-  questionNumber: number;
-  questions: QuizQuestion[];
-  answers: Record<string, QuizAnswer>;
-  aliveIds: string[];
-  results: QuizRevealEntry[];
-  allWrong: boolean;
-  aiInbox: { questions: QuizQuestion[] | null };
-  pendingBatch: boolean;
-  fallbackPool: QuizQuestion[] | null;
-}
-
 export interface QuizHostView {
   phase: QuizPhase;
   questionNumber: number;

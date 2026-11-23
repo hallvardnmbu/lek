@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createMemo, createSignal, onCleanup, onSettled } from 'solid-js';
+import { For, Show, createEffect, createMemo, createSignal, onCleanup } from 'solid-js';
 import {
   TANK_COLORS,
   TANK_WALLS,
@@ -10,6 +10,7 @@ import {
 } from '../../../../shared/games/tankgame';
 import {
   secondsLeft,
+  type GameUiDefinition,
   type MobileGameViewProps,
   type TvGameViewProps,
 } from '../registry';
@@ -114,6 +115,7 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
       }
       prev = curr;
       curr = snap;
+      if (host.phase !== 'PLAYING') draw();
     }
   );
 
@@ -194,13 +196,17 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
     }
   }
 
-  onSettled(() => {
-    let frame = requestAnimationFrame(function loop() {
-      draw();
-      frame = requestAnimationFrame(loop);
-    });
-    return () => cancelAnimationFrame(frame);
-  });
+  createEffect(
+    () => view()?.phase === 'PLAYING',
+    (playing) => {
+      if (!playing) return;
+      let frame = requestAnimationFrame(function loop() {
+        draw();
+        frame = requestAnimationFrame(loop);
+      });
+      onCleanup(() => cancelAnimationFrame(frame));
+    }
+  );
 
   return (
     <div class="tk-tv">
@@ -226,7 +232,7 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
           </div>
         </Show>
       </div>
-      <div class="tk-tv-actions">
+      <div class="tv-action-bar">
         <button class="btn btn-tv" onClick={props.endGame}>
           End Game
         </button>
@@ -423,7 +429,7 @@ function TankGameMobileView(props: MobileGameViewProps<TankGamePlayerView>) {
   );
 }
 
-export const tankGameUi = {
+export const tankGameUi: GameUiDefinition<TankGameHostView, TankGamePlayerView> = {
   id: 'tank-battle',
   name: 'Tanks',
   TvView: TankGameTvView,

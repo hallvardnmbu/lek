@@ -1,10 +1,21 @@
 import {
+  type MusicQuizGuess,
   type MusicQuizHostView,
+  type MusicQuizPhase,
   type MusicQuizPlayerView,
   type MusicQuizRoundResult,
   type MusicQuizSong,
-  type MusicQuizState,
 } from '../../shared/games/musicquiz';
+
+export interface MusicQuizState {
+  phase: MusicQuizPhase;
+  round: number;
+  totalRounds: number;
+  songs: MusicQuizSong[];
+  roundStartedAt: number;
+  guesses: Record<string, MusicQuizGuess>;
+  lastResults: MusicQuizRoundResult[];
+}
 import type { GameContext, GameDefinition } from '../game';
 import { allConnected, awardCappedScore, connectedPlayers, createRoomHistory, parseRounds, shuffle, withoutKey } from './helpers';
 import { getMusicQuizCatalog, previewUrlFor, refreshPreviews } from './musicquizCatalog';
@@ -30,7 +41,7 @@ function pickSongs(roomCode: string, catalog: MusicQuizSong[], count: number): M
   return chosen;
 }
 
-function currentSong(state: MusicQuizState): MusicQuizSong {
+function currentSong(state: MusicQuizState): MusicQuizSong | undefined {
   return state.songs[state.round - 1];
 }
 
@@ -48,7 +59,7 @@ function sharedView(ctx: GameContext, state: MusicQuizState) {
     phase: state.phase,
     round: state.round,
     totalRounds: state.totalRounds,
-    song: state.phase === 'REVEAL' ? { title: song.title, artist: song.artist } : null,
+    song: state.phase === 'REVEAL' && song ? { title: song.title, artist: song.artist } : null,
     guessedCount: connected.filter((p) => state.guesses[p.id] !== undefined).length,
     connectedCount: connected.length,
     results: state.lastResults,
@@ -62,6 +73,10 @@ function speedBonus(state: MusicQuizState, guessedAt: number): number {
 
 function reveal(ctx: GameContext, state: MusicQuizState): MusicQuizState {
   const song = currentSong(state);
+  if (!song) {
+    ctx.endGame();
+    return state;
+  }
   const results: MusicQuizRoundResult[] = ctx
     .getPlayers()
     .map((p) => {
@@ -120,6 +135,19 @@ export function createMusicQuizGame(
     onStart(ctx, config) {
       const catalog = getCatalog();
       const totalRounds = Math.min(parseRounds(config, MIN_ROUNDS, MAX_ROUNDS, DEFAULT_ROUNDS), catalog.length);
+
+      if (totalRounds === 0) {
+        ctx.endGame();
+        return {
+          phase: 'REVEAL',
+          round: 0,
+          totalRounds: 0,
+          songs: [],
+          roundStartedAt: 0,
+          guesses: {},
+          lastResults: [],
+        };
+      }
 
       const state: MusicQuizState = {
         phase: 'INTRO',
@@ -181,9 +209,10 @@ export function createMusicQuizGame(
     },
 
     getHostView(state, ctx) {
+      const song = currentSong(state);
       return {
         ...sharedView(ctx, state),
-        audioUrl: state.phase === 'GUESSING' ? previewUrlFor(currentSong(state)) : null,
+        audioUrl: state.phase === 'GUESSING' && song ? previewUrlFor(song) : null,
       };
     },
 

@@ -90,10 +90,6 @@
   color: var(--on-accent);
 }
 
-.wr-tv-actions {
-  gap: 1rem;
-}
-
 .wr-mobile-wrap {
   display: flex;
   flex-direction: column;

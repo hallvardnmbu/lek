@@ -15,7 +15,7 @@
 .draw-tv-round {
   font-size: 0.95rem;
   font-weight: 700;
-  color: var(--muted, #8b8b94);
+  color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -24,7 +24,7 @@
   margin: 0.25rem 0 0;
   font-size: 2.25rem;
   font-weight: 900;
-  color: var(--text, #d4d4d8);
+  color: var(--text);
 }
 
 .draw-vote-badge {
@@ -79,8 +79,8 @@
   width: 100%;
   aspect-ratio: 4 / 3;
   border-radius: 10px;
-  background: var(--surface-2, #1c1c21);
-  color: var(--muted, #8b8b94);
+  background: var(--surface-2);
+  color: var(--muted);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -111,8 +111,8 @@
 }
 
 .draw-mobile-prompt-box {
-  background: var(--surface-2, #1c1c21);
-  border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.14));
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
   border-radius: 12px;
   padding: 0.75rem 1rem;
   margin-bottom: 0.75rem;
@@ -131,7 +131,7 @@
   width: 100%;
   aspect-ratio: 4 / 3;
   border-radius: 12px;
-  border: 2px solid var(--border-strong, rgba(255, 255, 255, 0.14));
+  border: 2px solid var(--border-strong);
   background: #ffffff;
   touch-action: none;
   display: block;
@@ -161,7 +161,7 @@
 }
 
 .draw-swatch.active {
-  border-color: var(--accent, #f59e0b);
+  border-color: var(--accent);
   transform: scale(1.12);
 }
 
@@ -174,17 +174,17 @@
 .draw-size-btn {
   padding: 0.35rem 0.6rem;
   border-radius: 8px;
-  border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.14));
-  background: var(--surface-2, #1c1c21);
-  color: var(--text, #d4d4d8);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
   font-size: 0.8rem;
   font-weight: 700;
   cursor: pointer;
 }
 
 .draw-size-btn.active {
-  border-color: var(--accent, #f59e0b);
-  color: var(--accent, #f59e0b);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .draw-actions-row {
@@ -209,7 +209,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  color: var(--text, #d4d4d8);
+  color: var(--text);
   font-weight: 700;
 }
 

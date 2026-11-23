@@ -7,7 +7,7 @@ import type {
   WikiRacePhase,
 } from '../../shared/games/wikirace';
 import type { GameContext, GameDefinition } from '../game';
-import { awardCappedScore, connectedPlayers, playerName } from './helpers';
+import { MAX_GAME_SCORE, awardCappedScore, connectedPlayers, playerName } from './helpers';
 import {
   CURATED_PAIRS,
   fetchWikiArticle,
@@ -16,29 +16,12 @@ import {
   type WikiArticle,
 } from './wikirace-wiki';
 
-const POLL_MS = 120;
-
 interface RacerState {
   path: string[];
   hops: number;
   finishedRank: number | null;
   loadingTitle: string | null;
   error: string | null;
-}
-
-interface FetchInboxEntry {
-  round: number;
-  requestedTitle: string;
-  article?: WikiArticle;
-  error?: string;
-}
-
-interface WikiRaceInbox {
-  round: number;
-  initStart?: WikiArticle;
-  initTarget?: WikiArticle;
-  initError?: string;
-  fetches: Record<string, FetchInboxEntry>;
 }
 
 export interface WikiRaceState {
@@ -53,7 +36,6 @@ export interface WikiRaceState {
   finishedOrder: string[];
   loserId: string | null;
   usedPairs: string[];
-  inbox: WikiRaceInbox;
 }
 
 function pickPair(usedPairs: string[]): readonly [string, string] {
@@ -95,10 +77,6 @@ function buildProgressList(ctx: GameContext, state: WikiRaceState): WikiRacePlay
       if (b.finishedRank !== null) return 1;
       return a.hops - b.hops || a.name.localeCompare(b.name);
     });
-}
-
-function hasPendingFetches(state: WikiRaceState): boolean {
-  return Object.values(state.racers).some((r) => r.loadingTitle !== null);
 }
 
 function checkRaceCompletion(ctx: GameContext, state: WikiRaceState): void {
@@ -151,7 +129,7 @@ function moveRacerToArticle(
   if (normalizeTitle(article.title) === normalizeTitle(state.targetTitle)) {
     state.finishedOrder.push(playerId);
     racer.finishedRank = state.finishedOrder.length;
-    awardCappedScore(ctx, playerId, Math.max(1, 5 - (racer.finishedRank - 1)));
+    awardCappedScore(ctx, playerId, Math.max(1, MAX_GAME_SCORE - (racer.finishedRank - 1)));
     checkRaceCompletion(ctx, state);
   }
 }
@@ -169,27 +147,27 @@ function startRace(
       ? [pairKey]
       : [...previousUsedPairs, pairKey];
 
-  const inbox: WikiRaceInbox = {
-    round,
-    fetches: {},
-  };
-
-  const fetchInit = (title: string, targetKey: 'initStart' | 'initTarget', label: string) => {
-    fetcher(title)
-      .then((article) => {
-        if (inbox.round === round) inbox[targetKey] = article;
-      })
-      .catch((err) => {
-        if (inbox.round === round) {
-          inbox.initError = err instanceof Error ? err.message : `Failed to load ${label} article.`;
+  Promise.all([fetcher(rawStart), fetcher(rawTarget)])
+    .then(([startArticle, targetArticle]) => {
+      ctx.dispatch<WikiRaceState>((state) => {
+        if (state.phase !== 'LOADING' || state.round !== round) return;
+        recordArticle(state, state.startTitle, startArticle);
+        state.startTitle = startArticle.title;
+        state.targetTitle = targetArticle.title;
+        state.phase = 'RACING';
+        for (const p of ctx.getPlayers()) {
+          state.racers[p.id] = createInitialRacer(startArticle.title);
         }
+        ctx.clearTimer();
       });
-  };
-
-  fetchInit(rawStart, 'initStart', 'start');
-  fetchInit(rawTarget, 'initTarget', 'target');
-
-  ctx.setTimer(POLL_MS);
+    })
+    .catch((err) => {
+      ctx.dispatch<WikiRaceState>((state) => {
+        if (state.phase !== 'LOADING' || state.round !== round) return;
+        state.error = err instanceof Error ? err.message : 'Failed to load race articles.';
+        ctx.clearTimer();
+      });
+    });
 
   return {
     phase: 'LOADING',
@@ -203,7 +181,6 @@ function startRace(
     finishedOrder: [],
     loserId: null,
     usedPairs,
-    inbox,
   };
 }
 
@@ -263,25 +240,28 @@ function handleAction(
     racer.loadingTitle = requestedTitle;
     racer.error = null;
 
-    const inbox = state.inbox;
     const round = state.round;
     fetcher(requestedTitle)
       .then((article) => {
-        if (inbox.round === round) {
-          inbox.fetches[playerId] = { round, requestedTitle, article };
-        }
+        ctx.dispatch<WikiRaceState>((current) => {
+          if (current.phase !== 'RACING' || current.round !== round) return;
+          const currentRacer = current.racers[playerId];
+          if (!currentRacer || currentRacer.loadingTitle !== requestedTitle) return;
+          recordArticle(current, requestedTitle, article);
+          moveRacerToArticle(ctx, current, playerId, article);
+        });
       })
       .catch((err) => {
-        if (inbox.round === round) {
-          inbox.fetches[playerId] = {
-            round,
-            requestedTitle,
-            error: err instanceof Error ? err.message : 'Could not load article.',
-          };
-        }
+        ctx.dispatch<WikiRaceState>((current) => {
+          if (current.phase !== 'RACING' || current.round !== round) return;
+          const currentRacer = current.racers[playerId];
+          if (!currentRacer || currentRacer.loadingTitle !== requestedTitle) return;
+          currentRacer.loadingTitle = null;
+          currentRacer.error = err instanceof Error ? err.message : 'Could not load article.';
+          ctx.clearTimer();
+        });
       });
 
-    ctx.setTimer(POLL_MS);
     return state;
   }
 
@@ -301,63 +281,6 @@ export function createWikiRaceGame(
 
     onStart(ctx) {
       return startRace(ctx, fetcher, 1, []);
-    },
-
-    onTimerExpired(ctx, state) {
-      if (state.phase === 'LOADING') {
-        if (state.inbox.initError) {
-          state.error = state.inbox.initError;
-          ctx.clearTimer();
-          return state;
-        }
-
-        if (state.inbox.initStart && state.inbox.initTarget) {
-          const startArticle = state.inbox.initStart;
-          const targetArticle = state.inbox.initTarget;
-
-          recordArticle(state, state.startTitle, startArticle);
-          state.startTitle = startArticle.title;
-          state.targetTitle = targetArticle.title;
-          state.phase = 'RACING';
-
-          for (const p of ctx.getPlayers()) {
-            state.racers[p.id] = createInitialRacer(startArticle.title);
-          }
-
-          ctx.clearTimer();
-          return state;
-        }
-
-        ctx.setTimer(POLL_MS);
-        return state;
-      }
-
-      if (state.phase === 'RACING') {
-        for (const [playerId, entry] of Object.entries(state.inbox.fetches)) {
-          if (entry.round !== state.round) continue;
-          const racer = state.racers[playerId];
-          if (!racer || racer.loadingTitle !== entry.requestedTitle) continue;
-
-          delete state.inbox.fetches[playerId];
-
-          if (entry.article) {
-            recordArticle(state, entry.requestedTitle, entry.article);
-            moveRacerToArticle(ctx, state, playerId, entry.article);
-          } else {
-            racer.loadingTitle = null;
-            racer.error = entry.error ?? 'Could not load article. Try another link.';
-          }
-        }
-
-        if (state.phase === 'RACING' && hasPendingFetches(state)) {
-          ctx.setTimer(POLL_MS);
-        } else {
-          ctx.clearTimer();
-        }
-        return state;
-      }
-
-      return state;
     },
 
     onPlayerAction(ctx, state, playerId, action) {
@@ -380,13 +303,10 @@ export function createWikiRaceGame(
       return state;
     },
 
-    onPlayerLeave(ctx, state) {
+    onPlayerLeave(ctx, state, playerId) {
+      delete state.racers[playerId];
       checkRaceCompletion(ctx, state);
       return state;
-    },
-
-    onEnd(ctx) {
-      ctx.clearTimer();
     },
 
     getHostView(state, ctx) {

@@ -41,6 +41,7 @@ function createTestCtx(players: TestPlayer[]) {
     clearTimer: () => {
       cleared++;
     },
+    dispatch: () => {},
     broadcastEvent: (event, payload) => events.push({ event, payload }),
     sendEventToHost: () => {},
     sendEventToPlayer: () => {},
@@ -135,5 +136,28 @@ describe('Roulette game', () => {
 
     state = rouletteGame.onPlayerAction(ctx, state, 'p1', { type: 'spin' })!;
     expect(state.phase).toBe('SPINNING');
+  });
+
+  it('cleans up playerOrder and selectedId on leave and ends when empty', () => {
+    let ended = false;
+    const { ctx } = createTestCtx(threePlayers);
+    ctx.endGame = () => {
+      ended = true;
+    };
+
+    let state = rouletteGame.onStart(ctx);
+    state = rouletteGame.onTimerExpired!(ctx, state)!;
+    const selected = state.selectedId!;
+
+    state = rouletteGame.onPlayerLeave!(ctx, state, selected)!;
+    expect(state.playerOrder).not.toContain(selected);
+    expect(state.selectedId).toBeNull();
+    expect(ended).toBe(false);
+
+    for (const remaining of state.playerOrder) {
+      state = rouletteGame.onPlayerLeave!(ctx, state, remaining)!;
+    }
+    expect(state.playerOrder).toEqual([]);
+    expect(ended).toBe(true);
   });
 });

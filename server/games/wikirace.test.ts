@@ -12,6 +12,7 @@ interface TestPlayer {
 function createTestCtx(players: TestPlayer[]) {
   const events: Array<{ event: string; payload: unknown }> = [];
   const scores = new Map<string, number>();
+  let currentState: any;
 
   const toGamePlayers = () =>
     players.map((p) => ({
@@ -32,6 +33,11 @@ function createTestCtx(players: TestPlayer[]) {
     setPlayerMeta: () => {},
     setTimer: () => {},
     clearTimer: () => {},
+    dispatch: (fn) => {
+      if (currentState === undefined) return;
+      const next = fn(currentState);
+      if (next !== undefined) currentState = next;
+    },
     broadcastEvent: (event, payload) => events.push({ event, payload }),
     sendEventToHost: () => {},
     sendEventToPlayer: () => {},
@@ -39,7 +45,14 @@ function createTestCtx(players: TestPlayer[]) {
     endGame: () => {},
   };
 
-  return { ctx, events, score: (id: string) => scores.get(id) ?? 0 };
+  return {
+    ctx,
+    events,
+    setState: (s: unknown) => {
+      currentState = s;
+    },
+    score: (id: string) => scores.get(id) ?? 0,
+  };
 }
 
 async function flushMicrotasks(): Promise<void> {
@@ -97,7 +110,7 @@ describe('Wikipedia Race game', () => {
       { id: 'p2', name: 'Bob', connected: true },
       { id: 'p3', name: 'Carol', connected: true },
     ];
-    const { ctx, events, score } = createTestCtx(players);
+    const { ctx, events, score, setState } = createTestCtx(players);
 
     let state: WikiRaceState;
     const gameWithArticles = createWikiRaceGame(async (title) => {
@@ -123,9 +136,9 @@ describe('Wikipedia Race game', () => {
     });
 
     state = gameWithArticles.onStart(ctx);
+    setState(state);
 
     await flushMicrotasks();
-    state = gameWithArticles.onTimerExpired!(ctx, state)!;
     expect(state.phase).toBe('RACING');
 
     state = gameWithArticles.onPlayerAction(ctx, state, 'p1', {
@@ -139,7 +152,6 @@ describe('Wikipedia Race game', () => {
       payload: { title: 'Hub' },
     })!;
     await flushMicrotasks();
-    state = gameWithArticles.onTimerExpired!(ctx, state)!;
     expect(gameWithArticles.getPlayerView(state, 'p1', ctx).hops).toBe(1);
 
     state = gameWithArticles.onPlayerAction(ctx, state, 'p1', {
@@ -147,7 +159,6 @@ describe('Wikipedia Race game', () => {
       payload: { title: state.targetTitle },
     })!;
     await flushMicrotasks();
-    state = gameWithArticles.onTimerExpired!(ctx, state)!;
     expect(gameWithArticles.getPlayerView(state, 'p1', ctx).finishedRank).toBe(1);
     expect(state.phase).toBe('RACING');
 
@@ -200,7 +211,7 @@ describe('Wikipedia Race game', () => {
       { id: 'p2', name: 'Bob', connected: true },
       { id: 'p3', name: 'Carol', connected: true },
     ];
-    const { ctx } = createTestCtx(players);
+    const { ctx, setState } = createTestCtx(players);
 
     const game = createWikiRaceGame(async (title) => ({
       title,
@@ -209,8 +220,8 @@ describe('Wikipedia Race game', () => {
     }));
 
     let state = game.onStart(ctx);
+    setState(state);
     await flushMicrotasks();
-    state = game.onTimerExpired!(ctx, state)!;
     state.targetTitle = 'Goal';
 
     state = game.onPlayerAction(ctx, state, 'p1', {
@@ -218,7 +229,6 @@ describe('Wikipedia Race game', () => {
       payload: { title: 'Goal' },
     })!;
     await flushMicrotasks();
-    state = game.onTimerExpired!(ctx, state)!;
     expect(state.phase).toBe('RACING');
 
     players[2].connected = false;

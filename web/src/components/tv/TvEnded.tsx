@@ -1,7 +1,6 @@
-import { For, Show, createMemo } from 'solid-js';
+import { Show, createMemo } from 'solid-js';
 import type { RoomState } from '../../../../shared/protocol';
-import { ArmCrop } from '../ArmCrop';
-import { ARMS } from '../arms';
+import { PodiumList } from './PodiumList';
 
 interface TvEndedProps {
   state: RoomState;
@@ -16,14 +15,6 @@ export function TvEnded(props: TvEndedProps) {
     [...props.state.players].sort((a, b) => b.score - a.score)
   );
 
-  const maxScore = createMemo(() =>
-    Math.max(0, ...sortedPlayers().map((p) => p.score))
-  );
-
-  const hasSessionTotals = createMemo(() =>
-    props.state.players.some((p) => p.totalScore !== p.score)
-  );
-
   return (
     <div class="tv-phase-center">
       <Show when={props.state.randomizedMode}>
@@ -31,44 +22,7 @@ export function TvEnded(props: TvEndedProps) {
       </Show>
       <h1 class="tv-hero-title">Game Over</h1>
 
-      <div class="podium-list">
-        <For each={sortedPlayers()}>
-          {(p, idx) => {
-            const arm = () => ARMS[p.seat];
-            const fillPct = () => (maxScore() > 0 ? (p.score / maxScore()) * 100 : 0);
-            const isWinner = () => idx() === 0 && p.score > 0;
-            return (
-              <div
-                class={`podium-row rank-${idx() + 1} ${isWinner() ? 'is-winner' : ''} ${p.connected ? '' : 'disconnected'}`}
-                style={{ 'animation-delay': `${idx() * 90}ms` }}
-              >
-                <div class="podium-bar">
-                  <div class="podium-fill" style={{ width: `${fillPct()}%` }} />
-                </div>
-                <span class="rank-num">#{idx() + 1}</span>
-                <Show when={arm()}>
-                  {(a) => (
-                    <div class={`podium-arm from-${a().enter}`}>
-                      <ArmCrop arm={a()} class="podium-arm-crop" />
-                    </div>
-                  )}
-                </Show>
-                <span class="podium-name">{p.name}</span>
-                <Show when={isWinner()}>
-                  <span class="podium-badge">WINNER</span>
-                </Show>
-                <span class="podium-score">
-                  <span class="podium-score-num">{p.score}</span>
-                  <span class="podium-score-unit">pts</span>
-                  <Show when={hasSessionTotals()}>
-                    <span class="podium-score-total">· {p.totalScore} total</span>
-                  </Show>
-                </span>
-              </div>
-            );
-          }}
-        </For>
-      </div>
+      <PodiumList players={sortedPlayers()} />
 
       <div class="tv-action-bar">
         <Show

@@ -12,20 +12,6 @@ export interface CategoriesTallyEntry {
   isFailed: boolean;
 }
 
-export interface CategoriesState {
-  phase: CategoriesPhase;
-  round: number;
-  totalRounds: number;
-  category: string | null;
-  categoryIsAi: boolean;
-  votes: Record<string, string>;
-  continueVotes: Record<string, boolean>;
-  tally: CategoriesTallyEntry[];
-  failedIds: string[];
-  aiInbox: { categories: string[] | null };
-  fallbackCategories: string[] | null;
-}
-
 export interface CategoriesHostView {
   phase: CategoriesPhase;
   round: number;

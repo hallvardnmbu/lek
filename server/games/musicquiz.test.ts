@@ -4,9 +4,8 @@ import type {
   MusicQuizHostView,
   MusicQuizPlayerView,
   MusicQuizSong,
-  MusicQuizState,
 } from '../../shared/games/musicquiz';
-import { createMusicQuizGame } from './musicquiz';
+import { type MusicQuizState, createMusicQuizGame } from './musicquiz';
 
 type FullMusicQuizGame = Required<
   GameDefinition<MusicQuizState, MusicQuizHostView, MusicQuizPlayerView>
@@ -55,6 +54,7 @@ function createTestCtx(roomCode: string, players: TestPlayer[]) {
     setPlayerMeta: () => {},
     setTimer: () => {},
     clearTimer: () => {},
+    dispatch: () => {},
     broadcastEvent: () => {},
     sendEventToHost: () => {},
     sendEventToPlayer: () => {},
@@ -263,5 +263,17 @@ describe('Music Quiz game', () => {
     const firstIds = new Set(first.songs.map((s) => s.id));
     const overlap = second.songs.filter((s) => firstIds.has(s.id));
     expect(overlap).toHaveLength(0);
+  });
+
+  it('ends cleanly when the catalog is empty', () => {
+    const emptyGame = createMusicQuizGame(() => []) as FullMusicQuizGame;
+    const { ctx, isEnded } = createTestCtx('mq-empty', twoPlayers);
+
+    const state = emptyGame.onStart(ctx);
+    expect(state.totalRounds).toBe(0);
+    expect(isEnded()).toBe(true);
+    expect(emptyGame.getHostView(state, ctx).song).toBeNull();
+    expect(emptyGame.getHostView(state, ctx).audioUrl).toBeNull();
+    expect(emptyGame.getPlayerView(state, 'p1', ctx).song).toBeNull();
   });
 });

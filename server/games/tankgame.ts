@@ -7,13 +7,26 @@ import {
   TANK_WORLD_HEIGHT,
   TANK_WORLD_WIDTH,
   type TankGameBullet,
+  type TankGameElimination,
   type TankGameHostView,
+  type TankGamePhase,
   type TankGamePlayerView,
-  type TankGameState,
   type TankGameTank,
   type TankInput,
   type TankWall,
 } from '../../shared/games/tankgame';
+
+export interface TankGameState {
+  phase: TankGamePhase;
+  countdownEndsAt: number;
+  playingStartedAt: number;
+  tickAt: number;
+  nextBulletId: number;
+  tanks: Record<string, TankGameTank>;
+  bullets: TankGameBullet[];
+  inputs: Record<string, TankInput>;
+  eliminations: TankGameElimination[];
+}
 
 const TICK_MS = 50;
 const COUNTDOWN_MS = 3000;
@@ -265,12 +278,12 @@ export const tankGame: GameDefinition<TankGameState, TankGameHostView, TankGameP
       state.phase = 'PLAYING';
       state.playingStartedAt = now;
       state.tickAt = now;
-      ctx.setTimer(nextDelayMs(state, now));
+      ctx.setTimer(GAME_TIMEOUT_MS, true);
       return state;
     }
     if (state.phase !== 'PLAYING') return state;
     simulate(ctx, state, now);
-    if (!checkGameEnd(ctx, state, now)) ctx.setTimer(nextDelayMs(state, now));
+    if (!checkGameEnd(ctx, state, now)) ctx.setTimer(nextDelayMs(state, now), false);
     return state;
   },
 
@@ -292,7 +305,7 @@ export const tankGame: GameDefinition<TankGameState, TankGameHostView, TankGameP
       if (!wasSimulating && Object.keys(state.inputs).length > 0) {
         const now = Date.now();
         state.tickAt = now;
-        ctx.setTimer(nextDelayMs(state, now));
+        ctx.setTimer(nextDelayMs(state, now), false);
       }
       return state;
     }
@@ -310,7 +323,7 @@ export const tankGame: GameDefinition<TankGameState, TankGameHostView, TankGameP
       });
       if (!wasSimulating) {
         state.tickAt = now;
-        ctx.setTimer(nextDelayMs(state, now));
+        ctx.setTimer(nextDelayMs(state, now), false);
       }
       return state;
     }

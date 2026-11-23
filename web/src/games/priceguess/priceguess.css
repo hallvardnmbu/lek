@@ -4,16 +4,7 @@
 }
 
 .pg-tv-header {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1.5rem;
   margin-bottom: 0.5rem;
-}
-
-.pg-tv-header .eyebrow,
-.pg-mobile-header .eyebrow {
-  margin-bottom: 0;
 }
 
 .pg-tv-timer {
@@ -32,10 +23,6 @@
 }
 
 .pg-tv-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
   padding: 2rem;
 }
 
@@ -146,54 +133,15 @@
   color: var(--accent);
 }
 
-.pg-tv-results {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-}
-
 .pg-tv-callout {
   padding: 0.6rem 1rem;
-  border-radius: 10px;
   font-size: 1.1rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-}
-
-.pg-tv-callout.is-winner {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.pg-tv-callout.is-drinker {
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
-.pg-tv-board {
-  display: grid;
-  gap: 0.5rem;
 }
 
 .pg-tv-row {
-  display: grid;
   grid-template-columns: 1fr auto auto auto;
-  align-items: center;
   gap: 1rem;
   padding: 0.65rem 1rem;
-  border-radius: 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  font-weight: 700;
-  font-size: 1.05rem;
-}
-
-.pg-tv-row.is-winner {
-  border-color: var(--accent);
-}
-
-.pg-tv-row.is-drinker {
-  border-color: var(--danger);
 }
 
 .pg-tv-player {
@@ -203,14 +151,6 @@
 .pg-tv-diff {
   color: var(--muted);
   font-size: 0.9rem;
-}
-
-.pg-tv-badge {
-  font-size: 0.85rem;
-  font-weight: 900;
-  padding: 0.2rem 0.55rem;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.08);
 }
 
 .pg-tv-row.is-winner .pg-tv-badge {
@@ -224,53 +164,44 @@
 }
 
 .pg-mobile-wrap {
-  display: flex;
-  flex-direction: column;
   gap: 1rem;
-}
-
-.pg-mobile-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
 }
 
 .pg-mobile-timer {
   font-size: 1.1rem;
-  font-weight: 900;
-  color: var(--accent);
 }
 
 .pg-mobile-wait,
 .pg-mobile-form,
 .pg-mobile-result {
+  padding: 1.5rem 1rem;
+}
+
+.pg-mobile-form {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.75rem;
   text-align: center;
-  padding: 1.5rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.pg-mobile-wait {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
 }
 
 .pg-mobile-locked-title {
-  margin: 0;
   font-size: 1.3rem;
-  font-weight: 900;
-  color: var(--accent);
 }
 
 .pg-mobile-locked-price {
   margin: 0;
   font-size: 1.8rem;
   font-weight: 900;
-}
-
-.pg-mobile-sub {
-  margin: 0;
-  color: var(--muted);
 }
 
 .pg-mobile-product {
@@ -297,26 +228,16 @@
   color: inherit;
 }
 
-.pg-mobile-result.is-winner {
-  border-color: var(--accent);
-}
-
-.pg-mobile-result.is-drinker {
-  border-color: var(--danger);
+.pg-mobile-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .pg-mobile-verdict {
   margin: 0;
   font-size: 1.4rem;
-  font-weight: 900;
-}
-
-.pg-mobile-result.is-winner .pg-mobile-verdict {
-  color: var(--accent);
-}
-
-.pg-mobile-result.is-drinker .pg-mobile-verdict {
-  color: var(--danger);
 }
 
 .pg-mobile-actual {

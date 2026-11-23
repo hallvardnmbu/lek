@@ -12,20 +12,6 @@ export interface MostLikelyCandidate {
   name: string;
 }
 
-export interface MostLikelyState {
-  phase: MostLikelyPhase;
-  round: number;
-  totalRounds: number;
-  prompt: string | null;
-  promptIsAi: boolean;
-  votes: Record<string, string>;
-  tally: MostLikelyTallyEntry[];
-  drinkerIds: string[];
-  drinks: Record<string, number>;
-  aiInbox: { prompts: string[] | null };
-  fallbackPrompts: string[] | null;
-}
-
 export interface MostLikelyHostView {
   phase: MostLikelyPhase;
   round: number;

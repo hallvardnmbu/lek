@@ -23,16 +23,6 @@ export interface MusicQuizRoundResult {
   points: number;
 }
 
-export interface MusicQuizState {
-  phase: MusicQuizPhase;
-  round: number;
-  totalRounds: number;
-  songs: MusicQuizSong[];
-  roundStartedAt: number;
-  guesses: Record<string, MusicQuizGuess>;
-  lastResults: MusicQuizRoundResult[];
-}
-
 export interface MusicQuizHostView {
   phase: MusicQuizPhase;
   round: number;

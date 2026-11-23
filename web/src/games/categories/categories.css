@@ -1,63 +1,8 @@
-.cat-generating {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1.25rem;
-}
-
-.tv-phase-center > .eyebrow {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.9rem;
-}
-
-.cat-ai-tag {
-  padding: 0.2rem 0.6rem;
-  border-radius: 6px;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-size: 0.7rem;
-  font-weight: 900;
-  line-height: 1;
-  letter-spacing: 0.1em;
-}
-
 .cat-tv-category {
   font-size: 3.4rem;
   line-height: 1.15;
   max-width: 1100px;
   margin: 0.5rem 0 1.5rem;
-}
-
-.cat-vote-progress {
-  font-size: 1.4rem;
-  font-weight: 800;
-  color: var(--accent);
-}
-
-.cat-next-hint {
-  margin-top: 1.5rem;
-  font-size: 1.15rem;
-  color: var(--muted);
-}
-
-.cat-mobile-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 800;
-  color: var(--muted);
-  margin-bottom: 1rem;
-}
-
-.cat-score-count {
-  color: var(--accent);
-}
-
-.cat-waiting {
-  text-align: center;
-  padding: 2rem 0;
 }
 
 .cat-mobile-eyebrow {
@@ -74,31 +19,13 @@
   line-height: 1.25;
 }
 
-.cat-vote-hint {
-  margin: 0 0 1rem;
-  font-size: 0.9rem;
-}
-
-.cat-candidates {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-}
-
-.cat-candidate.cat-voted,
-.cat-continue-btn.cat-voted {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-
 .cat-continue-btn {
   margin-top: 1rem;
 }
 
-.cat-vote-tally {
-  margin: 0.9rem 0 0;
-  text-align: center;
-  font-size: 0.85rem;
+.cat-continue-btn.is-voted {
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .cat-result-safe,

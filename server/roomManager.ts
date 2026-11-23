@@ -861,6 +861,7 @@ export class RoomManager {
   }
 
   private createGameContext(room: InternalRoom): GameContext {
+    const boundRoundId = room.roundId;
     return {
       roomCode: room.code,
       getPlayers: () => Array.from(room.players.values()),
@@ -884,14 +885,34 @@ export class RoomManager {
         const p = room.players.get(playerId);
         if (p) p.meta = { ...p.meta, ...meta };
       },
-      setTimer: (durationMs) => {
-        this.clearTimers(room);
-        room.phaseEndsAt = Date.now() + durationMs;
-        this.scheduleTimer(room, durationMs);
+      setTimer: (durationMs, showCountdown = true) => {
+        if (showCountdown) {
+          this.clearTimers(room);
+          room.phaseEndsAt = Date.now() + durationMs;
+          this.scheduleTimer(room, durationMs, true);
+        } else {
+          if (room.phaseTimer) {
+            clearTimeout(room.phaseTimer);
+            room.phaseTimer = undefined;
+          }
+          this.scheduleTimer(room, durationMs, false);
+        }
       },
       clearTimer: () => {
         this.clearTimers(room);
         room.phaseEndsAt = null;
+      },
+      dispatch: (fn) => {
+        if (room.phase !== 'PLAYING' || room.roundId !== boundRoundId || room.gameState === null) {
+          return;
+        }
+        const next = (fn as (state: unknown) => unknown)(room.gameState);
+        if (next !== undefined) {
+          room.gameState = next;
+        }
+        if (room.phase === 'PLAYING') {
+          this.broadcastState(room);
+        }
       },
       broadcastEvent: (event, payload) => {
         this.broadcaster.broadcastAll(room.code, {
@@ -989,10 +1010,14 @@ export class RoomManager {
     this.startTickInterval(room);
   }
 
-  private scheduleTimer(room: InternalRoom, durationMs: number): void {
+  private scheduleTimer(room: InternalRoom, durationMs: number, showCountdown = true): void {
     room.phaseTimer = setTimeout(() => {
-      room.phaseEndsAt = null;
-      this.clearTimers(room);
+      if (showCountdown) {
+        room.phaseEndsAt = null;
+        this.clearTimers(room);
+      } else {
+        room.phaseTimer = undefined;
+      }
       if (room.phase !== 'PLAYING') return;
 
       this.invokeGameHook(room, (game, ctx) =>
@@ -1003,7 +1028,9 @@ export class RoomManager {
       }
     }, durationMs);
 
-    this.startTickInterval(room);
+    if (showCountdown) {
+      this.startTickInterval(room);
+    }
   }
 
   private startTickInterval(room: InternalRoom): void {

@@ -1,5 +1,11 @@
 import { For, Show, createMemo } from 'solid-js';
 import type { RoomState } from '../../../../shared/protocol';
+import {
+  getAvailableGames,
+  getConnectedCount,
+  getVoteCount,
+  getVotersFor,
+} from '../../lib/gameSelector';
 
 interface MobileGameSelectorProps {
   state: RoomState;
@@ -9,30 +15,11 @@ interface MobileGameSelectorProps {
 
 export function MobileGameSelector(props: MobileGameSelectorProps) {
   const mode = () => props.state.gameSelectMode ?? 'CHOOSE';
-
-  const availableGames = createMemo(() =>
-    props.state.games.filter(
-      (g) =>
-        props.state.players.length >= g.minPlayers &&
-        props.state.players.length <= g.maxPlayers
-    )
-  );
-
+  const availableGames = createMemo(() => getAvailableGames(props.state));
   const myVote = createMemo(() => props.state.gameVotes?.[props.playerId]);
-
-  const connectedCount = createMemo(
-    () => props.state.players.filter((p) => p.connected).length
-  );
-
-  const totalVotes = createMemo(() => {
-    const votes = props.state.gameVotes ?? {};
-    return props.state.players.filter((p) => p.connected && Boolean(votes[p.id])).length;
-  });
-
-  const votesFor = (gameId: string) => {
-    const votes = props.state.gameVotes ?? {};
-    return props.state.players.filter((p) => p.connected && votes[p.id] === gameId).length;
-  };
+  const connectedCount = createMemo(() => getConnectedCount(props.state));
+  const totalVotes = createMemo(() => getVoteCount(props.state));
+  const votesFor = (gameId: string) => getVotersFor(props.state, gameId).length;
 
   return (
     <div class="mobile-card">

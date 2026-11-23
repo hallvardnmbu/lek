@@ -72,7 +72,7 @@
   font-size: 1.6rem;
   letter-spacing: 0.35em;
   font-weight: 700;
-  color: var(--muted, #9aa7b4);
+  color: var(--muted);
 }
 
 .tk-count-num {
@@ -82,9 +82,8 @@
   line-height: 1;
 }
 
-.tk-tv-actions {
-  display: flex;
-  justify-content: center;
+.tk-tv .tv-action-bar {
+  margin-top: 0;
 }
 
 .tk-mobile {
@@ -113,7 +112,7 @@
 .tk-status,
 .tk-hint {
   margin: 0.4rem 0;
-  color: var(--muted, #9aa7b4);
+  color: var(--muted);
 }
 
 .tk-hint {
@@ -136,7 +135,7 @@
 
 .tk-dead-sub {
   margin: 0;
-  color: var(--muted, #9aa7b4);
+  color: var(--muted);
 }
 
 .tk-controls {

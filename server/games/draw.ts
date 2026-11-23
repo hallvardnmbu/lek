@@ -8,7 +8,13 @@ import type {
   DrawVoteResult,
 } from '../../shared/games/draw';
 import type { GameContext, GameDefinition } from '../game';
-import { awardCappedScore, buildVoteTally, connectedOrAllPlayers } from './helpers';
+import {
+  awardCappedScore,
+  buildVoteTally,
+  connectedOrAllPlayers,
+  connectedPlayers,
+  withoutKey,
+} from './helpers';
 
 const PROMPT_DURATION_MS = 45_000;
 export const DRAW_DURATION_MS = 90_000;
@@ -127,8 +133,12 @@ function tallyResults(ctx: GameContext, state: DrawGameState): DrawGameState {
   };
 }
 
-function allConnectedDone(ctx: GameContext, done: (playerId: string) => boolean): boolean {
-  const active = connectedOrAllPlayers(ctx);
+function allConnectedDone(
+  ctx: GameContext,
+  done: (playerId: string) => boolean,
+  excludeId?: string
+): boolean {
+  const active = connectedOrAllPlayers(ctx).filter((p) => p.id !== excludeId);
   return active.length > 0 && active.every((p) => done(p.id));
 }
 
@@ -153,15 +163,18 @@ function handlePlayerExit(
   playerId: string
 ): DrawGameState {
   if (state.phase === 'PROMPTING' && state.prompterId === playerId) {
-    const nextPrompterId = pickRandomPrompter(ctx, playerId);
-    if (nextPrompterId && nextPrompterId !== playerId) {
-      return { ...state, prompterId: nextPrompterId };
+    const remaining = connectedPlayers(ctx).filter((p) => p.id !== playerId);
+    if (remaining.length === 0) {
+      ctx.endGame();
+      return state;
     }
+    const nextPrompterId = remaining[Math.floor(Math.random() * remaining.length)].id;
+    return { ...state, prompterId: nextPrompterId };
   }
-  if (state.phase === 'DRAWING' && allConnectedDone(ctx, (id) => state.submittedIds.includes(id))) {
+  if (state.phase === 'DRAWING' && allConnectedDone(ctx, (id) => state.submittedIds.includes(id), playerId)) {
     return startVotingPhase(ctx, state);
   }
-  if (state.phase === 'VOTING' && allConnectedDone(ctx, (id) => Boolean(state.votes[id]))) {
+  if (state.phase === 'VOTING' && allConnectedDone(ctx, (id) => Boolean(state.votes[id]), playerId)) {
     return tallyResults(ctx, state);
   }
   return state;
@@ -219,7 +232,7 @@ export const drawGame: GameDefinition<DrawGameState, DrawHostView, DrawPlayerVie
     if (action.type === 'cast_vote' && state.phase === 'VOTING') {
       const targetId = action.payload?.targetPlayerId;
       if (typeof targetId !== 'string' || targetId === playerId) return state;
-      if (!ctx.getPlayer(targetId)) return state;
+      if (!ctx.getPlayer(targetId) || !state.submittedIds.includes(targetId)) return state;
       const nextVotes = { ...state.votes, [playerId]: targetId };
       const nextState: DrawGameState = {
         ...state,
@@ -257,7 +270,19 @@ export const drawGame: GameDefinition<DrawGameState, DrawHostView, DrawPlayerVie
   },
 
   onPlayerLeave(ctx, state, playerId) {
-    return handlePlayerExit(ctx, state, playerId);
+    const votes: Record<string, string> = {};
+    for (const [voterId, targetId] of Object.entries(state.votes)) {
+      if (voterId !== playerId && targetId !== playerId) {
+        votes[voterId] = targetId;
+      }
+    }
+    const cleaned: DrawGameState = {
+      ...state,
+      drawings: withoutKey(state.drawings, playerId),
+      submittedIds: state.submittedIds.filter((id) => id !== playerId),
+      votes,
+    };
+    return handlePlayerExit(ctx, cleaned, playerId);
   },
 
   getHostView(state, ctx) {

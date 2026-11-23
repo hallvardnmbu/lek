@@ -22,7 +22,7 @@ function PriceGuessTvView(props: TvGameViewProps<PriceGuessHostView>) {
 
   return (
     <div class="tv-phase-center pg-tv-wrap">
-      <div class="pg-tv-header">
+      <div class="guess-tv-header pg-tv-header">
         <p class="eyebrow">PRICE · ROUND {host()?.round ?? 1}</p>
         <Show when={host()?.phase === 'GUESSING' && props.remainingMs !== null}>
           <span class="pg-tv-timer">{secondsLeft(props.remainingMs)}s</span>
@@ -34,7 +34,7 @@ function PriceGuessTvView(props: TvGameViewProps<PriceGuessHostView>) {
       </Show>
 
       <Show when={host()?.phase === 'LOADING'}>
-        <div class="pg-tv-loading">
+        <div class="guess-tv-loading pg-tv-loading">
           <div class="spinner" />
           <p class="tv-hero-sub">Picking a bottle</p>
         </div>
@@ -95,23 +95,23 @@ function PriceGuessTvView(props: TvGameViewProps<PriceGuessHostView>) {
           </div>
 
           <Show when={host()?.phase === 'REVEAL'}>
-            <div class="pg-tv-results">
+            <div class="guess-tv-results">
               <Show when={host()?.winnerName}>
-                <div class="pg-tv-callout is-winner">
+                <div class="guess-tv-callout pg-tv-callout is-winner">
                   Closest: <strong>{host()?.winnerName}</strong>
                 </div>
               </Show>
               <Show when={host()?.drinkerName}>
-                <div class="pg-tv-callout is-drinker">
+                <div class="guess-tv-callout pg-tv-callout is-drinker">
                   Furthest: <strong>{host()?.drinkerName}</strong>. DRINKS!
                 </div>
               </Show>
 
-              <div class="pg-tv-board">
+              <div class="guess-tv-board">
                 <For each={host()?.players ?? []}>
                   {(player) => (
                     <div
-                      class={`pg-tv-row ${player.isWinner ? 'is-winner' : ''} ${player.drinks ? 'is-drinker' : ''}`}
+                      class={`guess-tv-row pg-tv-row ${player.isWinner ? 'is-winner' : ''} ${player.drinks ? 'is-drinker' : ''}`}
                     >
                       <span class="pg-tv-player">{player.name}</span>
                       <span class="pg-tv-guess">
@@ -120,7 +120,7 @@ function PriceGuessTvView(props: TvGameViewProps<PriceGuessHostView>) {
                       <span class="pg-tv-diff">
                         {player.diff !== null ? `±${formatPrice(player.diff)}` : ''}
                       </span>
-                      <span class="pg-tv-badge">
+                      <span class="guess-tv-badge pg-tv-badge">
                         {player.isWinner ? 'WIN' : player.drinks ? 'DRINK' : `${player.score} pts`}
                       </span>
                     </div>
@@ -180,16 +180,16 @@ function PriceGuessMobileView(props: MobileGameViewProps<PriceGuessPlayerView>) 
   };
 
   return (
-    <div class="pg-mobile-wrap">
-      <div class="pg-mobile-header">
+    <div class="guess-mobile-wrap pg-mobile-wrap">
+      <div class="guess-mobile-header">
         <span class="eyebrow">ROUND {view()?.round ?? 1}</span>
         <Show when={view()?.phase === 'GUESSING' && props.remainingMs !== null}>
-          <span class="pg-mobile-timer">{secondsLeft(props.remainingMs)}s</span>
+          <span class="guess-mobile-timer pg-mobile-timer">{secondsLeft(props.remainingMs)}s</span>
         </Show>
       </div>
 
       <Show when={view()?.phase === 'LOADING'}>
-        <div class="pg-mobile-wait">
+        <div class="guess-mobile-wait pg-mobile-wait">
           <div class="spinner" />
           <p>Picking a bottle</p>
         </div>
@@ -199,10 +199,10 @@ function PriceGuessMobileView(props: MobileGameViewProps<PriceGuessPlayerView>) 
         <Show
           when={!view()?.lockedIn}
           fallback={
-            <div class="pg-mobile-wait">
-              <p class="pg-mobile-locked-title">Guess Locked In!</p>
+            <div class="guess-mobile-wait pg-mobile-wait">
+              <p class="guess-mobile-locked-title pg-mobile-locked-title">Guess Locked In!</p>
               <p class="pg-mobile-locked-price">{formatPrice(view()?.guess)}</p>
-              <p class="pg-mobile-sub">Waiting for others</p>
+              <p class="guess-mobile-sub">Waiting for others</p>
             </div>
           }
         >
@@ -223,7 +223,7 @@ function PriceGuessMobileView(props: MobileGameViewProps<PriceGuessPlayerView>) 
               onInput={(e) => setDraft(e.currentTarget.value)}
             />
             <button
-              class="btn pg-mobile-submit"
+              class="btn btn-primary btn-block"
               type="submit"
               disabled={parsedPrice() === null}
             >
@@ -235,16 +235,16 @@ function PriceGuessMobileView(props: MobileGameViewProps<PriceGuessPlayerView>) 
 
       <Show when={view()?.phase === 'REVEAL'}>
         <div
-          class={`pg-mobile-result ${view()?.isWinner ? 'is-winner' : ''} ${view()?.drinks ? 'is-drinker' : ''}`}
+          class={`guess-mobile-result pg-mobile-result ${view()?.isWinner ? 'is-winner' : ''} ${view()?.drinks ? 'is-drinker' : ''}`}
         >
           <Show when={view()?.isWinner}>
-            <p class="pg-mobile-verdict">CLOSEST! YOU WIN</p>
+            <p class="guess-mobile-verdict pg-mobile-verdict">CLOSEST! YOU WIN</p>
           </Show>
           <Show when={view()?.drinks}>
-            <p class="pg-mobile-verdict">FURTHEST OFF. DRINK!</p>
+            <p class="guess-mobile-verdict pg-mobile-verdict">FURTHEST OFF. DRINK!</p>
           </Show>
           <Show when={!view()?.isWinner && !view()?.drinks}>
-            <p class="pg-mobile-verdict">YOU ARE SAFE</p>
+            <p class="guess-mobile-verdict pg-mobile-verdict">YOU ARE SAFE</p>
           </Show>
 
           <p class="pg-mobile-actual">{formatPrice(view()?.actualPrice)}</p>
@@ -257,7 +257,7 @@ function PriceGuessMobileView(props: MobileGameViewProps<PriceGuessPlayerView>) 
         </div>
 
         <button
-          class="btn pg-mobile-submit"
+          class="btn btn-primary btn-block"
           onClick={() => props.sendAction({ type: 'next_round' })}
         >
           Next Round
