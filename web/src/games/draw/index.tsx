@@ -189,7 +189,7 @@ function DrawMobileView(props: MobileGameViewProps<DrawPlayerView>) {
                       required
                     />
                   </label>
-                  <button class="btn btn-block" type="submit" disabled={!promptInput().trim()}>
+                  <button class="btn" type="submit" disabled={!promptInput().trim()}>
                     Start Drawing
                   </button>
                 </form>
@@ -262,14 +262,14 @@ function DrawMobileView(props: MobileGameViewProps<DrawPlayerView>) {
               <div class="draw-mobile-actions">
                 <button
                   type="button"
-                  class="btn btn-block"
+                  class="btn"
                   onClick={() => props.sendAction({ type: 'next_round' })}
                 >
                   Next Round
                 </button>
                 <button
                   type="button"
-                  class="btn btn-block"
+                  class="btn"
                   onClick={() => props.sendAction({ type: 'finish_game' })}
                 >
                   End Game

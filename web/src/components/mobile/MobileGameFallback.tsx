@@ -10,7 +10,7 @@ export function MobileGameFallback(props: MobileGameFallbackProps) {
     <div class="mobile-card">
       <h2>{props.gameInfo?.name ?? 'Active Game'}</h2>
       <button
-        class="btn btn-block"
+        class="btn"
         onClick={() =>
           props.onSendAction({ type: 'ping_action', payload: { ts: Date.now() } })
         }

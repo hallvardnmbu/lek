@@ -297,10 +297,6 @@
   color: inherit;
 }
 
-.pg-mobile-submit {
-  width: 100%;
-}
-
 .pg-mobile-result.is-winner {
   border-color: var(--accent);
 }

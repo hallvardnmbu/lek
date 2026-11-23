@@ -38,7 +38,7 @@ export function MobileJoinForm(props: MobileJoinFormProps) {
         />
       </label>
 
-      <button type="submit" class="btn btn-block" disabled={!props.connected}>
+      <button type="submit" class="btn" disabled={!props.connected}>
         {props.connected ? 'Join' : 'Connecting'}
       </button>
     </form>

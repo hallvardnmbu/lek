@@ -104,7 +104,7 @@ function CategoriesMobileView(props: MobileGameViewProps<CategoriesPlayerView>) 
               </Show>
               <TallyList entries={toTallyEntries(view()?.tally ?? [])} badgeLabel="FAILED" tone="danger" compact />
               <button
-                class={`btn btn-block cat-continue-btn ${view()?.myContinueVote ? 'cat-voted' : ''}`}
+                class={`btn cat-continue-btn ${view()?.myContinueVote ? 'cat-voted' : ''}`}
                 onClick={() => props.sendAction({ type: 'continue' })}
               >
                 {view()?.myContinueVote ? 'Ready for Next Category' : 'Continue'}
