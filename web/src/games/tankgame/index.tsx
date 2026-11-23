@@ -90,9 +90,23 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
   );
 
   let canvas: HTMLCanvasElement | null = null;
+  let themeColors: { ink: string; text: string; accent: string; peach: string } | null = null;
   let prev: Snapshot | null = null;
   let curr: Snapshot | null = null;
   const blasts: { x: number; y: number; at: number }[] = [];
+
+  function getThemeColors(el: HTMLCanvasElement) {
+    if (!themeColors) {
+      const s = getComputedStyle(el);
+      themeColors = {
+        ink: s.getPropertyValue('--ink').trim() || '#1a0505',
+        text: s.getPropertyValue('--text').trim() || '#fbeee6',
+        accent: s.getPropertyValue('--accent').trim() || '#dba952',
+        peach: s.getPropertyValue('--peach').trim() || '#fac8a2',
+      };
+    }
+    return themeColors;
+  }
 
   createEffect(
     () => view(),
@@ -129,16 +143,17 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
     x: number,
     y: number,
     angle: number,
-    color: string
+    color: string,
+    outlineColor: string
   ): void {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(angle);
-    ctx.fillStyle = '#0c0f12';
+    ctx.fillStyle = outlineColor;
     ctx.fillRect(-19, -15, 38, 30);
     ctx.fillStyle = color;
     ctx.fillRect(-16, -12, 32, 24);
-    ctx.fillStyle = '#0c0f12';
+    ctx.fillStyle = outlineColor;
     ctx.fillRect(4, -3.5, 24, 7);
     ctx.restore();
   }
@@ -147,17 +162,17 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx || !curr) return;
+    const theme = getThemeColors(canvas);
     const now = Date.now();
     const span = prev && curr.at > prev.at ? curr.at - prev.at : 0;
     const t = span > 1 ? clamp01((now - curr.at) / span) : 1;
 
-    ctx.fillStyle = '#10161c';
-    ctx.fillRect(0, 0, TANK_WORLD_WIDTH, TANK_WORLD_HEIGHT);
+    ctx.clearRect(0, 0, TANK_WORLD_WIDTH, TANK_WORLD_HEIGHT);
 
-    ctx.fillStyle = '#31404d';
+    ctx.fillStyle = theme.accent;
     for (const wall of TANK_WALLS) ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
 
-    ctx.fillStyle = '#ffd54f';
+    ctx.fillStyle = theme.peach;
     for (const [id, pos] of curr.bullets) {
       const p = prev?.bullets.get(id);
       const x = p ? lerp(p.x, pos.x, t) : pos.x;
@@ -175,8 +190,8 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
         const x = p ? lerp(p.x, tank.x, t) : tank.x;
         const y = p ? lerp(p.y, tank.y, t) : tank.y;
         const angle = p ? lerpAngle(p.angle, tank.angle, t) : tank.angle;
-        drawTankBody(ctx, x, y, angle, TANK_COLORS[tank.colorIndex] ?? '#ffffff');
-        ctx.fillStyle = 'rgba(255,255,255,0.88)';
+        drawTankBody(ctx, x, y, angle, TANK_COLORS[tank.colorIndex] ?? '#ffffff', theme.ink);
+        ctx.fillStyle = theme.accent;
         ctx.font = '600 16px system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(nameOf(tank.playerId), x, y - 26);
@@ -187,7 +202,7 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
     for (const blast of blasts) {
       const age = (now - blast.at) / 600;
       ctx.globalAlpha = 1 - age;
-      ctx.strokeStyle = '#ff7043';
+      ctx.strokeStyle = theme.peach;
       ctx.lineWidth = 4;
       ctx.beginPath();
       ctx.arc(blast.x, blast.y, 12 + 34 * age, 0, Math.PI * 2);
@@ -210,27 +225,26 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
 
   return (
     <div class="tk-tv">
+      <div class="tk-topbar">
+        <span>{view()?.aliveCount ?? 0} tanks in play</span>
+        <Show when={view()?.phase !== 'PLAYING'}>
+          <span class="tk-countdown">
+            BATTLE STARTING <strong class="tk-count-num">{Math.max(1, secondsLeft(props.remainingMs))}</strong>
+          </span>
+        </Show>
+        <span class="tk-clock">{clockText(liveTimeLeftMs())}</span>
+      </div>
       <div class="tk-stage">
         <canvas
           ref={(el) => (canvas = el)}
           width={TANK_WORLD_WIDTH}
           height={TANK_WORLD_HEIGHT}
         />
-        <div class="tk-topbar">
-          <span>{view()?.aliveCount ?? 0} tanks in play</span>
-          <span class="tk-clock">{clockText(liveTimeLeftMs())}</span>
-        </div>
         <div class="tk-feed">
           <For each={view()?.eliminations ?? []}>
             {(e) => <div class="tk-feed-row">{elimText(e)}</div>}
           </For>
         </div>
-        <Show when={view()?.phase !== 'PLAYING'}>
-          <div class="tk-countdown">
-            <p class="tk-count-label">BATTLE STARTING</p>
-            <p class="tk-count-num">{Math.max(1, secondsLeft(props.remainingMs))}</p>
-          </div>
-        </Show>
       </div>
       <div class="tv-action-bar">
         <button class="btn btn-tv" onClick={props.endGame}>
