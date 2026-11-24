@@ -30,7 +30,7 @@ function PriceGuessTvView(props: TvGameViewProps<PriceGuessHostView>) {
         player.guess !== null
           ? `${formatPrice(player.guess)}${player.diff !== null ? ` · ±${formatPrice(player.diff)}` : ''}`
           : 'No guess',
-      badge: player.isWinner ? 'WIN' : player.drinks ? 'DRINK' : undefined,
+      badge: player.isWinner ? 'WIN' : player.drinks ? 'DRINK' : 'SAFE',
       badgeTone: player.isWinner ? 'accent' : player.drinks ? 'loser' : 'muted',
       tone: player.isWinner ? 'accent' : player.drinks ? 'loser' : 'default',
       stat: `${player.score} pts`,
@@ -124,7 +124,7 @@ function PriceGuessTvView(props: TvGameViewProps<PriceGuessHostView>) {
               <ResultList
                 players={props.state.players}
                 entries={resultEntries()}
-                class="pg-tv-board"
+                compact
               />
             </div>
           </Show>

@@ -8,6 +8,7 @@ import {
   type TankGameHostView,
   type TankGamePlayerView,
 } from '../../../../shared/games/tankgame';
+import { playHitSound, playShootSound } from '../../lib/sfx';
 import {
   secondsLeft,
   type GameUiDefinition,
@@ -103,6 +104,7 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
   const renderedTanks = new Map<string, RenderedTank>();
   const renderedBullets = new Map<number, RenderedBullet>();
   let aliveIds = new Set<string>();
+  let knownBulletIds = new Set<number>();
   const blasts: { x: number; y: number; at: number }[] = [];
 
   function getCanvasCtx(): CanvasRenderingContext2D | null {
@@ -147,6 +149,7 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
           const by = prevRender?.y ?? serverTank?.y;
           if (bx !== undefined && by !== undefined) {
             blasts.push({ x: bx, y: by, at: now });
+            playHitSound();
           }
           renderedTanks.delete(id);
         }
@@ -161,6 +164,12 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
       for (const id of renderedBullets.keys()) {
         if (!activeBulletIds.has(id)) renderedBullets.delete(id);
       }
+      if (host.phase === 'PLAYING') {
+        for (const id of activeBulletIds) {
+          if (!knownBulletIds.has(id)) playShootSound();
+        }
+      }
+      knownBulletIds = activeBulletIds;
 
       if (host.phase === 'COUNTDOWN') {
         draw(now);

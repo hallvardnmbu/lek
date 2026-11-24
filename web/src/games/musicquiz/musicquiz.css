@@ -140,6 +140,11 @@
   word-break: break-word;
 }
 
+.mq-song-btn:hover:not(:disabled) .mq-song-artist,
+.mq-song-btn:focus-visible .mq-song-artist {
+  color: var(--on-accent);
+}
+
 .mq-search-hint {
   margin: 0.9rem 0 0;
   text-align: center;

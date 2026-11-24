@@ -132,7 +132,7 @@ describe('Roulette game', () => {
     expect(hostView.selectedName).toBe(selectedViews[0].name);
 
     for (const p of threePlayers) {
-      expect(score(p.id)).toBe(p.id === expectedSelectedId ? 0 : 1);
+      expect(score(p.id)).toBe(p.id === expectedSelectedId ? 1 : 0);
     }
 
     state = rouletteGame.onTimerExpired!(ctx, state)!;

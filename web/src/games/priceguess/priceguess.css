@@ -129,11 +129,6 @@
   font-size: 1.1rem;
 }
 
-.pg-tv-board {
-  max-width: none;
-  max-height: 30vh;
-  overflow-y: auto;
-}
 
 .pg-mobile-wrap {
   gap: 1rem;

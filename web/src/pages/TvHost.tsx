@@ -98,9 +98,6 @@ export function TvHost() {
                     Abort
                   </button>
                 </Show>
-                <button class="btn" onClick={lobbyMusic.toggleMute}>
-                  {lobbyMusic.muted() ? 'Sound on' : 'Sound off'}
-                </button>
                 <Show when={secondsLeft() !== null}>
                   <div class={`timer-pill ${(secondsLeft() ?? 99) <= 5 ? 'urgent' : ''}`}>
                     {secondsLeft()}s

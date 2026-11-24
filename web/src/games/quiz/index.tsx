@@ -15,17 +15,18 @@ function QuizTvView(props: TvGameViewProps<QuizHostView>) {
   );
 
   const scoreboardEntries = createMemo<ResultListEntry[]>(() =>
-    (host()?.results ?? []).map((entry) => {
-      const playerScore = scoresById().get(entry.playerId) ?? 0;
-      return {
+    [...(host()?.results ?? [])]
+      .sort(
+        (a, b) => Number(b.correct) - Number(a.correct) || a.playerName.localeCompare(b.playerName)
+      )
+      .map((entry) => ({
         playerId: entry.playerId,
         name: entry.playerName,
         tone: entry.eliminated ? 'loser' : entry.correct ? 'accent' : 'default',
-        badge: entry.eliminated ? 'OUT' : entry.correct ? 'CORRECT' : 'SAFE',
+        badge: entry.eliminated ? 'OUT' : entry.correct ? 'CORRECT' : 'WRONG',
         badgeTone: entry.eliminated ? 'loser' : entry.correct ? 'accent' : 'muted',
-        stat: `${playerScore} pts`,
-      };
-    })
+        stat: `${scoresById().get(entry.playerId) ?? 0} pts`,
+      }))
   );
 
   return (
@@ -84,7 +85,7 @@ function QuizTvView(props: TvGameViewProps<QuizHostView>) {
               <ResultList
                 players={props.state.players}
                 entries={scoreboardEntries()}
-                class="qz-scoreboard"
+                compact
               />
             </div>
           }

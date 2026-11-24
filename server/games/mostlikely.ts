@@ -53,6 +53,7 @@ const MIN_ROUNDS = 1;
 const MAX_ROUNDS = 20;
 const DEFAULT_ROUNDS = 3;
 const WIN_POINTS = 1;
+const REVEAL_MS = 15_000;
 
 const FALLBACK_PROMPTS = [
   'wake up in another country with no memory of how they got there',
@@ -99,6 +100,7 @@ function reveal(ctx: GameContext, state: MostLikelyState): MostLikelyState {
   state.tally = baseTally.map((t) => ({ ...t, isDrinker: drinkerSet.has(t.playerId) }));
   state.drinkerIds = drinkerIds;
   state.continueVotes = {};
+  ctx.setTimer(REVEAL_MS);
 
   ctx.broadcastEvent('most_likely_reveal', {
     prompt: state.prompt,
@@ -144,6 +146,7 @@ function startRound(ctx: GameContext, state: MostLikelyState): MostLikelyState {
 }
 
 function nextRound(ctx: GameContext, state: MostLikelyState): MostLikelyState {
+  ctx.clearTimer();
   if (state.round >= state.totalRounds) {
     ctx.endGame();
     return state;
@@ -155,8 +158,11 @@ function advanceIfReady(ctx: GameContext, state: MostLikelyState): MostLikelySta
   if (state.phase === 'VOTING' && allConnected(ctx, (id) => state.votes[id] !== undefined)) {
     return reveal(ctx, state);
   }
-  if (state.phase === 'REVEAL' && allConnected(ctx, (id) => state.continueVotes[id] === true)) {
-    return nextRound(ctx, state);
+  if (state.phase === 'REVEAL') {
+    const { continueCount, connectedCount } = viewCounts(ctx, state);
+    if (connectedCount > 0 && continueCount * 2 >= connectedCount) {
+      return nextRound(ctx, state);
+    }
   }
   return state;
 }
@@ -199,6 +205,11 @@ export function createMostLikelyGame(
           });
         });
 
+      return state;
+    },
+
+    onTimerExpired(ctx, state) {
+      if (state.phase === 'REVEAL') return nextRound(ctx, state);
       return state;
     },
 

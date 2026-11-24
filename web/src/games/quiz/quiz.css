@@ -94,10 +94,6 @@
   padding: 0.45rem 0.9rem;
 }
 
-.qz-scoreboard {
-  max-height: 30vh;
-  overflow-y: auto;
-}
 
 .qz-mobile-head {
   display: flex;

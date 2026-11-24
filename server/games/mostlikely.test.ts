@@ -92,7 +92,6 @@ describe('Most Likely To game', () => {
       twoPlayers
     );
 
-    expect(game.onTimerExpired).toBeUndefined();
     expect(game.onHostAction).toBeUndefined();
 
     let state = bindState(game.onStart(ctx));
@@ -126,13 +125,8 @@ describe('Most Likely To game', () => {
     expect(playerView.myDrinks).toBe(1);
     expect(playerView.myContinueVote).toBe(false);
 
+    expect(timerCalls()).toBe(1);
     state = game.onPlayerAction!(ctx, state, 'p1', { type: 'continue' })!;
-    expect(state.phase).toBe('REVEAL');
-    expect(game.getHostView(state, ctx).continuePlayerIds).toEqual(['p1']);
-    expect(game.getPlayerView(state, 'p1', ctx).myContinueVote).toBe(true);
-    expect(game.getPlayerView(state, 'p1', ctx).continueCount).toBe(1);
-
-    state = game.onPlayerAction!(ctx, state, 'p2', { type: 'continue' })!;
     expect(state.phase).toBe('VOTING');
     expect(state.round).toBe(2);
     expect(state.prompt).toBe('prompt b');
@@ -144,8 +138,7 @@ describe('Most Likely To game', () => {
     expect(state.phase).toBe('REVEAL');
     expect(score('p1')).toBe(1);
 
-    state = game.onPlayerAction!(ctx, state, 'p1', { type: 'continue' })!;
-    state = game.onPlayerAction!(ctx, state, 'p2', { type: 'continue' })!;
+    state = game.onTimerExpired!(ctx, state)!;
     expect(state.phase).toBe('VOTING');
     expect(state.round).toBe(3);
     expect(state.prompt).toBe('prompt c');
@@ -155,12 +148,11 @@ describe('Most Likely To game', () => {
     expect(state.phase).toBe('REVEAL');
     expect(isEnded()).toBe(false);
 
-    state = game.onPlayerAction!(ctx, state, 'p1', { type: 'continue' })!;
     expect(isEnded()).toBe(false);
 
     state = game.onPlayerAction!(ctx, state, 'p2', { type: 'continue' })!;
     expect(isEnded()).toBe(true);
-    expect(timerCalls()).toBe(0);
+    expect(timerCalls()).toBe(3);
   });
 
   it('dispatches round start when prompts arrive asynchronously', async () => {
@@ -238,7 +230,6 @@ describe('Most Likely To game', () => {
     expect(state.phase).toBe('REVEAL');
 
     state = game.onPlayerAction!(ctx, state, 'p1', { type: 'continue' })!;
-    state = game.onPlayerAction!(ctx, state, 'p2', { type: 'continue' })!;
     expect(state.phase).toBe('REVEAL');
 
     players[2].connected = false;
@@ -288,12 +279,7 @@ describe('Most Likely To game', () => {
     state = game.onPlayerLeave!(ctx, state, 'p2')!;
     expect(state.phase).toBe('REVEAL');
 
-    players.push({ id: 'p3', name: 'Carol', connected: true });
     state = game.onPlayerAction!(ctx, state, 'p1', { type: 'continue' })!;
-    expect(state.phase).toBe('REVEAL');
-
-    players.splice(1, 1);
-    state = game.onPlayerLeave!(ctx, state, 'p3')!;
     expect(state.phase).toBe('VOTING');
     expect(state.round).toBe(2);
   });
