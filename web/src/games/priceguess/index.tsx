@@ -3,7 +3,7 @@ import type {
   PriceGuessHostView,
   PriceGuessPlayerView,
 } from '../../../../shared/games/priceguess';
-import { PodiumList } from '../../components/tv/PodiumList';
+import { ResultList, type ResultListEntry } from '../../components/ResultList';
 import { TvActedArms } from '../../components/tv/TvActedArms';
 import {
   secondsLeft,
@@ -22,8 +22,19 @@ function PriceGuessTvView(props: TvGameViewProps<PriceGuessHostView>) {
   const host = () => props.state.hostState;
   const product = () => host()?.product;
 
-  const rankedPlayers = createMemo(() =>
-    [...props.state.players].sort((a, b) => b.score - a.score)
+  const resultEntries = createMemo<ResultListEntry[]>(() =>
+    (host()?.players ?? []).map((player) => ({
+      playerId: player.playerId,
+      name: player.name,
+      detail:
+        player.guess !== null
+          ? `${formatPrice(player.guess)}${player.diff !== null ? ` · ±${formatPrice(player.diff)}` : ''}`
+          : 'No guess',
+      badge: player.drinks ? 'DRINK' : undefined,
+      badgeTone: 'loser',
+      tone: player.drinks ? 'loser' : 'default',
+      stat: `${player.score} pts`,
+    }))
   );
 
   return (
@@ -98,14 +109,8 @@ function PriceGuessTvView(props: TvGameViewProps<PriceGuessHostView>) {
 
           <Show when={host()?.phase === 'REVEAL'}>
             <div class="guess-tv-results">
-              <Show when={(host()?.drinkerNames.length ?? 0) > 0}>
-                <div class="guess-tv-callout pg-tv-callout is-drinker">
-                  {host()?.drinkReason === 'no_guess' ? 'No guess' : 'Furthest'}:{' '}
-                  <strong>{host()?.drinkerNames.join(', ')}</strong> · DRINK!
-                </div>
-              </Show>
 
-              <PodiumList players={rankedPlayers()} compact />
+              <ResultList players={props.state.players} entries={resultEntries()} />
             </div>
           </Show>
         </div>

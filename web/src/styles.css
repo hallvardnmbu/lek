@@ -568,6 +568,7 @@ button {
 
 .tv-acted-slot.edge-right .tv-acted-crop {
   height: 100%;
+  max-width: none;
 }
 
 .tv-acted-name {
@@ -693,7 +694,8 @@ button {
   max-width: 100%;
 }
 
-.tally-arm.from-right .tally-arm-crop {
+.tally-arm.from-right .tally-arm-crop,
+.podium-arm.from-right .podium-arm-crop {
   height: auto;
   width: 100%;
 }
