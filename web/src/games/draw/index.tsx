@@ -1,5 +1,6 @@
 import { For, Show, createSignal } from 'solid-js';
 import type { DrawHostView, DrawPlayerView } from '../../../../shared/games/draw';
+import { TvActedArms } from '../../components/tv/TvActedArms';
 import type { GameUiDefinition, MobileGameViewProps, TvGameViewProps } from '../registry';
 import { DrawCanvas } from './DrawCanvas';
 import './draw.css';
@@ -23,39 +24,25 @@ function DrawTvView(props: TvGameViewProps<DrawHostView>) {
       <Show when={hs()}>
         {(view) => (
           <>
-            <div class="draw-tv-banner">
-              <div class="draw-tv-round">Round {view().round}</div>
-
-              <Show when={view().phase === 'PROMPTING'}>
-                <h1 class="draw-tv-prompt">
+            <Show when={view().phase === 'PROMPTING'}>
+              <div class="tv-phase-center">
+                <div class="eyebrow">DRAW</div>
+                <h1 class="tv-hero-title">
                   {view().prompterName} is picking a prompt
                 </h1>
-              </Show>
-
-              <Show when={view().phase === 'DRAWING'}>
-                <h1 class="draw-tv-prompt">Draw: {view().prompt}</h1>
-              </Show>
-
-              <Show when={view().phase === 'VOTING'}>
-                <h1 class="draw-tv-prompt">{view().prompt}</h1>
-                <div class={`draw-vote-badge ${view().voteMode ?? 'best'}`}>
-                  Vote for the {view().voteMode === 'worst' ? 'WORST' : 'BEST'} drawing!
-                </div>
-              </Show>
-
-              <Show when={view().phase === 'RESULTS'}>
-                <h1 class="draw-tv-prompt">{view().prompt}</h1>
-                <div class={`draw-vote-badge ${view().voteMode ?? 'best'}`}>
-                  {view().voteMode === 'worst' ? 'WORST' : 'BEST'} Drawing Results
-                </div>
-              </Show>
-            </div>
+              </div>
+            </Show>
 
             <Show when={view().phase === 'DRAWING'}>
+              <div class="draw-tv-banner">
+                <div class="eyebrow">DRAW THIS PROMPT</div>
+                <h1 class="draw-tv-title">{view().prompt}</h1>
+              </div>
+
               <div class="draw-tv-grid">
                 <For each={view().entries}>
                   {(entry) => (
-                    <div class="draw-tv-card">
+                    <div class={`draw-tv-card ${entry.submitted ? 'is-submitted' : ''}`}>
                       <DrawingThumb
                         src={entry.imageData}
                         alt={entry.playerName}
@@ -65,16 +52,28 @@ function DrawTvView(props: TvGameViewProps<DrawHostView>) {
                       <div class="draw-tv-card-footer">
                         <span>{entry.playerName}</span>
                         <Show when={entry.submitted}>
-                          <span class="draw-tag">Done</span>
+                          <span class="status-badge badge-accent">DONE</span>
                         </Show>
                       </div>
                     </div>
                   )}
                 </For>
               </div>
+
+              <TvActedArms
+                players={props.state.players}
+                actedIds={view().entries.filter((e) => e.submitted).map((e) => e.playerId)}
+              />
             </Show>
 
             <Show when={view().phase === 'VOTING'}>
+              <div class="draw-tv-banner">
+                <h1 class="draw-tv-vote-title">
+                  Vote for the {view().voteMode === 'worst' ? 'WORST' : 'BEST'} drawing
+                </h1>
+                <p class="draw-tv-subtitle">Prompt: {view().prompt}</p>
+              </div>
+
               <div class="draw-tv-grid">
                 <For each={view().entries}>
                   {(entry, idx) => (
@@ -93,22 +92,17 @@ function DrawTvView(props: TvGameViewProps<DrawHostView>) {
                 </For>
               </div>
 
-              <div class="status-pills-grid">
-                <For each={props.state.players}>
-                  {(p) => {
-                    const voted = () => view().votedPlayerIds.includes(p.id);
-                    return (
-                      <div class={`status-pill ${voted() ? 'done' : ''}`}>
-                        <span>{p.name}</span>
-                        <span>{voted() ? 'Voted' : 'Voting'}</span>
-                      </div>
-                    );
-                  }}
-                </For>
-              </div>
+              <TvActedArms players={props.state.players} actedIds={view().votedPlayerIds} />
             </Show>
 
             <Show when={view().phase === 'RESULTS'}>
+              <div class="draw-tv-banner">
+                <div class="eyebrow">
+                  {view().voteMode === 'worst' ? 'WORST DRAWING' : 'BEST DRAWING'}
+                </div>
+                <h1 class="draw-tv-title">{view().prompt}</h1>
+              </div>
+
               <div class="draw-tv-grid">
                 <For each={view().results}>
                   {(res) => (
@@ -121,23 +115,14 @@ function DrawTvView(props: TvGameViewProps<DrawHostView>) {
                       />
                       <div class="draw-tv-card-footer">
                         <span>{res.playerName}</span>
-                        <span class={`draw-tag ${res.isWinner ? 'winner' : ''}`}>
+                        <span class={`status-badge ${res.isWinner ? 'badge-accent' : 'badge-muted'}`}>
                           {res.votes} {res.votes === 1 ? 'vote' : 'votes'}
-                          {res.isWinner ? ' · +100' : ''}
+                          {res.isWinner ? ' · +2 pts' : ''}
                         </span>
                       </div>
                     </div>
                   )}
                 </For>
-              </div>
-
-              <div class="tv-action-bar">
-                <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'next_round' })}>
-                  Next Round
-                </button>
-                <button class="btn btn-tv" onClick={props.endGame}>
-                  End Game
-                </button>
               </div>
             </Show>
           </>
@@ -200,7 +185,21 @@ function DrawMobileView(props: MobileGameViewProps<DrawPlayerView>) {
               <div class="draw-mobile-prompt-box">{view().prompt}</div>
               <Show
                 when={!view().hasSubmitted}
-                fallback={<p class="muted">Submitted. Waiting for others.</p>}
+                fallback={
+                  <div class="draw-mobile-submitted">
+                    <p class="draw-mobile-submitted-title">Submitted!</p>
+                    <Show when={view().myDrawingData}>
+                      {(src) => (
+                        <img
+                          class="draw-mobile-submitted-thumb"
+                          src={src()}
+                          alt="Your drawing"
+                        />
+                      )}
+                    </Show>
+                    <p class="muted">Waiting for others</p>
+                  </div>
+                }
               >
                 <DrawCanvas
                   onSync={(imageData) =>
@@ -215,7 +214,7 @@ function DrawMobileView(props: MobileGameViewProps<DrawPlayerView>) {
 
             <Show when={view().phase === 'VOTING'}>
               <h2>
-                Vote for the {view().voteMode === 'worst' ? 'WORST' : 'BEST'} drawing!
+                Vote for the {view().voteMode === 'worst' ? 'WORST' : 'BEST'} drawing
               </h2>
               <p class="muted">Prompt: {view().prompt}</p>
               <div class="draw-mobile-vote-grid">
@@ -243,38 +242,33 @@ function DrawMobileView(props: MobileGameViewProps<DrawPlayerView>) {
                   )}
                 </For>
               </div>
+              <Show when={view().hasVoted}>
+                <p class="vote-tally-note muted">Vote locked in — waiting for others</p>
+              </Show>
             </Show>
 
             <Show when={view().phase === 'RESULTS'}>
-              <h2>Round {view().round} Results</h2>
-              <p class="muted">
-                {view().voteMode === 'worst' ? 'Worst' : 'Best'} drawing of "{view().prompt}"
-              </p>
+              <div class="eyebrow">
+                {view().voteMode === 'worst' ? 'WORST DRAWING' : 'BEST DRAWING'}
+              </div>
+              <h2>{view().prompt}</h2>
               <Show when={view().results.find((r) => r.playerId === props.playerId)}>
                 {(mine) => (
-                  <p>
-                    {mine().isWinner
-                      ? 'You won this round! +100 pts'
-                      : `You got ${mine().votes} ${mine().votes === 1 ? 'vote' : 'votes'}.`}
-                  </p>
+                  <div class={`draw-mobile-result ${mine().isWinner ? 'is-winner' : ''}`}>
+                    <p class="draw-mobile-result-title">
+                      {mine().isWinner ? 'You won!' : 'Results'}
+                    </p>
+                    <div class="draw-mobile-result-badges">
+                      <span class="status-badge badge-muted">
+                        {mine().votes} {mine().votes === 1 ? 'vote' : 'votes'}
+                      </span>
+                      <Show when={mine().isWinner}>
+                        <span class="status-badge badge-accent">+2 pts</span>
+                      </Show>
+                    </div>
+                  </div>
                 )}
               </Show>
-              <div class="draw-mobile-actions">
-                <button
-                  type="button"
-                  class="btn"
-                  onClick={() => props.sendAction({ type: 'next_round' })}
-                >
-                  Next Round
-                </button>
-                <button
-                  type="button"
-                  class="btn"
-                  onClick={() => props.sendAction({ type: 'finish_game' })}
-                >
-                  End Game
-                </button>
-              </div>
             </Show>
           </>
         )}

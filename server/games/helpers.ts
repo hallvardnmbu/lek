@@ -30,6 +30,15 @@ export function countConnectedActed(
   return { acted, total: connected.length };
 }
 
+export function actedConnectedIds(
+  ctx: GameContext,
+  pred: (playerId: string) => boolean
+): string[] {
+  return connectedPlayers(ctx)
+    .filter((p) => pred(p.id))
+    .map((p) => p.id);
+}
+
 export function allConnected(ctx: GameContext, pred: (playerId: string) => boolean): boolean {
   const connected = connectedPlayers(ctx);
   return connected.length > 0 && connected.every((p) => pred(p.id));

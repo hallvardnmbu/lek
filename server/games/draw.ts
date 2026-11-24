@@ -16,12 +16,12 @@ import {
   withoutKey,
 } from './helpers';
 
-const PROMPT_DURATION_MS = 45_000;
+export const PROMPT_DURATION_MS = 45_000;
 export const DRAW_DURATION_MS = 90_000;
-const VOTE_DURATION_MS = 30_000;
+export const RESULTS_DURATION_MS = 8_000;
 const MAX_PROMPT_LENGTH = 60;
 const MAX_IMAGE_DATA_LENGTH = 200_000;
-const WIN_POINTS = 2;
+export const WIN_POINTS = 2;
 
 const FALLBACK_PROMPTS = [
   'A cat riding a skateboard',
@@ -43,10 +43,9 @@ interface DrawGameState {
   results: DrawVoteResult[];
 }
 
-function pickRandomPrompter(ctx: GameContext, excludeId?: string): string {
+function pickRandomPrompter(ctx: GameContext): string {
   const pool = connectedOrAllPlayers(ctx);
-  const candidates = excludeId && pool.length > 1 ? pool.filter((p) => p.id !== excludeId) : pool;
-  const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+  const chosen = pool[Math.floor(Math.random() * pool.length)];
   return chosen?.id ?? '';
 }
 
@@ -57,11 +56,11 @@ function sanitizeImageData(raw: unknown): string | null {
   return raw;
 }
 
-function startPromptPhase(ctx: GameContext, round: number, excludePrompterId?: string): DrawGameState {
-  const prompterId = pickRandomPrompter(ctx, excludePrompterId);
+function startPromptPhase(ctx: GameContext): DrawGameState {
+  const prompterId = pickRandomPrompter(ctx);
   ctx.setTimer(PROMPT_DURATION_MS);
   return {
-    round,
+    round: 1,
     phase: 'PROMPTING',
     prompterId,
     prompt: null,
@@ -95,20 +94,20 @@ function buildEntries(state: DrawGameState, ctx: GameContext): DrawEntry[] {
   }));
 }
 
-function startVotingPhase(ctx: GameContext, state: DrawGameState): DrawGameState {
-  const voteMode: DrawVoteMode = Math.random() < 0.5 ? 'best' : 'worst';
-  ctx.setTimer(VOTE_DURATION_MS);
-  return {
-    ...state,
-    phase: 'VOTING',
-    voteMode,
-    votes: {},
-    results: [],
-  };
+function hasVotableTarget(ctx: GameContext, state: DrawGameState, playerId: string): boolean {
+  return state.submittedIds.some((id) => id !== playerId && Boolean(ctx.getPlayer(id)));
+}
+
+function allConnectedDone(
+  ctx: GameContext,
+  done: (playerId: string) => boolean,
+  excludeId?: string
+): boolean {
+  const active = connectedOrAllPlayers(ctx).filter((p) => p.id !== excludeId);
+  return active.length > 0 && active.every((p) => done(p.id));
 }
 
 function tallyResults(ctx: GameContext, state: DrawGameState): DrawGameState {
-  ctx.clearTimer();
   const tally = buildVoteTally(ctx, state.votes);
   const maxVotes = tally[0]?.votes ?? 0;
 
@@ -126,6 +125,7 @@ function tallyResults(ctx: GameContext, state: DrawGameState): DrawGameState {
     };
   });
 
+  ctx.setTimer(RESULTS_DURATION_MS, false);
   return {
     ...state,
     phase: 'RESULTS',
@@ -133,28 +133,20 @@ function tallyResults(ctx: GameContext, state: DrawGameState): DrawGameState {
   };
 }
 
-function allConnectedDone(
-  ctx: GameContext,
-  done: (playerId: string) => boolean,
-  excludeId?: string
-): boolean {
-  const active = connectedOrAllPlayers(ctx).filter((p) => p.id !== excludeId);
-  return active.length > 0 && active.every((p) => done(p.id));
-}
-
-function handleRoundControl(
-  ctx: GameContext,
-  state: DrawGameState,
-  action: DrawAction
-): DrawGameState {
-  if (state.phase !== 'RESULTS') return state;
-  if (action.type === 'next_round') {
-    return startPromptPhase(ctx, state.round + 1, state.prompterId);
+function startVotingPhase(ctx: GameContext, state: DrawGameState): DrawGameState {
+  const voteMode: DrawVoteMode = Math.random() < 0.5 ? 'best' : 'worst';
+  ctx.clearTimer();
+  const nextState: DrawGameState = {
+    ...state,
+    phase: 'VOTING',
+    voteMode,
+    votes: {},
+    results: [],
+  };
+  if (allConnectedDone(ctx, (id) => !hasVotableTarget(ctx, nextState, id))) {
+    return tallyResults(ctx, nextState);
   }
-  if (action.type === 'finish_game') {
-    ctx.endGame();
-  }
-  return state;
+  return nextState;
 }
 
 function handlePlayerExit(
@@ -174,7 +166,14 @@ function handlePlayerExit(
   if (state.phase === 'DRAWING' && allConnectedDone(ctx, (id) => state.submittedIds.includes(id), playerId)) {
     return startVotingPhase(ctx, state);
   }
-  if (state.phase === 'VOTING' && allConnectedDone(ctx, (id) => Boolean(state.votes[id]), playerId)) {
+  if (
+    state.phase === 'VOTING' &&
+    allConnectedDone(
+      ctx,
+      (id) => Boolean(state.votes[id]) || !hasVotableTarget(ctx, state, id),
+      playerId
+    )
+  ) {
     return tallyResults(ctx, state);
   }
   return state;
@@ -188,7 +187,7 @@ export const drawGame: GameDefinition<DrawGameState, DrawHostView, DrawPlayerVie
   maxPlayers: 12,
 
   onStart(ctx) {
-    return startPromptPhase(ctx, 1);
+    return startPromptPhase(ctx);
   },
 
   onPlayerAction(ctx, state, playerId, action) {
@@ -238,17 +237,18 @@ export const drawGame: GameDefinition<DrawGameState, DrawHostView, DrawPlayerVie
         ...state,
         votes: nextVotes,
       };
-      if (allConnectedDone(ctx, (id) => Boolean(nextVotes[id]))) {
+      if (
+        allConnectedDone(
+          ctx,
+          (id) => Boolean(nextVotes[id]) || !hasVotableTarget(ctx, nextState, id)
+        )
+      ) {
         return tallyResults(ctx, nextState);
       }
       return nextState;
     }
 
-    return handleRoundControl(ctx, state, action);
-  },
-
-  onHostAction(ctx, state, action) {
-    return handleRoundControl(ctx, state, action);
+    return state;
   },
 
   onTimerExpired(ctx, state) {
@@ -257,10 +257,14 @@ export const drawGame: GameDefinition<DrawGameState, DrawHostView, DrawPlayerVie
       return startDrawingPhase(ctx, state, fallback);
     }
     if (state.phase === 'DRAWING') {
-      return startVotingPhase(ctx, state);
+      const autoSubmitted = Array.from(
+        new Set([...state.submittedIds, ...connectedOrAllPlayers(ctx).map((p) => p.id)])
+      );
+      return startVotingPhase(ctx, { ...state, submittedIds: autoSubmitted });
     }
-    if (state.phase === 'VOTING') {
-      return tallyResults(ctx, state);
+    if (state.phase === 'RESULTS') {
+      ctx.endGame();
+      return state;
     }
     return state;
   },
@@ -287,6 +291,12 @@ export const drawGame: GameDefinition<DrawGameState, DrawHostView, DrawPlayerVie
 
   getHostView(state, ctx) {
     const prompter = ctx.getPlayer(state.prompterId);
+    const entries =
+      state.phase === 'DRAWING'
+        ? buildEntries(state, ctx)
+        : state.phase === 'VOTING'
+          ? buildEntries(state, ctx).filter((entry) => entry.submitted)
+          : [];
     return {
       round: state.round,
       phase: state.phase,
@@ -294,7 +304,7 @@ export const drawGame: GameDefinition<DrawGameState, DrawHostView, DrawPlayerVie
       prompterName: prompter?.name ?? 'Player',
       prompt: state.prompt,
       voteMode: state.voteMode,
-      entries: state.phase === 'DRAWING' || state.phase === 'VOTING' ? buildEntries(state, ctx) : [],
+      entries,
       votedPlayerIds: Object.keys(state.votes),
       results: state.results,
     };
@@ -304,7 +314,9 @@ export const drawGame: GameDefinition<DrawGameState, DrawHostView, DrawPlayerVie
     const prompter = ctx.getPlayer(state.prompterId);
     const votableEntries =
       state.phase === 'VOTING'
-        ? buildEntries(state, ctx).filter((entry) => entry.playerId !== playerId)
+        ? buildEntries(state, ctx).filter(
+            (entry) => entry.submitted && entry.playerId !== playerId
+          )
         : [];
     return {
       round: state.round,
@@ -313,6 +325,7 @@ export const drawGame: GameDefinition<DrawGameState, DrawHostView, DrawPlayerVie
       prompterName: prompter?.name ?? 'Player',
       prompt: state.prompt,
       hasSubmitted: state.submittedIds.includes(playerId),
+      myDrawingData: state.drawings[playerId] ?? '',
       voteMode: state.voteMode,
       hasVoted: Boolean(state.votes[playerId]),
       votedForId: state.votes[playerId] ?? null,

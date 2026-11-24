@@ -6,6 +6,18 @@ import {
   type MusicQuizRoundResult,
   type MusicQuizSong,
 } from '../../shared/games/musicquiz';
+import type { GameContext, GameDefinition } from '../game';
+import {
+  actedConnectedIds,
+  allConnected,
+  awardCappedScore,
+  connectedPlayers,
+  createRoomHistory,
+  parseRounds,
+  shuffle,
+  withoutKey,
+} from './helpers';
+import { getMusicQuizCatalog, previewUrlFor, refreshPreviews } from './musicquizCatalog';
 
 export interface MusicQuizState {
   phase: MusicQuizPhase;
@@ -16,13 +28,10 @@ export interface MusicQuizState {
   guesses: Record<string, MusicQuizGuess>;
   lastResults: MusicQuizRoundResult[];
 }
-import type { GameContext, GameDefinition } from '../game';
-import { allConnected, awardCappedScore, connectedPlayers, createRoomHistory, parseRounds, shuffle, withoutKey } from './helpers';
-import { getMusicQuizCatalog, previewUrlFor, refreshPreviews } from './musicquizCatalog';
 
-const INTRO_MS = 4_000;
-const GUESS_MS = 30_000;
-const REVEAL_MS = 8_000;
+export const INTRO_MS = 4_000;
+export const GUESS_MS = 30_000;
+export const REVEAL_MS = 8_000;
 const MIN_ROUNDS = 1;
 const MAX_ROUNDS = 20;
 const DEFAULT_ROUNDS = 5;
@@ -96,9 +105,7 @@ function reveal(ctx: GameContext, state: MusicQuizState): MusicQuizState {
 
   state.phase = 'REVEAL';
   state.lastResults = results;
-  if (state.round < state.totalRounds) {
-    ctx.setTimer(REVEAL_MS);
-  }
+  ctx.setTimer(REVEAL_MS);
   return state;
 }
 
@@ -189,16 +196,6 @@ export function createMusicQuizGame(
       return maybeReveal(ctx, state);
     },
 
-    onHostAction(ctx, state, action) {
-      if (action.type === 'reveal' && state.phase === 'GUESSING') {
-        return reveal(ctx, state);
-      }
-      if (action.type === 'next' && state.phase === 'REVEAL') {
-        return nextRound(ctx, state);
-      }
-      return state;
-    },
-
     onPlayerDisconnect(ctx, state) {
       return maybeReveal(ctx, state);
     },
@@ -213,6 +210,7 @@ export function createMusicQuizGame(
       return {
         ...sharedView(ctx, state),
         audioUrl: state.phase === 'GUESSING' && song ? previewUrlFor(song) : null,
+        guessedPlayerIds: actedConnectedIds(ctx, (id) => state.guesses[id] !== undefined),
       };
     },
 

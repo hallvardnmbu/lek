@@ -9,7 +9,7 @@
 }
 
 .tk-topbar {
-  width: min(100%, calc((100vh - 260px) * 16 / 9));
+  width: min(100%, calc((100vh - 190px) * 16 / 9));
   max-width: 1280px;
   display: flex;
   justify-content: space-between;
@@ -23,7 +23,7 @@
 
 .tk-stage {
   position: relative;
-  width: min(100%, calc((100vh - 260px) * 16 / 9));
+  width: min(100%, calc((100vh - 190px) * 16 / 9));
   max-width: 1280px;
   aspect-ratio: 16 / 9;
   border: 2px solid var(--accent);
@@ -72,10 +72,6 @@
   font-weight: 400;
   color: var(--accent);
   line-height: 1;
-}
-
-.tk-tv .tv-action-bar {
-  margin-top: 0;
 }
 
 .tk-mobile {

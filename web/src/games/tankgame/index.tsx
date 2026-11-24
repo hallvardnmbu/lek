@@ -16,8 +16,8 @@ import {
 } from '../registry';
 import './tankgame.css';
 
-function clamp01(value: number): number {
-  return Math.max(0, Math.min(1, value));
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }
 
 function lerp(a: number, b: number, t: number): number {
@@ -70,16 +70,15 @@ function useLiveTimeLeft(
   };
 }
 
-interface TankSnap {
+interface RenderedTank {
   x: number;
   y: number;
   angle: number;
 }
 
-interface Snapshot {
-  at: number;
-  tanks: Map<string, TankSnap>;
-  bullets: Map<number, { x: number; y: number }>;
+interface RenderedBullet {
+  x: number;
+  y: number;
 }
 
 function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
@@ -90,15 +89,35 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
   );
 
   let canvas: HTMLCanvasElement | null = null;
-  let themeColors: { ink: string; text: string; accent: string; peach: string } | null = null;
-  let prev: Snapshot | null = null;
-  let curr: Snapshot | null = null;
+  let ctx2d: CanvasRenderingContext2D | null = null;
+  let themeColors: {
+    surface: string;
+    ink: string;
+    text: string;
+    accent: string;
+    peach: string;
+  } | null = null;
+
+  let snapshotAt = 0;
+  let lastFrameTs = 0;
+  const renderedTanks = new Map<string, RenderedTank>();
+  const renderedBullets = new Map<number, RenderedBullet>();
+  let aliveIds = new Set<string>();
   const blasts: { x: number; y: number; at: number }[] = [];
+
+  function getCanvasCtx(): CanvasRenderingContext2D | null {
+    if (!canvas) return null;
+    if (!ctx2d) {
+      ctx2d = canvas.getContext('2d', { alpha: false });
+    }
+    return ctx2d;
+  }
 
   function getThemeColors(el: HTMLCanvasElement) {
     if (!themeColors) {
       const s = getComputedStyle(el);
       themeColors = {
+        surface: s.getPropertyValue('--surface').trim() || '#690707',
         ink: s.getPropertyValue('--ink').trim() || '#1a0505',
         text: s.getPropertyValue('--text').trim() || '#fbeee6',
         accent: s.getPropertyValue('--accent').trim() || '#dba952',
@@ -112,31 +131,49 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
     () => view(),
     (host) => {
       if (!host) return;
-      const now = Date.now();
-      const snap: Snapshot = {
-        at: now,
-        tanks: new Map(
-          host.tanks
-            .filter((t) => t.alive)
-            .map((t) => [t.playerId, { x: t.x, y: t.y, angle: t.angle }])
-        ),
-        bullets: new Map(host.bullets.map((b) => [b.id, { x: b.x, y: b.y }])),
-      };
-      if (curr) {
-        for (const [id, pos] of curr.tanks) {
-          if (!snap.tanks.has(id)) blasts.push({ x: pos.x, y: pos.y, at: now });
+      const now = performance.now();
+      snapshotAt = now;
+
+      const nextAlive = new Set<string>();
+      for (const tank of host.tanks) {
+        if (tank.alive) nextAlive.add(tank.playerId);
+      }
+
+      for (const id of aliveIds) {
+        if (!nextAlive.has(id)) {
+          const prevRender = renderedTanks.get(id);
+          const serverTank = host.tanks.find((t) => t.playerId === id);
+          const bx = prevRender?.x ?? serverTank?.x;
+          const by = prevRender?.y ?? serverTank?.y;
+          if (bx !== undefined && by !== undefined) {
+            blasts.push({ x: bx, y: by, at: now });
+          }
+          renderedTanks.delete(id);
         }
       }
-      prev = curr;
-      curr = snap;
-      if (host.phase !== 'PLAYING') draw();
+      aliveIds = nextAlive;
+
+      for (const id of renderedTanks.keys()) {
+        if (!nextAlive.has(id)) renderedTanks.delete(id);
+      }
+
+      const activeBulletIds = new Set(host.bullets.map((b) => b.id));
+      for (const id of renderedBullets.keys()) {
+        if (!activeBulletIds.has(id)) renderedBullets.delete(id);
+      }
+
+      if (host.phase === 'COUNTDOWN') {
+        draw(now);
+      }
     }
   );
 
   const nameOf = (playerId: string) => playersById().get(playerId) ?? 'Unknown';
 
   const elimText = (e: TankGameElimination) =>
-    e.byPlayerId ? `${nameOf(e.byPlayerId)} destroyed ${nameOf(e.playerId)}` : `${nameOf(e.playerId)} left the battle`;
+    e.byPlayerId
+      ? `${nameOf(e.byPlayerId)} destroyed ${nameOf(e.playerId)}`
+      : `${nameOf(e.playerId)} left the battle`;
 
   function drawTankBody(
     ctx: CanvasRenderingContext2D,
@@ -158,49 +195,79 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
     ctx.restore();
   }
 
-  function draw(): void {
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx || !curr) return;
+  function draw(ts: number): void {
+    const ctx = getCanvasCtx();
+    const host = view();
+    if (!canvas || !ctx || !host) return;
     const theme = getThemeColors(canvas);
-    const now = Date.now();
-    const span = prev && curr.at > prev.at ? curr.at - prev.at : 0;
-    const t = span > 1 ? clamp01((now - curr.at) / span) : 1;
 
-    ctx.clearRect(0, 0, TANK_WORLD_WIDTH, TANK_WORLD_HEIGHT);
+    const dtSec = lastFrameTs > 0 ? Math.min(0.05, Math.max(0, (ts - lastFrameTs) / 1000)) : 0;
+    lastFrameTs = ts;
+    const ageSec = snapshotAt > 0 ? Math.min(0.12, Math.max(0, (ts - snapshotAt) / 1000)) : 0;
+    const alpha = dtSec > 0 ? 1 - Math.exp(-18 * dtSec) : 1;
+
+    ctx.fillStyle = theme.surface;
+    ctx.fillRect(0, 0, TANK_WORLD_WIDTH, TANK_WORLD_HEIGHT);
 
     ctx.fillStyle = theme.accent;
     for (const wall of TANK_WALLS) ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
 
     ctx.fillStyle = theme.peach;
-    for (const [id, pos] of curr.bullets) {
-      const p = prev?.bullets.get(id);
-      const x = p ? lerp(p.x, pos.x, t) : pos.x;
-      const y = p ? lerp(p.y, pos.y, t) : pos.y;
+    for (const bullet of host.bullets) {
+      const targetX = clamp(bullet.x + bullet.vx * ageSec, 16, TANK_WORLD_WIDTH - 16);
+      const targetY = clamp(bullet.y + bullet.vy * ageSec, 16, TANK_WORLD_HEIGHT - 16);
+      let rb = renderedBullets.get(bullet.id);
+      if (!rb) {
+        rb = { x: targetX, y: targetY };
+        renderedBullets.set(bullet.id, rb);
+      } else {
+        const nextX = clamp(rb.x + bullet.vx * dtSec, 16, TANK_WORLD_WIDTH - 16);
+        const nextY = clamp(rb.y + bullet.vy * dtSec, 16, TANK_WORLD_HEIGHT - 16);
+        if (Math.hypot(targetX - nextX, targetY - nextY) > 120) {
+          rb.x = targetX;
+          rb.y = targetY;
+        } else {
+          rb.x = clamp(lerp(nextX, targetX, alpha), 16, TANK_WORLD_WIDTH - 16);
+          rb.y = clamp(lerp(nextY, targetY, alpha), 16, TANK_WORLD_HEIGHT - 16);
+        }
+      }
       ctx.beginPath();
-      ctx.arc(x, y, 5, 0, Math.PI * 2);
+      ctx.arc(rb.x, rb.y, 5, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    const host = view();
-    if (host) {
-      for (const tank of host.tanks) {
-        if (!tank.alive) continue;
-        const p = prev?.tanks.get(tank.playerId);
-        const x = p ? lerp(p.x, tank.x, t) : tank.x;
-        const y = p ? lerp(p.y, tank.y, t) : tank.y;
-        const angle = p ? lerpAngle(p.angle, tank.angle, t) : tank.angle;
-        drawTankBody(ctx, x, y, angle, TANK_COLORS[tank.colorIndex] ?? '#ffffff', theme.ink);
-        ctx.fillStyle = theme.accent;
-        ctx.font = '600 16px system-ui, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(nameOf(tank.playerId), x, y - 26);
+    ctx.font = '600 16px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+
+    for (const tank of host.tanks) {
+      if (!tank.alive) continue;
+      const targetX = clamp(tank.x + tank.vx * ageSec, 16, TANK_WORLD_WIDTH - 16);
+      const targetY = clamp(tank.y + tank.vy * ageSec, 16, TANK_WORLD_HEIGHT - 16);
+      let rt = renderedTanks.get(tank.playerId);
+      if (!rt) {
+        rt = { x: targetX, y: targetY, angle: tank.angle };
+        renderedTanks.set(tank.playerId, rt);
+      } else {
+        const nextX = clamp(rt.x + tank.vx * dtSec, 16, TANK_WORLD_WIDTH - 16);
+        const nextY = clamp(rt.y + tank.vy * dtSec, 16, TANK_WORLD_HEIGHT - 16);
+        if (Math.hypot(targetX - nextX, targetY - nextY) > 120) {
+          rt.x = targetX;
+          rt.y = targetY;
+          rt.angle = tank.angle;
+        } else {
+          rt.x = clamp(lerp(nextX, targetX, alpha), 16, TANK_WORLD_WIDTH - 16);
+          rt.y = clamp(lerp(nextY, targetY, alpha), 16, TANK_WORLD_HEIGHT - 16);
+          rt.angle = lerpAngle(rt.angle, tank.angle, alpha);
+        }
       }
+      drawTankBody(ctx, rt.x, rt.y, rt.angle, TANK_COLORS[tank.colorIndex] ?? '#ffffff', theme.ink);
+      ctx.fillStyle = theme.accent;
+      ctx.fillText(nameOf(tank.playerId), rt.x, rt.y - 26);
     }
 
-    while (blasts.length > 0 && now - blasts[0].at > 600) blasts.shift();
+    while (blasts.length > 0 && ts - blasts[0].at > 600) blasts.shift();
     for (const blast of blasts) {
-      const age = (now - blast.at) / 600;
+      const age = clamp((ts - blast.at) / 600, 0, 1);
       ctx.globalAlpha = 1 - age;
       ctx.strokeStyle = theme.peach;
       ctx.lineWidth = 4;
@@ -212,11 +279,18 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
   }
 
   createEffect(
-    () => view()?.phase === 'PLAYING',
-    (playing) => {
-      if (!playing) return;
-      let frame = requestAnimationFrame(function loop() {
-        draw();
+    () => {
+      const phase = view()?.phase;
+      return phase === 'PLAYING' || phase === 'ENDING';
+    },
+    (active) => {
+      if (!active) {
+        lastFrameTs = 0;
+        return;
+      }
+      lastFrameTs = 0;
+      let frame = requestAnimationFrame(function loop(ts) {
+        draw(ts);
         frame = requestAnimationFrame(loop);
       });
       onCleanup(() => cancelAnimationFrame(frame));
@@ -227,16 +301,24 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
     <div class="tk-tv">
       <div class="tk-topbar">
         <span>{view()?.aliveCount ?? 0} tanks in play</span>
-        <Show when={view()?.phase !== 'PLAYING'}>
+        <Show when={view()?.phase === 'COUNTDOWN'}>
           <span class="tk-countdown">
             BATTLE STARTING <strong class="tk-count-num">{Math.max(1, secondsLeft(props.remainingMs))}</strong>
+          </span>
+        </Show>
+        <Show when={view()?.phase === 'ENDING'}>
+          <span class="tk-countdown">
+            {view()?.winnerId ? `WINNER: ${nameOf(view()!.winnerId!)}` : 'DRAW'}
           </span>
         </Show>
         <span class="tk-clock">{clockText(liveTimeLeftMs())}</span>
       </div>
       <div class="tk-stage">
         <canvas
-          ref={(el) => (canvas = el)}
+          ref={(el) => {
+            canvas = el;
+            ctx2d = null;
+          }}
           width={TANK_WORLD_WIDTH}
           height={TANK_WORLD_HEIGHT}
         />
@@ -245,11 +327,6 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
             {(e) => <div class="tk-feed-row">{elimText(e)}</div>}
           </For>
         </div>
-      </div>
-      <div class="tv-action-bar">
-        <button class="btn btn-tv" onClick={props.endGame}>
-          End Game
-        </button>
       </div>
     </div>
   );
@@ -400,8 +477,12 @@ function TankGameMobileView(props: MobileGameViewProps<TankGamePlayerView>) {
         <span class="tk-clock">{clockText(liveTimeLeftMs())}</span>
       </div>
 
-      <Show when={view()?.phase !== 'PLAYING'}>
+      <Show when={view()?.phase === 'COUNTDOWN'}>
         <p class="tk-status">Battle starts in {Math.max(1, secondsLeft(props.remainingMs))}s</p>
+      </Show>
+
+      <Show when={view()?.phase === 'ENDING'}>
+        <p class="tk-status">{view()?.alive ? 'Victory!' : 'Battle over'}</p>
       </Show>
 
       <Show when={view()?.phase === 'PLAYING' && view()?.participating === false}>

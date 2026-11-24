@@ -5,7 +5,7 @@ interface TvGameFallbackProps {
   state: RoomState;
   gameInfo: GameInfo | null;
   lastEvent: { event: string; payload: unknown; at: number } | null;
-  onEndGame: () => void;
+  onEndGame?: () => void;
 }
 
 export function TvGameFallback(props: TvGameFallbackProps) {
@@ -31,12 +31,6 @@ export function TvGameFallback(props: TvGameFallbackProps) {
           </p>
         )}
       </Show>
-
-      <div class="tv-action-bar">
-        <button class="btn" onClick={props.onEndGame}>
-          End
-        </button>
-      </div>
     </div>
   );
 }

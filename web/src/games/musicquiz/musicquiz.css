@@ -1,3 +1,13 @@
+@keyframes mq-eq-bounce {
+  0%,
+  100% {
+    transform: scaleY(0.28);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
 .mq-eq {
   display: flex;
   align-items: flex-end;
@@ -11,19 +21,33 @@
   height: 100%;
   border-radius: 5px;
   background: var(--accent);
+  transform-origin: bottom;
+  animation: mq-eq-bounce 0.85s ease-in-out infinite;
 }
 
-.mq-eq span:nth-child(1) { height: 42%; }
-.mq-eq span:nth-child(2) { height: 85%; }
-.mq-eq span:nth-child(3) { height: 60%; }
-.mq-eq span:nth-child(4) { height: 95%; }
-.mq-eq span:nth-child(5) { height: 50%; }
+.mq-eq span:nth-child(1) {
+  animation-duration: 0.78s;
+  animation-delay: 0s;
+}
 
-.mq-progress {
-  margin-top: 1.25rem;
-  font-size: 1.4rem;
-  font-weight: 800;
-  color: var(--accent);
+.mq-eq span:nth-child(2) {
+  animation-duration: 0.62s;
+  animation-delay: -0.25s;
+}
+
+.mq-eq span:nth-child(3) {
+  animation-duration: 0.92s;
+  animation-delay: -0.45s;
+}
+
+.mq-eq span:nth-child(4) {
+  animation-duration: 0.68s;
+  animation-delay: -0.15s;
+}
+
+.mq-eq span:nth-child(5) {
+  animation-duration: 0.84s;
+  animation-delay: -0.35s;
 }
 
 .mq-no-audio {
@@ -43,53 +67,20 @@
 .mq-answer-title {
   font-size: 3.25rem;
   margin: 0.25rem 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .mq-answer-artist {
   font-size: 1.6rem;
   color: var(--muted);
   margin: 0 0 1.5rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
-.mq-result-pills {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.75rem;
-  max-width: 900px;
-}
-
-.mq-result-pill {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  background: var(--surface);
-  border-radius: 12px;
-  padding: 0.6rem 1.1rem;
-  font-size: 1.1rem;
-  font-weight: 700;
-}
-
-.mq-result-pill strong {
-  color: var(--success);
-}
-
-.mq-pill-guess {
-  max-width: 240px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 500;
-  font-size: 0.95rem;
-  color: var(--muted);
-}
-
-.mq-result-pill.missed strong {
-  color: var(--danger);
-}
-
-.mq-standings {
-  max-width: 640px;
+.mq-results {
+  max-width: 760px;
 }
 
 .mq-next-hint {
@@ -123,22 +114,30 @@
 
 .mq-search-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.6rem;
   max-height: 320px;
   overflow-y: auto;
 }
 
 .mq-song-btn {
+  min-width: 0;
   gap: 0.15rem;
 }
 
 .mq-song-title {
+  max-width: 100%;
   font-weight: 800;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .mq-song-artist {
+  max-width: 100%;
   font-size: 0.85rem;
   color: var(--muted);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .mq-search-hint {
@@ -165,73 +164,49 @@
   font-size: 0.78rem;
   font-weight: 900;
   letter-spacing: 0.12em;
-  color: var(--success);
+  color: var(--accent);
 }
 
 .mq-locked-song {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 800;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .mq-locked-artist {
   margin: 0.15rem 0 0.75rem;
   color: var(--muted);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .mq-reveal-song {
   margin: 0.25rem 0 0;
   font-size: 1.6rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .mq-reveal-artist {
   margin: 0 0 1rem;
   color: var(--muted);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .mq-verdict {
   margin: 0 0 1rem;
   font-weight: 900;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .mq-verdict.mq-correct {
-  color: var(--success);
+  color: var(--accent);
 }
 
 .mq-verdict.mq-wrong {
-  color: var(--danger);
-}
-
-.mq-round-results {
-  display: grid;
-  gap: 0.5rem;
-}
-
-.mq-round-row {
-  display: flex;
-  justify-content: space-between;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0.55rem 0.9rem;
-  font-weight: 700;
-}
-
-.mq-round-row.ok {
-  border-color: var(--success);
-}
-
-.mq-round-guess {
-  flex: 1;
-  margin: 0 0.75rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 500;
-  font-size: 0.9rem;
-  color: var(--muted);
-}
-
-.mq-round-row span:last-child {
-  color: var(--success);
+  color: var(--pink);
 }

@@ -1,5 +1,6 @@
 import type {
   PriceGuessAction,
+  PriceGuessDrinkReason,
   PriceGuessHostView,
   PriceGuessPhase,
   PriceGuessPlayerView,
@@ -7,7 +8,13 @@ import type {
   PriceGuessResultEntry,
 } from '../../shared/games/priceguess';
 import type { GameContext, GameDefinition } from '../game';
-import { allConnected, awardCappedScore, countConnectedActed, playerName } from './helpers';
+import {
+  actedConnectedIds,
+  allConnected,
+  awardCappedScore,
+  countConnectedActed,
+  playerName,
+} from './helpers';
 import {
   fetchRandomProduct,
   type PriceGuessProduct,
@@ -15,6 +22,8 @@ import {
 } from './priceguess-db';
 
 const ROUND_DURATION_MS = 30_000;
+export const REVEAL_DURATION_MS = 7_500;
+export const TOTAL_ROUNDS = 3;
 const WIN_POINTS = 2;
 
 interface GuessEntry {
@@ -28,8 +37,9 @@ interface PriceGuessState {
   product: PriceGuessProduct | null;
   guesses: Record<string, GuessEntry>;
   usedIds: string[];
-  winnerId: string | null;
-  drinkerId: string | null;
+  winnerIds: string[];
+  drinkerIds: string[];
+  drinkReason: PriceGuessDrinkReason;
   error: string | null;
 }
 
@@ -80,24 +90,24 @@ function startRound(
     product: null,
     guesses: {},
     usedIds,
-    winnerId: null,
-    drinkerId: null,
+    winnerIds: [],
+    drinkerIds: [],
+    drinkReason: null,
     error: null,
   };
 }
 
-function handleRoundAdvance(
+function advanceRound(
   ctx: GameContext,
   fetcher: ProductFetcher,
-  state: PriceGuessState,
-  action: PriceGuessAction
-): PriceGuessState | null {
-  if (action.type !== 'next_round' && action.type !== 'skip_product') return null;
-  if (state.phase === 'REVEAL' || (action.type === 'skip_product' && state.phase !== 'LOADING')) {
-    ctx.clearTimer();
-    return startRound(ctx, fetcher, state.round + 1, state.usedIds);
+  state: PriceGuessState
+): PriceGuessState {
+  if (state.round >= TOTAL_ROUNDS) {
+    ctx.endGame();
+    return state;
   }
-  return state;
+  ctx.clearTimer();
+  return startRound(ctx, fetcher, state.round + 1, state.usedIds);
 }
 
 function revealRound(ctx: GameContext, state: PriceGuessState): void {
@@ -115,26 +125,38 @@ function revealRound(ctx: GameContext, state: PriceGuessState): void {
     }))
     .sort((a, b) => a.diff - b.diff);
 
-  const winner = submitted[0] ?? null;
-  state.winnerId = winner ? winner.id : null;
-  if (winner) {
-    awardCappedScore(ctx, winner.id, WIN_POINTS);
-  }
-
-  state.drinkerId = null;
-  const activePlayers = players.filter((p) => p.connected || state.guesses[p.id]);
-  if (activePlayers.length >= 2) {
-    const nonSubmitters = activePlayers.filter((p) => !state.guesses[p.id]);
-    if (nonSubmitters.length > 0) {
-      state.drinkerId = nonSubmitters[Math.floor(Math.random() * nonSubmitters.length)].id;
-    } else if (submitted.length >= 2) {
-      state.drinkerId = submitted[submitted.length - 1].id;
+  state.winnerIds = [];
+  if (submitted.length > 0) {
+    const minDiff = submitted[0].diff;
+    state.winnerIds = submitted.filter((s) => s.diff === minDiff).map((s) => s.id);
+    for (const id of state.winnerIds) {
+      awardCappedScore(ctx, id, WIN_POINTS);
     }
   }
 
+  state.drinkerIds = [];
+  state.drinkReason = null;
+  const activePlayers = players.filter((p) => p.connected || Boolean(state.guesses[p.id]));
+  if (activePlayers.length >= 2) {
+    const nonSubmitters = activePlayers.filter((p) => !state.guesses[p.id]);
+    if (nonSubmitters.length > 0) {
+      state.drinkerIds = nonSubmitters.map((p) => p.id);
+      state.drinkReason = 'no_guess';
+    } else if (submitted.length >= 2) {
+      const maxDiff = submitted[submitted.length - 1].diff;
+      const minDiff = submitted[0].diff;
+      if (maxDiff > minDiff) {
+        state.drinkerIds = submitted.filter((s) => s.diff === maxDiff).map((s) => s.id);
+        state.drinkReason = 'furthest';
+      }
+    }
+  }
+
+  ctx.setTimer(REVEAL_DURATION_MS, false);
   ctx.broadcastEvent('priceguess_reveal', {
-    winnerId: state.winnerId,
-    drinkerId: state.drinkerId,
+    winnerIds: state.winnerIds,
+    drinkerIds: state.drinkerIds,
+    drinkReason: state.drinkReason,
     actualPrice: state.product?.price ?? null,
   });
 }
@@ -160,8 +182,8 @@ function buildResultEntries(ctx: GameContext, state: PriceGuessState): PriceGues
         name: p.name,
         guess: isReveal && guess ? roundMoney(guess.price) : null,
         diff: isReveal && guess ? roundMoney(guess.diff) : null,
-        isWinner: isReveal && state.winnerId === p.id,
-        drinks: isReveal && state.drinkerId === p.id,
+        isWinner: isReveal && state.winnerIds.includes(p.id),
+        drinks: isReveal && state.drinkerIds.includes(p.id),
         connected: p.connected,
         score: p.score,
       };
@@ -194,9 +216,6 @@ export function createPriceGuessGame(
 
     onPlayerAction(ctx, state, playerId, action) {
       const a = action as PriceGuessAction;
-      const advanced = handleRoundAdvance(ctx, fetcher, state, a);
-      if (advanced) return advanced;
-
       if (a.type !== 'submit_guess') return state;
       if (state.phase !== 'GUESSING' || !state.product) return state;
 
@@ -212,15 +231,14 @@ export function createPriceGuessGame(
       return state;
     },
 
-    onHostAction(ctx, state, action) {
-      return handleRoundAdvance(ctx, fetcher, state, action) ?? state;
-    },
-
     onTimerExpired(ctx, state) {
       if (state.phase === 'GUESSING') {
         revealRound(ctx, state);
+        return state;
       }
-
+      if (state.phase === 'REVEAL') {
+        return advanceRound(ctx, fetcher, state);
+      }
       return state;
     },
 
@@ -244,13 +262,20 @@ export function createPriceGuessGame(
       return {
         phase: state.phase,
         round: state.round,
+        totalRounds: TOTAL_ROUNDS,
         product: toProductInfo(state.product),
         actualPrice: isReveal && state.product ? roundMoney(state.product.price) : null,
         lockedCount,
         totalCount,
+        lockedPlayerIds: actedConnectedIds(ctx, (id) => Boolean(state.guesses[id])),
         players: buildResultEntries(ctx, state),
-        winnerName: playerName(ctx, state.winnerId),
-        drinkerName: playerName(ctx, state.drinkerId),
+        winnerNames: state.winnerIds
+          .map((id) => playerName(ctx, id))
+          .filter((name): name is string => Boolean(name)),
+        drinkerNames: state.drinkerIds
+          .map((id) => playerName(ctx, id))
+          .filter((name): name is string => Boolean(name)),
+        drinkReason: state.drinkReason,
         error: state.error,
       };
     },
@@ -262,13 +287,14 @@ export function createPriceGuessGame(
       return {
         phase: state.phase,
         round: state.round,
+        totalRounds: TOTAL_ROUNDS,
         productName: state.product?.name ?? null,
         lockedIn: Boolean(guess),
         guess: guess ? roundMoney(guess.price) : null,
         actualPrice: isReveal && state.product ? roundMoney(state.product.price) : null,
         diff: isReveal && guess ? roundMoney(guess.diff) : null,
-        isWinner: isReveal && state.winnerId === playerId,
-        drinks: isReveal && state.drinkerId === playerId,
+        isWinner: isReveal && state.winnerIds.includes(playerId),
+        drinks: isReveal && state.drinkerIds.includes(playerId),
       };
     },
   };

@@ -1,5 +1,7 @@
 export type PriceGuessPhase = 'LOADING' | 'GUESSING' | 'REVEAL';
 
+export type PriceGuessDrinkReason = 'no_guess' | 'furthest' | null;
+
 export interface PriceGuessProductInfo {
   name: string;
   category: string;
@@ -26,19 +28,23 @@ export interface PriceGuessResultEntry {
 export interface PriceGuessHostView {
   phase: PriceGuessPhase;
   round: number;
+  totalRounds: number;
   product: PriceGuessProductInfo | null;
   actualPrice: number | null;
   lockedCount: number;
   totalCount: number;
+  lockedPlayerIds: string[];
   players: PriceGuessResultEntry[];
-  winnerName: string | null;
-  drinkerName: string | null;
+  winnerNames: string[];
+  drinkerNames: string[];
+  drinkReason: PriceGuessDrinkReason;
   error: string | null;
 }
 
 export interface PriceGuessPlayerView {
   phase: PriceGuessPhase;
   round: number;
+  totalRounds: number;
   productName: string | null;
   lockedIn: boolean;
   guess: number | null;
@@ -48,7 +54,7 @@ export interface PriceGuessPlayerView {
   drinks: boolean;
 }
 
-export type PriceGuessAction =
-  | { type: 'submit_guess'; payload: { price: number } }
-  | { type: 'next_round' }
-  | { type: 'skip_product' };
+export type PriceGuessAction = {
+  type: 'submit_guess';
+  payload: { price: number };
+};

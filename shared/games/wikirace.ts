@@ -1,3 +1,6 @@
+export const STEP_ANIM_MS = 950;
+export const POST_PATH_HOLD_MS = 3_000;
+
 export type WikiRacePhase = 'LOADING' | 'RACING' | 'RESULTS';
 
 export interface WikiRacePlayerProgress {
@@ -10,18 +13,17 @@ export interface WikiRacePlayerProgress {
 
 export interface WikiRaceHostView {
   phase: WikiRacePhase;
-  round: number;
   startTitle: string;
   targetTitle: string;
   players: WikiRacePlayerProgress[];
-  loserId: string | null;
-  loserName: string | null;
+  winnerId: string | null;
+  winnerName: string | null;
+  winnerPath: string[];
   error: string | null;
 }
 
 export interface WikiRacePlayerView {
   phase: WikiRacePhase;
-  round: number;
   startTitle: string;
   targetTitle: string;
   currentTitle: string | null;
@@ -29,14 +31,15 @@ export interface WikiRacePlayerView {
   hops: number;
   canGoBack: boolean;
   loading: boolean;
+  loadingTitle: string | null;
   error: string | null;
   finishedRank: number | null;
-  isLoser: boolean;
-  loserName: string | null;
+  winnerId: string | null;
+  winnerName: string | null;
+  winnerPath: string[];
   players: WikiRacePlayerProgress[];
 }
 
 export type WikiRaceAction =
   | { type: 'navigate'; payload: { title: string } }
-  | { type: 'back' }
-  | { type: 'next_race' };
+  | { type: 'back' };

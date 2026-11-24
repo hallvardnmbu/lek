@@ -17,10 +17,8 @@ export interface CategoriesHostView {
   round: number;
   totalRounds: number;
   category: string | null;
-  categoryIsAi: boolean;
-  votedCount: number;
-  continueCount: number;
-  connectedCount: number;
+  votedPlayerIds: string[];
+  continuePlayerIds: string[];
   tally: CategoriesTallyEntry[];
 }
 

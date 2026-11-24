@@ -5,11 +5,14 @@ import type {
   MusicQuizPlayerView,
   MusicQuizSong,
 } from '../../shared/games/musicquiz';
-import { type MusicQuizState, createMusicQuizGame } from './musicquiz';
+import { REVEAL_MS, type MusicQuizState, createMusicQuizGame } from './musicquiz';
 
-type FullMusicQuizGame = Required<
-  GameDefinition<MusicQuizState, MusicQuizHostView, MusicQuizPlayerView>
->;
+type TestedMusicQuizGame = Omit<
+  Required<GameDefinition<MusicQuizState, MusicQuizHostView, MusicQuizPlayerView>>,
+  'onHostAction'
+> & {
+  onHostAction?: GameDefinition<MusicQuizState, MusicQuizHostView, MusicQuizPlayerView>['onHostAction'];
+};
 
 const TEST_SONGS: MusicQuizSong[] = [
   { id: 'song-a', title: 'Alpha Anthem', artist: 'The Aardvarks', previewUrl: 'https://example.com/a.mp3' },
@@ -20,8 +23,8 @@ const TEST_SONGS: MusicQuizSong[] = [
   { id: 'song-f', title: 'Foxtrot Funk', artist: 'The Foxes', previewUrl: 'https://example.com/f.mp3' },
 ];
 
-function makeGame(): FullMusicQuizGame {
-  return createMusicQuizGame(() => TEST_SONGS) as FullMusicQuizGame;
+function makeGame(): TestedMusicQuizGame {
+  return createMusicQuizGame(() => TEST_SONGS) as TestedMusicQuizGame;
 }
 
 interface TestPlayer {
@@ -32,6 +35,7 @@ interface TestPlayer {
 
 function createTestCtx(roomCode: string, players: TestPlayer[]) {
   const scores = new Map<string, number>();
+  const timers: number[] = [];
   let ended = false;
 
   const toGamePlayers = () =>
@@ -52,7 +56,9 @@ function createTestCtx(roomCode: string, players: TestPlayer[]) {
     setPlayerScore: (id, score) => scores.set(id, score),
     addPlayerScore: (id, delta) => scores.set(id, (scores.get(id) ?? 0) + delta),
     setPlayerMeta: () => {},
-    setTimer: () => {},
+    setTimer: (ms) => {
+      timers.push(ms);
+    },
     clearTimer: () => {},
     dispatch: () => {},
     broadcastEvent: () => {},
@@ -66,6 +72,7 @@ function createTestCtx(roomCode: string, players: TestPlayer[]) {
 
   return {
     ctx,
+    timers,
     isEnded: () => ended,
     score: (id: string) => scores.get(id) ?? 0,
   };
@@ -77,7 +84,7 @@ const twoPlayers: TestPlayer[] = [
 ];
 
 describe('Music Quiz game', () => {
-  it('runs intro -> guessing -> reveal rounds and ends after totalRounds', () => {
+  it('runs intro -> guessing -> reveal rounds and ends automatically after totalRounds', () => {
     const game = makeGame();
     const { ctx, isEnded, score } = createTestCtx('mq-lifecycle', twoPlayers);
 
@@ -93,6 +100,7 @@ describe('Music Quiz game', () => {
     const guessingHost = game.getHostView(state, ctx);
     expect(guessingHost.audioUrl).toBe(state.songs[0].previewUrl);
     expect(guessingHost.song).toBeNull();
+    expect(guessingHost.guessedPlayerIds).toEqual([]);
 
     const guessingView = game.getPlayerView(state, 'p1', ctx);
     expect(guessingView.song).toBeNull();
@@ -104,6 +112,7 @@ describe('Music Quiz game', () => {
 
     state = game.onPlayerAction(ctx, state, 'p1', { type: 'guess', payload: { songId: answerId } })!;
     expect(state.phase).toBe('GUESSING');
+    expect(game.getHostView(state, ctx).guessedPlayerIds).toEqual(['p1']);
 
     state = game.onPlayerAction(ctx, state, 'p2', { type: 'guess', payload: { songId: wrongId } })!;
     expect(state.phase).toBe('REVEAL');
@@ -112,6 +121,7 @@ describe('Music Quiz game', () => {
     expect(hostView.song?.title).toBe(state.songs[0].title);
     expect(hostView.song?.artist).toBe(state.songs[0].artist);
     expect(hostView.guessedCount).toBe(2);
+    expect(hostView.guessedPlayerIds).toEqual(['p1', 'p2']);
 
     const p1View = game.getPlayerView(state, 'p1', ctx);
     expect(p1View.myResult?.correct).toBe(true);
@@ -130,6 +140,7 @@ describe('Music Quiz game', () => {
     state = game.onTimerExpired(ctx, state)!;
     expect(state.phase).toBe('GUESSING');
     expect(game.getPlayerView(state, 'p1', ctx).myGuessSongId).toBeNull();
+    expect(game.getHostView(state, ctx).guessedPlayerIds).toEqual([]);
 
     state = game.onTimerExpired(ctx, state)!;
     expect(state.phase).toBe('REVEAL');
@@ -157,7 +168,7 @@ describe('Music Quiz game', () => {
     expect(game.getPlayerView(state, 'p1', ctx).myGuessSongId).toBe(wrongId);
     expect(state.phase).toBe('GUESSING');
 
-    state = game.onHostAction(ctx, state, { type: 'reveal' })!;
+    state = game.onTimerExpired(ctx, state)!;
     expect(state.phase).toBe('REVEAL');
 
     state = game.onPlayerAction(ctx, state, 'p2', { type: 'guess', payload: { songId: answerId } })!;
@@ -165,7 +176,7 @@ describe('Music Quiz game', () => {
     expect(game.getPlayerView(state, 'p2', ctx).myGuessSongId).toBeNull();
   });
 
-  it('rewards faster correct guesses with more points', async () => {
+  it('rewards faster correct guesses with more points', () => {
     const game = makeGame();
     const { ctx, score } = createTestCtx('mq-speed', twoPlayers);
 
@@ -231,9 +242,11 @@ describe('Music Quiz game', () => {
     expect(hostView.results.find((r) => r.playerId === 'p2')?.correct).toBe(false);
   });
 
-  it('waits for the host on the final reveal and ends via the next action', () => {
+  it('schedules REVEAL_MS on the final reveal and ends automatically when timer expires', () => {
     const game = makeGame();
-    const { ctx, isEnded } = createTestCtx('mq-final', twoPlayers);
+    const { ctx, timers, isEnded } = createTestCtx('mq-final', twoPlayers);
+
+    expect(game.onHostAction).toBeUndefined();
 
     let state = game.onStart(ctx, { rounds: 1 });
     state = game.onTimerExpired(ctx, state)!;
@@ -243,9 +256,10 @@ describe('Music Quiz game', () => {
     state = game.onPlayerAction(ctx, state, 'p1', { type: 'guess', payload: { songId: answerId } })!;
     state = game.onPlayerAction(ctx, state, 'p2', { type: 'guess', payload: { songId: answerId } })!;
     expect(state.phase).toBe('REVEAL');
+    expect(timers[timers.length - 1]).toBe(REVEAL_MS);
     expect(isEnded()).toBe(false);
 
-    state = game.onHostAction(ctx, state, { type: 'next' })!;
+    state = game.onTimerExpired(ctx, state)!;
     expect(state.phase).toBe('REVEAL');
     expect(isEnded()).toBe(true);
   });
@@ -266,7 +280,7 @@ describe('Music Quiz game', () => {
   });
 
   it('ends cleanly when the catalog is empty', () => {
-    const emptyGame = createMusicQuizGame(() => []) as FullMusicQuizGame;
+    const emptyGame = createMusicQuizGame(() => []) as TestedMusicQuizGame;
     const { ctx, isEnded } = createTestCtx('mq-empty', twoPlayers);
 
     const state = emptyGame.onStart(ctx);

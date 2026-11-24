@@ -4,6 +4,7 @@ import type {
   CategoriesPlayerView,
 } from '../../../../shared/games/categories';
 import { TallyList } from '../../components/TallyList';
+import { TvActedArms } from '../../components/tv/TvActedArms';
 import type { GameUiDefinition, MobileGameViewProps, TvGameViewProps } from '../registry';
 import './categories.css';
 
@@ -31,43 +32,29 @@ function CategoriesTvView(props: TvGameViewProps<CategoriesHostView>) {
           </div>
         }
       >
+        <TvActedArms
+          players={props.state.players}
+          actedIds={
+            host()?.phase === 'REVEAL'
+              ? (host()?.continuePlayerIds ?? [])
+              : (host()?.votedPlayerIds ?? [])
+          }
+        />
+
         <p class="eyebrow vote-eyebrow">
           ROUND {host()?.round} OF {host()?.totalRounds}
-          <Show when={host()?.categoryIsAi}>
-            <span class="vote-ai-tag">AI CATEGORY</span>
-          </Show>
         </p>
 
         <h1 class="cat-tv-category">{host()?.category}</h1>
 
-        <Show
-          when={host()?.phase === 'PLAYING'}
-          fallback={
-            <>
-              <TallyList entries={toTallyEntries(host()?.tally ?? [])} badgeLabel="FAILED" tone="danger" />
-              <p class="vote-next-hint">
-                {host()?.continueCount}/{host()?.connectedCount} ready to continue
-              </p>
-            </>
-          }
-        >
-          <p class="vote-progress">
-            {host()?.votedCount}/{host()?.connectedCount} voted who failed
-          </p>
+        <Show when={host()?.phase === 'REVEAL'}>
+          <TallyList
+            entries={toTallyEntries(host()?.tally ?? [])}
+            players={props.state.players}
+            badgeLabel="FAILED"
+            tone="loser"
+          />
         </Show>
-
-        <div class="tv-action-bar">
-          <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'next' })}>
-            {host()?.phase === 'PLAYING'
-              ? 'Reveal Now'
-              : (host()?.round ?? 0) < (host()?.totalRounds ?? 0)
-                ? 'Next Category'
-                : 'Finish Game'}
-          </button>
-          <button class="btn btn-tv" onClick={props.endGame}>
-            End Game
-          </button>
-        </div>
       </Show>
     </div>
   );
@@ -98,16 +85,22 @@ function CategoriesMobileView(props: MobileGameViewProps<CategoriesPlayerView>) 
             <>
               <Show
                 when={view()?.iFailed}
-                fallback={<p class="cat-result-safe">You survived! +10 pts.</p>}
+                fallback={<p class="cat-result-safe">You survived! +1 pt</p>}
               >
                 <p class="cat-result-fail">You failed this round!</p>
               </Show>
-              <TallyList entries={toTallyEntries(view()?.tally ?? [])} badgeLabel="FAILED" tone="danger" compact />
+              <TallyList
+                entries={toTallyEntries(view()?.tally ?? [])}
+                players={props.state.players}
+                badgeLabel="FAILED"
+                tone="loser"
+                compact
+              />
               <button
-                class={`btn cat-continue-btn ${view()?.myContinueVote ? 'is-voted' : ''}`}
+                class={`btn btn-primary cat-continue-btn ${view()?.myContinueVote ? 'is-voted' : ''}`}
                 onClick={() => props.sendAction({ type: 'continue' })}
               >
-                {view()?.myContinueVote ? 'Ready for Next Category' : 'Continue'}
+                {view()?.myContinueVote ? 'Ready' : 'Continue'}
               </button>
               <p class="muted vote-tally-note">
                 {view()?.continueCount}/{view()?.connectedCount} ready

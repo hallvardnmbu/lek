@@ -397,12 +397,14 @@ const server = Bun.serve<SocketData>({
         case 'start_random_game':
         case 'stop_randomized':
         case 'end_game':
+        case 'abort_game':
         case 'return_to_lobby': {
           const handlers = {
             open_game_selector: roomManager.openGameSelector.bind(roomManager),
             start_random_game: roomManager.startRandomGame.bind(roomManager),
             stop_randomized: roomManager.stopRandomized.bind(roomManager),
             end_game: roomManager.endGame.bind(roomManager),
+            abort_game: roomManager.abortGame.bind(roomManager),
             return_to_lobby: roomManager.returnToLobby.bind(roomManager),
           };
           withActorCode(ws, payload, `${msg.type} requires "code".`, handlers[msg.type]);

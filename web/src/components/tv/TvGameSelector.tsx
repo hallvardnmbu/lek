@@ -1,11 +1,7 @@
 import { For, Show, createMemo } from 'solid-js';
 import type { GameSelectMode, RoomState } from '../../../../shared/protocol';
-import {
-  getAvailableGames,
-  getConnectedCount,
-  getVoteCount,
-  getVotersFor,
-} from '../../lib/gameSelector';
+import { getAvailableGames, getVotersFor } from '../../lib/gameSelector';
+import { TvActedArms } from './TvActedArms';
 
 interface TvGameSelectorProps {
   state: RoomState;
@@ -18,9 +14,8 @@ interface TvGameSelectorProps {
 export function TvGameSelector(props: TvGameSelectorProps) {
   const mode = () => props.state.gameSelectMode ?? 'CHOOSE';
   const availableGames = createMemo(() => getAvailableGames(props.state));
-  const connectedCount = createMemo(() => getConnectedCount(props.state));
-  const voteCount = createMemo(() => getVoteCount(props.state));
   const votersFor = (gameId: string) => getVotersFor(props.state, gameId);
+  const votedIds = createMemo(() => Object.keys(props.state.gameVotes ?? {}));
 
   return (
     <div class="game-selector-stage">
@@ -50,9 +45,6 @@ export function TvGameSelector(props: TvGameSelectorProps) {
       >
         <div class="selector-header">
           <h1 class="tv-hero-title">Vote</h1>
-          <p class="selector-subtitle">
-            {voteCount()}/{connectedCount()} voted
-          </p>
         </div>
 
         <div class="game-grid">
@@ -84,6 +76,8 @@ export function TvGameSelector(props: TvGameSelectorProps) {
             }}
           </For>
         </div>
+
+        <TvActedArms players={props.state.players} actedIds={votedIds()} />
       </Show>
 
       <div class="tv-action-bar">

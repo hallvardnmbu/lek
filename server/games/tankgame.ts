@@ -1,6 +1,7 @@
 import type { GameContext, GameDefinition } from '../game';
 import { awardCappedScore, connectedOrAllPlayers, shuffle } from './helpers';
 import {
+  END_DELAY_MS,
   TANK_COLORS,
   TANK_SPAWNS,
   TANK_WALLS,
@@ -16,10 +17,14 @@ import {
   type TankWall,
 } from '../../shared/games/tankgame';
 
+export { END_DELAY_MS };
+
 export interface TankGameState {
   phase: TankGamePhase;
   countdownEndsAt: number;
   playingStartedAt: number;
+  endedAt: number;
+  winnerId: string | null;
   tickAt: number;
   nextBulletId: number;
   tanks: Record<string, TankGameTank>;
@@ -43,6 +48,10 @@ const KILL_POINTS = 1;
 const WIN_POINTS = 2;
 const ELIMINATION_FEED_MS = 3500;
 const BULLET_SUBSTEP_PX = 12;
+
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
+}
 
 function resolveCircleWall(
   cx: number,
@@ -91,6 +100,19 @@ function moveTank(tank: TankGameTank, input: TankInput, dtSec: number): void {
   }
   tank.x = Math.max(TANK_RADIUS, Math.min(TANK_WORLD_WIDTH - TANK_RADIUS, tank.x));
   tank.y = Math.max(TANK_RADIUS, Math.min(TANK_WORLD_HEIGHT - TANK_RADIUS, tank.y));
+}
+
+function tankVelocity(state: TankGameState, tank: TankGameTank): { vx: number; vy: number } {
+  if (!tank.alive || state.phase !== 'PLAYING') return { vx: 0, vy: 0 };
+  const input = state.inputs[tank.playerId];
+  if (!input) return { vx: 0, vy: 0 };
+  const mag = Math.hypot(input.x, input.y);
+  if (mag < INPUT_DEADZONE) return { vx: 0, vy: 0 };
+  const factor = (Math.min(1, mag) / mag) * TANK_SPEED;
+  return {
+    vx: round1(input.x * factor),
+    vy: round1(input.y * factor),
+  };
 }
 
 function separateTanks(alive: TankGameTank[]): void {
@@ -189,24 +211,38 @@ function aliveTanks(state: TankGameState): TankGameTank[] {
   return Object.values(state.tanks).filter((t) => t.alive);
 }
 
+function enterEnding(
+  ctx: GameContext,
+  state: TankGameState,
+  winnerId: string | null,
+  now: number
+): true {
+  if (winnerId) awardCappedScore(ctx, winnerId, WIN_POINTS);
+  state.phase = 'ENDING';
+  state.winnerId = winnerId;
+  state.endedAt = now;
+  state.inputs = {};
+  state.bullets = [];
+  ctx.setTimer(END_DELAY_MS, false);
+  return true;
+}
+
 function checkGameEnd(ctx: GameContext, state: TankGameState, now: number): boolean {
   if (state.phase !== 'PLAYING') return false;
   const alive = aliveTanks(state);
   if (alive.length <= 1) {
-    if (alive.length === 1) awardCappedScore(ctx, alive[0].playerId, WIN_POINTS);
-    ctx.endGame();
-    return true;
+    return enterEnding(ctx, state, alive.length === 1 ? alive[0].playerId : null, now);
   }
   if (now - state.playingStartedAt >= GAME_TIMEOUT_MS) {
-    ctx.endGame();
-    return true;
+    return enterEnding(ctx, state, null, now);
   }
   return false;
 }
 
 function timeLeftMs(state: TankGameState, now: number): number {
   if (state.phase === 'COUNTDOWN') return Math.max(0, state.countdownEndsAt - now);
-  return Math.max(0, GAME_TIMEOUT_MS - (now - state.playingStartedAt));
+  const refNow = state.phase === 'ENDING' ? state.endedAt : now;
+  return Math.max(0, GAME_TIMEOUT_MS - (refNow - state.playingStartedAt));
 }
 
 function nextDelayMs(state: TankGameState, now: number): number {
@@ -249,6 +285,8 @@ export const tankGame: GameDefinition<TankGameState, TankGameHostView, TankGameP
       phase: 'COUNTDOWN',
       countdownEndsAt: now + COUNTDOWN_MS,
       playingStartedAt: 0,
+      endedAt: 0,
+      winnerId: null,
       tickAt: now,
       nextBulletId: 1,
       tanks: {},
@@ -278,7 +316,13 @@ export const tankGame: GameDefinition<TankGameState, TankGameHostView, TankGameP
       state.phase = 'PLAYING';
       state.playingStartedAt = now;
       state.tickAt = now;
-      ctx.setTimer(GAME_TIMEOUT_MS, true);
+      if (!checkGameEnd(ctx, state, now)) {
+        ctx.setTimer(GAME_TIMEOUT_MS, true);
+      }
+      return state;
+    }
+    if (state.phase === 'ENDING') {
+      ctx.endGame();
       return state;
     }
     if (state.phase !== 'PLAYING') return state;
@@ -288,30 +332,43 @@ export const tankGame: GameDefinition<TankGameState, TankGameHostView, TankGameP
   },
 
   onPlayerAction(ctx, state, playerId, action) {
-    const tank = state.tanks[playerId];
-    if (state.phase !== 'PLAYING' || !tank?.alive) return state;
+    if (state.phase !== 'PLAYING' || !state.tanks[playerId]?.alive) return state;
     const wasSimulating = Object.keys(state.inputs).length > 0 || state.bullets.length > 0;
+
     if (action.type === 'input') {
       const raw = action.payload as { x?: unknown; y?: unknown } | undefined;
       const x = Number(raw?.x);
       const y = Number(raw?.y);
       if (!Number.isFinite(x) || !Number.isFinite(y)) return state;
+      const now = Date.now();
+      if (now > state.tickAt) {
+        simulate(ctx, state, now);
+        if (checkGameEnd(ctx, state, now)) return state;
+      }
+      const tank = state.tanks[playerId];
+      if (!tank?.alive) return state;
       const mag = Math.hypot(x, y);
       if (mag < INPUT_DEADZONE) {
         delete state.inputs[playerId];
       } else {
         state.inputs[playerId] = mag <= 1 ? { x, y } : { x: x / mag, y: y / mag };
       }
-      if (!wasSimulating && Object.keys(state.inputs).length > 0) {
-        const now = Date.now();
+      const isSimulating = Object.keys(state.inputs).length > 0 || state.bullets.length > 0;
+      if (!wasSimulating && isSimulating) {
         state.tickAt = now;
         ctx.setTimer(nextDelayMs(state, now), false);
       }
       return state;
     }
+
     if (action.type === 'fire') {
       const now = Date.now();
-      if (now - tank.lastFiredAt < FIRE_COOLDOWN_MS) return state;
+      if (now > state.tickAt) {
+        simulate(ctx, state, now);
+        if (checkGameEnd(ctx, state, now)) return state;
+      }
+      const tank = state.tanks[playerId];
+      if (!tank?.alive || now - tank.lastFiredAt < FIRE_COOLDOWN_MS) return state;
       tank.lastFiredAt = now;
       state.bullets.push({
         id: state.nextBulletId++,
@@ -321,16 +378,19 @@ export const tankGame: GameDefinition<TankGameState, TankGameHostView, TankGameP
         angle: tank.angle,
         firedAt: now,
       });
-      if (!wasSimulating) {
+      const isSimulating = Object.keys(state.inputs).length > 0 || state.bullets.length > 0;
+      if (!wasSimulating && isSimulating) {
         state.tickAt = now;
         ctx.setTimer(nextDelayMs(state, now), false);
       }
       return state;
     }
+
     return state;
   },
 
   onPlayerDisconnect(ctx, state, playerId) {
+    if (state.phase === 'ENDING') return state;
     const now = Date.now();
     destroyTank(ctx, state, playerId, now);
     checkGameEnd(ctx, state, now);
@@ -339,7 +399,9 @@ export const tankGame: GameDefinition<TankGameState, TankGameHostView, TankGameP
 
   onPlayerLeave(ctx, state, playerId) {
     const now = Date.now();
-    destroyTank(ctx, state, playerId, now);
+    if (state.phase !== 'ENDING') {
+      destroyTank(ctx, state, playerId, now);
+    }
     delete state.tanks[playerId];
     checkGameEnd(ctx, state, now);
     return state;
@@ -351,18 +413,26 @@ export const tankGame: GameDefinition<TankGameState, TankGameHostView, TankGameP
       phase: state.phase,
       timeLeftMs: timeLeftMs(state, now),
       aliveCount: aliveTanks(state).length,
-      tanks: Object.values(state.tanks).map((t) => ({
-        playerId: t.playerId,
-        x: Math.round(t.x),
-        y: Math.round(t.y),
-        angle: t.angle,
-        colorIndex: t.colorIndex,
-        alive: t.alive,
-      })),
+      winnerId: state.winnerId,
+      tanks: Object.values(state.tanks).map((t) => {
+        const vel = tankVelocity(state, t);
+        return {
+          playerId: t.playerId,
+          x: round1(t.x),
+          y: round1(t.y),
+          vx: vel.vx,
+          vy: vel.vy,
+          angle: t.angle,
+          colorIndex: t.colorIndex,
+          alive: t.alive,
+        };
+      }),
       bullets: state.bullets.map((b) => ({
         id: b.id,
-        x: Math.round(b.x),
-        y: Math.round(b.y),
+        x: round1(b.x),
+        y: round1(b.y),
+        vx: round1(Math.cos(b.angle) * BULLET_SPEED),
+        vy: round1(Math.sin(b.angle) * BULLET_SPEED),
       })),
       eliminations: state.eliminations.filter((e) => now - e.at <= ELIMINATION_FEED_MS),
     };

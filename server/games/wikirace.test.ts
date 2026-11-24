@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 import type { GameContext } from '../game';
-import { createWikiRaceGame, type WikiRaceState } from './wikirace';
+import {
+  POST_PATH_HOLD_MS,
+  STEP_ANIM_MS,
+  WIN_POINTS,
+  createWikiRaceGame,
+  type WikiRaceState,
+} from './wikirace';
 import { sanitizeWikiHtml } from './wikirace-wiki';
 
 interface TestPlayer {
@@ -12,7 +18,9 @@ interface TestPlayer {
 function createTestCtx(players: TestPlayer[]) {
   const events: Array<{ event: string; payload: unknown }> = [];
   const scores = new Map<string, number>();
-  let currentState: any;
+  let currentState: unknown;
+  let lastTimer: { durationMs: number; showCountdown?: boolean } | null = null;
+  let endedCount = 0;
 
   const toGamePlayers = () =>
     players.map((p) => ({
@@ -31,18 +39,24 @@ function createTestCtx(players: TestPlayer[]) {
     setPlayerScore: (id, score) => scores.set(id, score),
     addPlayerScore: (id, delta) => scores.set(id, (scores.get(id) ?? 0) + delta),
     setPlayerMeta: () => {},
-    setTimer: () => {},
-    clearTimer: () => {},
+    setTimer: (durationMs, showCountdown) => {
+      lastTimer = { durationMs, showCountdown };
+    },
+    clearTimer: () => {
+      lastTimer = null;
+    },
     dispatch: (fn) => {
       if (currentState === undefined) return;
-      const next = fn(currentState);
+      const next = fn(currentState as never);
       if (next !== undefined) currentState = next;
     },
     broadcastEvent: (event, payload) => events.push({ event, payload }),
     sendEventToHost: () => {},
     sendEventToPlayer: () => {},
     emitWebhook: () => {},
-    endGame: () => {},
+    endGame: () => {
+      endedCount += 1;
+    },
   };
 
   return {
@@ -52,6 +66,8 @@ function createTestCtx(players: TestPlayer[]) {
       currentState = s;
     },
     score: (id: string) => scores.get(id) ?? 0,
+    lastTimer: () => lastTimer,
+    endedCount: () => endedCount,
   };
 }
 
@@ -104,21 +120,28 @@ describe('Wikipedia Race sanitization', () => {
 });
 
 describe('Wikipedia Race game', () => {
-  it('runs a race until every player finishes and marks the last arrival as loser', async () => {
+  it('finishes immediately on the first winner, records full click sequence including back, and auto-ends on timer expiry', async () => {
     const players: TestPlayer[] = [
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
       { id: 'p3', name: 'Carol', connected: true },
     ];
-    const { ctx, events, score, setState } = createTestCtx(players);
+    const { ctx, events, score, setState, lastTimer, endedCount } = createTestCtx(players);
 
     let state: WikiRaceState;
-    const gameWithArticles = createWikiRaceGame(async (title) => {
+    const game = createWikiRaceGame(async (title) => {
       if (title === 'Hub') {
         return {
           title: 'Hub',
           html: '<p>Hub</p>',
-          links: [state.targetTitle],
+          links: ['Detour', state.targetTitle],
+        };
+      }
+      if (title === 'Detour') {
+        return {
+          title: 'Detour',
+          html: '<p>Detour</p>',
+          links: [],
         };
       }
       if (state && title === state.targetTitle) {
@@ -135,83 +158,93 @@ describe('Wikipedia Race game', () => {
       };
     });
 
-    state = gameWithArticles.onStart(ctx);
+    state = game.onStart(ctx);
     setState(state);
 
     await flushMicrotasks();
     expect(state.phase).toBe('RACING');
 
-    state = gameWithArticles.onPlayerAction(ctx, state, 'p1', {
+    state = game.onPlayerAction(ctx, state, 'p1', {
       type: 'navigate',
       payload: { title: state.targetTitle },
     })!;
-    expect(gameWithArticles.getPlayerView(state, 'p1', ctx).hops).toBe(0);
+    expect(game.getPlayerView(state, 'p1', ctx).hops).toBe(0);
 
-    state = gameWithArticles.onPlayerAction(ctx, state, 'p1', {
+    state = game.onPlayerAction(ctx, state, 'p1', {
       type: 'navigate',
       payload: { title: 'Hub' },
+    })!;
+    expect(game.getPlayerView(state, 'p1', ctx).loadingTitle).toBe('Hub');
+    await flushMicrotasks();
+    expect(game.getPlayerView(state, 'p1', ctx).loadingTitle).toBeNull();
+    expect(game.getPlayerView(state, 'p1', ctx).hops).toBe(1);
+
+    state = game.onPlayerAction(ctx, state, 'p1', {
+      type: 'navigate',
+      payload: { title: 'Detour' },
     })!;
     await flushMicrotasks();
-    expect(gameWithArticles.getPlayerView(state, 'p1', ctx).hops).toBe(1);
+    expect(game.getPlayerView(state, 'p1', ctx).currentTitle).toBe('Detour');
+    expect(game.getPlayerView(state, 'p1', ctx).hops).toBe(2);
 
-    state = gameWithArticles.onPlayerAction(ctx, state, 'p1', {
+    state = game.onPlayerAction(ctx, state, 'p1', { type: 'back' })!;
+    expect(game.getPlayerView(state, 'p1', ctx).currentTitle).toBe('Hub');
+    expect(game.getPlayerView(state, 'p1', ctx).hops).toBe(3);
+
+    state = game.onPlayerAction(ctx, state, 'p2', {
+      type: 'navigate',
+      payload: { title: 'Hub' },
+    })!;
+    expect(game.getPlayerView(state, 'p2', ctx).hops).toBe(1);
+
+    state = game.onPlayerAction(ctx, state, 'p1', {
       type: 'navigate',
       payload: { title: state.targetTitle },
     })!;
     await flushMicrotasks();
-    expect(gameWithArticles.getPlayerView(state, 'p1', ctx).finishedRank).toBe(1);
-    expect(state.phase).toBe('RACING');
 
-    state = gameWithArticles.onPlayerAction(ctx, state, 'p2', {
-      type: 'navigate',
-      payload: { title: 'Hub' },
-    })!;
-    expect(gameWithArticles.getPlayerView(state, 'p2', ctx).currentTitle).toBe('Hub');
-
-    state = gameWithArticles.onPlayerAction(ctx, state, 'p2', { type: 'back' })!;
-    expect(gameWithArticles.getPlayerView(state, 'p2', ctx).currentTitle).toBe(state.startTitle);
-    expect(gameWithArticles.getPlayerView(state, 'p2', ctx).hops).toBe(2);
-
-    state = gameWithArticles.onPlayerAction(ctx, state, 'p2', {
-      type: 'navigate',
-      payload: { title: 'Hub' },
-    })!;
-    state = gameWithArticles.onPlayerAction(ctx, state, 'p2', {
-      type: 'navigate',
-      payload: { title: state.targetTitle },
-    })!;
-
-    expect(state.phase).toBe('RACING');
-    expect(gameWithArticles.getPlayerView(state, 'p2', ctx).finishedRank).toBe(2);
-
-    state = gameWithArticles.onPlayerAction(ctx, state, 'p3', {
-      type: 'navigate',
-      payload: { title: 'Hub' },
-    })!;
-    state = gameWithArticles.onPlayerAction(ctx, state, 'p3', {
-      type: 'navigate',
-      payload: { title: state.targetTitle },
-    })!;
-
+    const expectedPath = [state.startTitle, 'Hub', 'Detour', 'Hub', state.targetTitle];
     expect(state.phase).toBe('RESULTS');
-    expect(state.loserId).toBe('p3');
-    expect(events.some((e) => e.event === 'wikirace_finished')).toBe(true);
+    expect(state.winnerId).toBe('p1');
+    expect(state.winnerPath).toEqual(expectedPath);
+    expect(score('p1')).toBe(WIN_POINTS);
+    expect(score('p2')).toBe(0);
+    expect(score('p3')).toBe(0);
 
-    const p3View = gameWithArticles.getPlayerView(state, 'p3', ctx);
-    expect(p3View.isLoser).toBe(true);
-    expect(gameWithArticles.getHostView(state, ctx).loserName).toBe('Carol');
-    expect(score('p1')).toBe(5);
-    expect(score('p2')).toBe(4);
-    expect(score('p3')).toBe(3);
+    const hostView = game.getHostView(state, ctx);
+    expect(hostView.winnerId).toBe('p1');
+    expect(hostView.winnerName).toBe('Alice');
+    expect(hostView.winnerPath).toEqual(expectedPath);
+
+    const p2View = game.getPlayerView(state, 'p2', ctx);
+    expect(p2View.finishedRank).toBeNull();
+    expect(p2View.winnerId).toBe('p1');
+    expect(p2View.winnerName).toBe('Alice');
+    expect(p2View.winnerPath).toEqual(expectedPath);
+
+    expect(events.some((e) => e.event === 'wikirace_finished')).toBe(true);
+    expect(lastTimer()).toEqual({
+      durationMs: Math.max(4_500, expectedPath.length * STEP_ANIM_MS + POST_PATH_HOLD_MS),
+      showCountdown: false,
+    });
+    expect(endedCount()).toBe(0);
+
+    state = game.onPlayerAction(ctx, state, 'p2', {
+      type: 'navigate',
+      payload: { title: state.targetTitle },
+    })!;
+    expect(game.getPlayerView(state, 'p2', ctx).finishedRank).toBeNull();
+
+    game.onTimerExpired!(ctx, state);
+    expect(endedCount()).toBe(1);
   });
 
-  it('continues the race after a disconnect until every connected player finishes', async () => {
+  it('ends the game if all connected players disconnect during RACING', async () => {
     const players: TestPlayer[] = [
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
-      { id: 'p3', name: 'Carol', connected: true },
     ];
-    const { ctx, setState } = createTestCtx(players);
+    const { ctx, setState, endedCount } = createTestCtx(players);
 
     const game = createWikiRaceGame(async (title) => ({
       title,
@@ -222,24 +255,14 @@ describe('Wikipedia Race game', () => {
     let state = game.onStart(ctx);
     setState(state);
     await flushMicrotasks();
-    state.targetTitle = 'Goal';
-
-    state = game.onPlayerAction(ctx, state, 'p1', {
-      type: 'navigate',
-      payload: { title: 'Goal' },
-    })!;
-    await flushMicrotasks();
     expect(state.phase).toBe('RACING');
 
-    players[2].connected = false;
-    state = game.onPlayerDisconnect!(ctx, state, 'p3')!;
-    expect(state.phase).toBe('RACING');
+    players[0]!.connected = false;
+    state = game.onPlayerDisconnect!(ctx, state, 'p1')!;
+    expect(endedCount()).toBe(0);
 
-    state = game.onPlayerAction(ctx, state, 'p2', {
-      type: 'navigate',
-      payload: { title: 'Goal' },
-    })!;
-    expect(state.phase).toBe('RESULTS');
-    expect(state.loserId).toBe('p2');
+    players[1]!.connected = false;
+    state = game.onPlayerDisconnect!(ctx, state, 'p2')!;
+    expect(endedCount()).toBe(1);
   });
 });

@@ -1,4 +1,4 @@
-import { Show, createMemo, createSignal, onSettled } from 'solid-js';
+import { Show, createEffect, createMemo, createSignal, onSettled } from 'solid-js';
 import { TvExitModal } from '../components/tv/TvExitModal';
 import { TvStage } from '../components/tv/TvStage';
 import { createLobbyMusic } from '../lib/audio';
@@ -10,6 +10,8 @@ export function TvHost() {
   const [hostToken, setHostToken] = createSignal<string | undefined>(loadHostToken());
   const [showExitModal, setShowExitModal] = createSignal(false);
   let canvasRef: HTMLDivElement | undefined;
+  let seenRoomCode: string | null = null;
+  let seenPlayerIds = new Set<string>();
 
   const socket = createGameSocket({
     onOpen(send) {
@@ -43,6 +45,37 @@ export function TvHost() {
     return phase === 'LOBBY' || phase === 'GAME_SELECT';
   });
 
+  createEffect(
+    () => {
+      const s = state();
+      return s
+        ? { code: s.code, phase: s.phase, ids: s.players.map((p) => p.id) }
+        : null;
+    },
+    (snap) => {
+      if (!snap) return;
+      if (seenRoomCode !== snap.code) {
+        seenRoomCode = snap.code;
+        seenPlayerIds = new Set(snap.ids);
+        return;
+      }
+      const hasNewJoin = snap.ids.some((id) => !seenPlayerIds.has(id));
+      seenPlayerIds = new Set(snap.ids);
+      if (hasNewJoin && snap.phase === 'LOBBY') {
+        lobbyMusic.playJoinPling();
+      }
+    }
+  );
+
+  const abortGame = () => {
+    const s = state();
+    if (!s) return;
+    socket.send({
+      type: 'abort_game',
+      payload: { code: s.code, hostToken: hostToken() },
+    });
+  };
+
   return (
     <div class="tv-viewport">
       <div
@@ -60,6 +93,11 @@ export function TvHost() {
           <Show when={state()}>
             {(s) => (
               <div class="tv-room-strip">
+                <Show when={s().phase === 'PLAYING'}>
+                  <button class="btn" onClick={abortGame}>
+                    Abort
+                  </button>
+                </Show>
                 <button class="btn" onClick={lobbyMusic.toggleMute}>
                   {lobbyMusic.muted() ? 'Sound on' : 'Sound off'}
                 </button>
@@ -105,6 +143,11 @@ export function TvHost() {
 
         <Show when={showExitModal()}>
           <TvExitModal
+            canAbort={state()?.phase === 'PLAYING'}
+            onAbort={() => {
+              abortGame();
+              setShowExitModal(false);
+            }}
             onKeepPlaying={() => setShowExitModal(false)}
             onReload={reloadApp}
             onExit={() => exitTizenApp('/')}

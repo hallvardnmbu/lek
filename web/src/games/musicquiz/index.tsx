@@ -2,17 +2,38 @@ import { For, Show, createEffect, createMemo, createSignal, onSettled } from 'so
 import {
   type MusicQuizHostView,
   type MusicQuizPlayerView,
+  type MusicQuizRoundResult,
   type MusicQuizSong,
 } from '../../../../shared/games/musicquiz';
-import { PodiumList } from '../../components/tv/PodiumList';
+import { ResultList, type ResultListEntry } from '../../components/ResultList';
+import { TvActedArms } from '../../components/tv/TvActedArms';
 import { secondsLeft, type GameUiDefinition, type MobileGameViewProps, type TvGameViewProps } from '../registry';
 import { loadQuizCatalog, quizCatalog, songById } from './catalog';
 import './musicquiz.css';
 
+function toResultEntry(result: MusicQuizRoundResult, stat?: string): ResultListEntry {
+  return {
+    playerId: result.playerId,
+    name: result.playerName,
+    detail: result.guessSongId
+      ? (songById(result.guessSongId)?.title ?? 'unknown song')
+      : 'no guess',
+    badge: result.correct ? `+${result.points}` : 'MISSED',
+    badgeTone: result.correct ? 'accent' : 'loser',
+    tone: result.correct ? 'accent' : 'default',
+    stat,
+  };
+}
+
 function MusicQuizTvView(props: TvGameViewProps<MusicQuizHostView>) {
   const view = () => props.state.hostState;
-  const standings = createMemo(() =>
-    [...props.state.players].sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
+  const scoresById = createMemo(
+    () => new Map(props.state.players.map((p) => [p.id, p.score]))
+  );
+  const resultEntries = createMemo(() =>
+    (view()?.results ?? []).map((result) =>
+      toResultEntry(result, `${scoresById().get(result.playerId) ?? 0} pts`)
+    )
   );
 
   let audio: HTMLAudioElement | undefined;
@@ -64,11 +85,11 @@ function MusicQuizTvView(props: TvGameViewProps<MusicQuizHostView>) {
   const nextHint = () => {
     const v = view();
     if (!v) return '';
-    if (v.phase === 'INTRO') return `Song starts in ${secondsLeft(props.remainingMs)}s`;
+    const secs = secondsLeft(props.remainingMs);
+    if (v.phase === 'INTRO') return `Song starts in ${secs}s`;
     if (v.phase === 'REVEAL') {
-      return v.round < v.totalRounds
-        ? `Next round in ${secondsLeft(props.remainingMs)}s`
-        : 'Press Finish when you are ready for the final scores';
+      if (v.round < v.totalRounds) return `Next round in ${secs}s`;
+      return secs > 0 ? `Final scores in ${secs}s` : 'Final results next';
     }
     return '';
   };
@@ -95,9 +116,10 @@ function MusicQuizTvView(props: TvGameViewProps<MusicQuizHostView>) {
         <Show when={!view()?.audioUrl}>
           <p class="mq-no-audio">No clip</p>
         </Show>
-        <p class="mq-progress">
-          {view()?.guessedCount}/{view()?.connectedCount} locked in
-        </p>
+        <TvActedArms
+          players={props.state.players}
+          actedIds={view()?.guessedPlayerIds ?? []}
+        />
       </Show>
 
       <Show when={view()?.phase === 'REVEAL'}>
@@ -105,44 +127,16 @@ function MusicQuizTvView(props: TvGameViewProps<MusicQuizHostView>) {
         <h1 class="mq-answer-title">{view()?.song?.title}</h1>
         <p class="mq-answer-artist">{view()?.song?.artist}</p>
 
-        <div class="mq-result-pills">
-          <For each={view()?.results ?? []}>
-            {(result) => (
-              <div class={`mq-result-pill ${result.correct ? 'ok' : 'missed'}`}>
-                <span>{result.playerName}</span>
-                <span class="mq-pill-guess">
-                  {result.guessSongId
-                    ? (songById(result.guessSongId)?.title ?? 'unknown song')
-                    : 'no guess'}
-                </span>
-                <strong>{result.correct ? `+${result.points}` : 'missed'}</strong>
-              </div>
-            )}
-          </For>
-        </div>
-
-        <PodiumList players={standings()} compact class="mq-standings" />
+        <ResultList
+          entries={resultEntries()}
+          players={props.state.players}
+          class="mq-results"
+        />
       </Show>
 
       <Show when={nextHint()}>
         {(hint) => <p class="mq-next-hint">{hint()}</p>}
       </Show>
-
-      <div class="tv-action-bar">
-        <Show when={view()?.phase === 'GUESSING'}>
-          <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'reveal' })}>
-            Reveal Now
-          </button>
-        </Show>
-        <Show when={view()?.phase === 'REVEAL' && (view()?.round ?? 0) >= (view()?.totalRounds ?? 0)}>
-          <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'next' })}>
-            Finish
-          </button>
-        </Show>
-        <button class="btn btn-tv" onClick={props.endGame}>
-          End Game
-        </button>
-      </div>
     </div>
   );
 }
@@ -175,6 +169,10 @@ function MusicQuizMobileView(props: MobileGameViewProps<MusicQuizPlayerView>) {
       .slice(0, 12)
       .map((entry) => entry.song);
   });
+
+  const resultEntries = createMemo(() =>
+    (view()?.results ?? []).map((result) => toResultEntry(result))
+  );
 
   const submitGuess = (songId: string) => {
     props.sendAction({ type: 'guess', payload: { songId } });
@@ -284,25 +282,11 @@ function MusicQuizMobileView(props: MobileGameViewProps<MusicQuizPlayerView>) {
           )}
         </Show>
 
-        <div class="mq-round-results">
-          <For each={view()?.results ?? []}>
-            {(result) => (
-              <div class={`mq-round-row ${result.correct ? 'ok' : ''}`}>
-                <span>{result.playerName}</span>
-                <span class="mq-round-guess">
-                  {result.guessSongId
-                    ? (songById(result.guessSongId)?.title ?? 'unknown song')
-                    : 'no guess'}
-                </span>
-                <span>{result.correct ? `+${result.points}` : '-'}</span>
-              </div>
-            )}
-          </For>
-        </div>
-
-        <Show when={(view()?.round ?? 0) >= (view()?.totalRounds ?? 0)}>
-          <p class="muted mq-guessed-progress">Waiting for host</p>
-        </Show>
+        <ResultList
+          entries={resultEntries()}
+          players={props.state.players}
+          compact
+        />
       </Show>
     </div>
   );

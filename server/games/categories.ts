@@ -8,6 +8,7 @@ import type {
 import { cortiAgent, type PromptGenerator } from '../cortiModels';
 import type { GameContext, GameDefinition } from '../game';
 import {
+  actedConnectedIds,
   allConnected,
   awardCappedScore,
   buildVoteTally,
@@ -221,19 +222,6 @@ export function createCategoriesGame(
       return state;
     },
 
-    onHostAction(ctx, state, action) {
-      if (action.type !== 'next') {
-        return state;
-      }
-      if (state.phase === 'PLAYING') {
-        return reveal(ctx, state);
-      }
-      if (state.phase === 'REVEAL') {
-        return nextRound(ctx, state);
-      }
-      return state;
-    },
-
     onPlayerDisconnect(ctx, state) {
       return advanceIfReady(ctx, state);
     },
@@ -254,8 +242,8 @@ export function createCategoriesGame(
         round: state.round,
         totalRounds: state.totalRounds,
         category: state.category,
-        categoryIsAi: state.categoryIsAi,
-        ...viewCounts(ctx, state),
+        votedPlayerIds: actedConnectedIds(ctx, (id) => state.votes[id] !== undefined),
+        continuePlayerIds: actedConnectedIds(ctx, (id) => state.continueVotes[id] === true),
         tally: state.tally,
       };
     },

@@ -1,13 +1,22 @@
 import type { GameAction } from '../../shared/protocol';
-import type {
-  WikiRaceAction,
-  WikiRaceHostView,
-  WikiRacePlayerProgress,
-  WikiRacePlayerView,
-  WikiRacePhase,
+import {
+  POST_PATH_HOLD_MS,
+  STEP_ANIM_MS,
+  type WikiRaceAction,
+  type WikiRaceHostView,
+  type WikiRacePhase,
+  type WikiRacePlayerProgress,
+  type WikiRacePlayerView,
 } from '../../shared/games/wikirace';
 import type { GameContext, GameDefinition } from '../game';
-import { MAX_GAME_SCORE, awardCappedScore, connectedPlayers, playerName } from './helpers';
+import {
+  MAX_GAME_SCORE,
+  awardCappedScore,
+  connectedPlayers,
+  createRoomHistory,
+  playerName,
+  takeUnusedItem,
+} from './helpers';
 import {
   CURATED_PAIRS,
   fetchWikiArticle,
@@ -16,8 +25,16 @@ import {
   type WikiArticle,
 } from './wikirace-wiki';
 
+export { POST_PATH_HOLD_MS, STEP_ANIM_MS };
+export const WIN_POINTS = MAX_GAME_SCORE;
+
+const ERROR_HOLD_MS = 3_000;
+const pairHistory = createRoomHistory();
+const fallbackPairPool: { current: Array<readonly [string, string]> | null } = { current: null };
+
 interface RacerState {
   path: string[];
+  clicks: string[];
   hops: number;
   finishedRank: number | null;
   loadingTitle: string | null;
@@ -26,29 +43,34 @@ interface RacerState {
 
 export interface WikiRaceState {
   phase: WikiRacePhase;
-  round: number;
   startTitle: string;
   targetTitle: string;
   error: string | null;
   articles: Record<string, WikiArticle>;
   redirects: Record<string, string>;
   racers: Record<string, RacerState>;
-  finishedOrder: string[];
-  loserId: string | null;
-  usedPairs: string[];
+  winnerId: string | null;
+  winnerPath: string[];
 }
 
-function pickPair(usedPairs: string[]): readonly [string, string] {
-  const available = CURATED_PAIRS.filter(
-    ([a, b]) => !usedPairs.includes(`${a}::${b}`)
+function pickPair(roomCode: string): readonly [string, string] {
+  const keyOf = ([a, b]: readonly [string, string]) => `${a}::${b}`;
+  const { item } = takeUnusedItem(
+    roomCode,
+    pairHistory,
+    keyOf,
+    null,
+    fallbackPairPool,
+    CURATED_PAIRS
   );
-  const pool = available.length > 0 ? available : CURATED_PAIRS;
-  return pool[Math.floor(Math.random() * pool.length)];
+  pairHistory.remember(roomCode, keyOf(item));
+  return item;
 }
 
 function createInitialRacer(startTitle: string): RacerState {
   return {
     path: [startTitle],
+    clicks: [startTitle],
     hops: 0,
     finishedRank: null,
     loadingTitle: null,
@@ -75,29 +97,16 @@ function buildProgressList(ctx: GameContext, state: WikiRaceState): WikiRacePlay
       }
       if (a.finishedRank !== null) return -1;
       if (b.finishedRank !== null) return 1;
+      if (a.connected !== b.connected) return a.connected ? -1 : 1;
       return a.hops - b.hops || a.name.localeCompare(b.name);
     });
 }
 
-function checkRaceCompletion(ctx: GameContext, state: WikiRaceState): void {
-  if (state.phase !== 'RACING') return;
-
-  const connected = connectedPlayers(ctx);
-  if (connected.length === 0) return;
-
-  const unfinished = connected.filter((p) => !state.racers[p.id]?.finishedRank);
-  if (unfinished.length > 0) return;
-
-  state.phase = 'RESULTS';
-  state.loserId =
-    connected.length >= 2
-      ? [...connected].sort(
-          (a, b) =>
-            (state.racers[b.id]?.finishedRank ?? 0) - (state.racers[a.id]?.finishedRank ?? 0)
-        )[0]?.id ?? null
-      : null;
-  ctx.clearTimer();
-  ctx.broadcastEvent('wikirace_finished', { loserId: state.loserId });
+function checkActivePlayers(ctx: GameContext, state: WikiRaceState): void {
+  if (state.phase === 'RACING' && connectedPlayers(ctx).length === 0) {
+    ctx.clearTimer();
+    ctx.endGame();
+  }
 }
 
 function recordArticle(state: WikiRaceState, requestedTitle: string, article: WikiArticle): void {
@@ -118,39 +127,41 @@ function moveRacerToArticle(
   playerId: string,
   article: WikiArticle
 ): void {
+  if (state.phase !== 'RACING') return;
   const racer = state.racers[playerId];
   if (!racer || racer.finishedRank !== null) return;
 
   racer.hops += 1;
   racer.path.push(article.title);
+  racer.clicks.push(article.title);
   racer.loadingTitle = null;
   racer.error = null;
 
   if (normalizeTitle(article.title) === normalizeTitle(state.targetTitle)) {
-    state.finishedOrder.push(playerId);
-    racer.finishedRank = state.finishedOrder.length;
-    awardCappedScore(ctx, playerId, Math.max(1, MAX_GAME_SCORE - (racer.finishedRank - 1)));
-    checkRaceCompletion(ctx, state);
+    racer.finishedRank = 1;
+    awardCappedScore(ctx, playerId, WIN_POINTS);
+    state.winnerId = playerId;
+    state.winnerPath = [...racer.clicks];
+    state.phase = 'RESULTS';
+    for (const other of Object.values(state.racers)) {
+      other.loadingTitle = null;
+    }
+    const duration = Math.max(4_500, state.winnerPath.length * STEP_ANIM_MS + POST_PATH_HOLD_MS);
+    ctx.setTimer(duration, false);
+    ctx.broadcastEvent('wikirace_finished', {
+      winnerId: playerId,
+      winnerPath: state.winnerPath,
+    });
   }
 }
 
-function startRace(
-  ctx: GameContext,
-  fetcher: ArticleFetcher,
-  round: number,
-  previousUsedPairs: string[]
-): WikiRaceState {
-  const [rawStart, rawTarget] = pickPair(previousUsedPairs);
-  const pairKey = `${rawStart}::${rawTarget}`;
-  const usedPairs =
-    previousUsedPairs.length >= CURATED_PAIRS.length
-      ? [pairKey]
-      : [...previousUsedPairs, pairKey];
+function startRace(ctx: GameContext, fetcher: ArticleFetcher): WikiRaceState {
+  const [rawStart, rawTarget] = pickPair(ctx.roomCode);
 
   Promise.all([fetcher(rawStart), fetcher(rawTarget)])
     .then(([startArticle, targetArticle]) => {
       ctx.dispatch<WikiRaceState>((state) => {
-        if (state.phase !== 'LOADING' || state.round !== round) return;
+        if (state.phase !== 'LOADING') return;
         recordArticle(state, state.startTitle, startArticle);
         state.startTitle = startArticle.title;
         state.targetTitle = targetArticle.title;
@@ -159,48 +170,38 @@ function startRace(
           state.racers[p.id] = createInitialRacer(startArticle.title);
         }
         ctx.clearTimer();
+        checkActivePlayers(ctx, state);
       });
     })
     .catch((err) => {
       ctx.dispatch<WikiRaceState>((state) => {
-        if (state.phase !== 'LOADING' || state.round !== round) return;
+        if (state.phase !== 'LOADING') return;
         state.error = err instanceof Error ? err.message : 'Failed to load race articles.';
-        ctx.clearTimer();
+        ctx.setTimer(ERROR_HOLD_MS, false);
       });
     });
 
   return {
     phase: 'LOADING',
-    round,
     startTitle: rawStart,
     targetTitle: rawTarget,
     error: null,
     articles: {},
     redirects: {},
     racers: {},
-    finishedOrder: [],
-    loserId: null,
-    usedPairs,
+    winnerId: null,
+    winnerPath: [],
   };
 }
 
 function handleAction(
   ctx: GameContext,
   state: WikiRaceState,
-  playerId: string | null,
+  playerId: string,
   action: GameAction,
   fetcher: ArticleFetcher
 ): WikiRaceState {
-  const typed = action as WikiRaceAction;
-
-  if (typed.type === 'next_race') {
-    if (state.phase === 'RESULTS' || state.error !== null) {
-      return startRace(ctx, fetcher, state.round + 1, state.usedPairs);
-    }
-    return state;
-  }
-
-  if (state.phase !== 'RACING' || !playerId) {
+  if (state.phase !== 'RACING') {
     return state;
   }
 
@@ -209,9 +210,15 @@ function handleAction(
     return state;
   }
 
+  const typed = action as WikiRaceAction;
+
   if (typed.type === 'back') {
     if (racer.path.length <= 1) return state;
     racer.path.pop();
+    const previousTitle = racer.path[racer.path.length - 1];
+    if (previousTitle) {
+      racer.clicks.push(previousTitle);
+    }
     racer.hops += 1;
     racer.error = null;
     return state;
@@ -240,11 +247,10 @@ function handleAction(
     racer.loadingTitle = requestedTitle;
     racer.error = null;
 
-    const round = state.round;
     fetcher(requestedTitle)
       .then((article) => {
         ctx.dispatch<WikiRaceState>((current) => {
-          if (current.phase !== 'RACING' || current.round !== round) return;
+          if (current.phase !== 'RACING') return;
           const currentRacer = current.racers[playerId];
           if (!currentRacer || currentRacer.loadingTitle !== requestedTitle) return;
           recordArticle(current, requestedTitle, article);
@@ -253,12 +259,11 @@ function handleAction(
       })
       .catch((err) => {
         ctx.dispatch<WikiRaceState>((current) => {
-          if (current.phase !== 'RACING' || current.round !== round) return;
+          if (current.phase !== 'RACING') return;
           const currentRacer = current.racers[playerId];
           if (!currentRacer || currentRacer.loadingTitle !== requestedTitle) return;
           currentRacer.loadingTitle = null;
           currentRacer.error = err instanceof Error ? err.message : 'Could not load article.';
-          ctx.clearTimer();
         });
       });
 
@@ -275,20 +280,23 @@ export function createWikiRaceGame(
     id: 'wikirace',
     name: 'Wikipedia',
     description:
-      'Race from the start article to the target using only Wikipedia links. Last to arrive drinks.',
+      'First to race from the start article to the target using only Wikipedia links wins.',
     minPlayers: 2,
     maxPlayers: 12,
 
     onStart(ctx) {
-      return startRace(ctx, fetcher, 1, []);
+      return startRace(ctx, fetcher);
     },
 
     onPlayerAction(ctx, state, playerId, action) {
       return handleAction(ctx, state, playerId, action, fetcher);
     },
 
-    onHostAction(ctx, state, action) {
-      return handleAction(ctx, state, null, action, fetcher);
+    onTimerExpired(ctx, state) {
+      if (state.phase === 'RESULTS' || state.error !== null) {
+        ctx.endGame();
+      }
+      return state;
     },
 
     onPlayerJoin(_ctx, state, playerId) {
@@ -299,25 +307,25 @@ export function createWikiRaceGame(
     },
 
     onPlayerDisconnect(ctx, state) {
-      checkRaceCompletion(ctx, state);
+      checkActivePlayers(ctx, state);
       return state;
     },
 
     onPlayerLeave(ctx, state, playerId) {
       delete state.racers[playerId];
-      checkRaceCompletion(ctx, state);
+      checkActivePlayers(ctx, state);
       return state;
     },
 
     getHostView(state, ctx) {
       return {
         phase: state.phase,
-        round: state.round,
         startTitle: state.startTitle,
         targetTitle: state.targetTitle,
         players: buildProgressList(ctx, state),
-        loserId: state.loserId,
-        loserName: playerName(ctx, state.loserId),
+        winnerId: state.winnerId,
+        winnerName: playerName(ctx, state.winnerId),
+        winnerPath: state.winnerPath,
         error: state.error,
       };
     },
@@ -329,7 +337,6 @@ export function createWikiRaceGame(
 
       return {
         phase: state.phase,
-        round: state.round,
         startTitle: state.startTitle,
         targetTitle: state.targetTitle,
         currentTitle,
@@ -343,10 +350,12 @@ export function createWikiRaceGame(
             racer.path.length > 1
         ),
         loading: state.phase === 'LOADING' || Boolean(racer?.loadingTitle),
+        loadingTitle: racer?.loadingTitle ?? null,
         error: state.error ?? racer?.error ?? null,
         finishedRank: racer?.finishedRank ?? null,
-        isLoser: state.phase === 'RESULTS' && state.loserId === playerId,
-        loserName: playerName(ctx, state.loserId),
+        winnerId: state.winnerId,
+        winnerName: playerName(ctx, state.winnerId),
+        winnerPath: state.winnerPath,
         players: buildProgressList(ctx, state),
       };
     },

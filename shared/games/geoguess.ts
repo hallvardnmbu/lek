@@ -27,9 +27,10 @@ export interface GeoGuessHostView {
   target: GeoPoint | null;
   lockedCount: number;
   totalCount: number;
+  lockedPlayerIds: string[];
   players: GeoGuessResultEntry[];
   winnerName: string | null;
-  drinkerName: string | null;
+  drinkerNames: string[];
   error: string | null;
 }
 
@@ -47,7 +48,7 @@ export interface GeoGuessPlayerView {
   drinks: boolean;
 }
 
-export type GeoGuessAction =
-  | { type: 'submit_guess'; payload: { lat: number; lng: number } }
-  | { type: 'next_round' }
-  | { type: 'skip_spot' };
+export type GeoGuessAction = {
+  type: 'submit_guess';
+  payload: { lat: number; lng: number };
+};

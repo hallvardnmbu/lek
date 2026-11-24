@@ -31,6 +31,7 @@ export interface MusicQuizHostView {
   song: { title: string; artist: string } | null;
   guessedCount: number;
   connectedCount: number;
+  guessedPlayerIds: string[];
   results: MusicQuizRoundResult[];
 }
 

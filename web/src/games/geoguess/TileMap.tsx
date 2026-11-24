@@ -180,20 +180,24 @@ export function TileMap(props: TileMapProps) {
 
   const tiles = createMemo(() => {
     const m = viewMetrics();
-    const maxTile = Math.pow(2, m.z);
-    const minTileX = Math.floor(m.left / TILE_SIZE);
-    const maxTileX = Math.floor((m.left + m.width) / TILE_SIZE);
-    const minTileY = Math.max(0, Math.floor(m.top / TILE_SIZE));
-    const maxTileY = Math.min(maxTile - 1, Math.floor((m.top + m.height) / TILE_SIZE));
+    const tileZ = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.floor(m.z)));
+    const scale = Math.pow(2, m.z - tileZ);
+    const tileDisplaySize = TILE_SIZE * scale;
+    const maxTile = Math.pow(2, tileZ);
+    const minTileX = Math.floor(m.left / tileDisplaySize);
+    const maxTileX = Math.floor((m.left + m.width) / tileDisplaySize);
+    const minTileY = Math.max(0, Math.floor(m.top / tileDisplaySize));
+    const maxTileY = Math.min(maxTile - 1, Math.floor((m.top + m.height) / tileDisplaySize));
 
-    const list: Array<{ key: string; url: string; left: number; top: number }> = [];
+    const list: Array<{ key: string; url: string; left: number; top: number; size: number }> = [];
     for (let ty = minTileY; ty <= maxTileY; ty++) {
       for (let tx = minTileX; tx <= maxTileX; tx++) {
         list.push({
-          key: `${m.z}-${tx}-${ty}`,
-          url: tileUrl(m.z, tx, ty),
-          left: tx * TILE_SIZE - m.left,
-          top: ty * TILE_SIZE - m.top,
+          key: `${tileZ}-${tx}-${ty}`,
+          url: tileUrl(tileZ, tx, ty),
+          left: tx * tileDisplaySize - m.left,
+          top: ty * tileDisplaySize - m.top,
+          size: tileDisplaySize + 0.5,
         });
       }
     }
@@ -210,12 +214,12 @@ export function TileMap(props: TileMapProps) {
     return { x, y };
   };
 
-  const changeZoom = (delta: number) => {
-    setZoom((prev) => clampZoom(prev + delta));
+  const clampZoom = (value: number): number => {
+    return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, value));
   };
 
-  const clampZoom = (value: number): number => {
-    return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(value)));
+  const changeZoom = (delta: number) => {
+    setZoom((prev) => clampZoom(Math.round(prev + delta)));
   };
 
   const screenToGeo = (x: number, y: number): GeoPoint => {
@@ -323,8 +327,8 @@ export function TileMap(props: TileMapProps) {
       if (activePointers.size < 2) {
         pinching = false;
         pinchAnchor = null;
-        const [remainingId, remaining] = [...activePointers.entries()][0];
-        if (remainingId !== undefined) {
+        const [remainingId, remaining] = [...activePointers.entries()][0] ?? [];
+        if (remainingId !== undefined && remaining) {
           beginPan(remainingId, remaining.x, remaining.y);
           movedDistance = 8;
           el.setPointerCapture(remainingId);
@@ -381,8 +385,8 @@ export function TileMap(props: TileMapProps) {
               style={{
                 left: `${tile.left}px`,
                 top: `${tile.top}px`,
-                width: `${TILE_SIZE}px`,
-                height: `${TILE_SIZE}px`,
+                width: `${tile.size}px`,
+                height: `${tile.size}px`,
               }}
             />
           )}

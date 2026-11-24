@@ -36,6 +36,7 @@ export interface DrawPlayerView {
   prompterName: string;
   prompt: string | null;
   hasSubmitted: boolean;
+  myDrawingData: string;
   voteMode: DrawVoteMode | null;
   hasVoted: boolean;
   votedForId: string | null;
@@ -47,6 +48,4 @@ export type DrawAction =
   | { type: 'submit_prompt'; payload: { text: string } }
   | { type: 'sync_drawing'; payload: { imageData: string } }
   | { type: 'submit_drawing'; payload: { imageData?: string } }
-  | { type: 'cast_vote'; payload: { targetPlayerId: string } }
-  | { type: 'next_round' }
-  | { type: 'finish_game' };
+  | { type: 'cast_vote'; payload: { targetPlayerId: string } };

@@ -4,7 +4,8 @@ import type {
   MostLikelyPlayerView,
 } from '../../../../shared/games/mostlikely';
 import { TallyList } from '../../components/TallyList';
-import { secondsLeft, type GameUiDefinition, type MobileGameViewProps, type TvGameViewProps } from '../registry';
+import { TvActedArms } from '../../components/tv/TvActedArms';
+import type { GameUiDefinition, MobileGameViewProps, TvGameViewProps } from '../registry';
 import './mostlikely.css';
 
 function toTallyEntries(tally: MostLikelyHostView['tally']) {
@@ -31,46 +32,32 @@ function MostLikelyTvView(props: TvGameViewProps<MostLikelyHostView>) {
           </div>
         }
       >
+        <TvActedArms
+          players={props.state.players}
+          actedIds={
+            host()?.phase === 'REVEAL'
+              ? (host()?.continuePlayerIds ?? [])
+              : (host()?.votedPlayerIds ?? [])
+          }
+        />
+
         <p class="eyebrow vote-eyebrow">
           ROUND {host()?.round} OF {host()?.totalRounds}
-          <Show when={host()?.promptIsAi}>
-            <span class="vote-ai-tag">AI PROMPT</span>
-          </Show>
         </p>
+
         <h1 class="ml-tv-prompt">
           <span class="ml-tv-lead">Who is most likely to</span>
           {host()?.prompt}?
         </h1>
 
-        <Show
-          when={host()?.phase === 'VOTING'}
-          fallback={
-            <>
-              <TallyList entries={toTallyEntries(host()?.tally ?? [])} badgeLabel="DRINKS" />
-              <p class="vote-next-hint">
-                <Show
-                  when={(host()?.round ?? 0) < (host()?.totalRounds ?? 0)}
-                  fallback="Final results next"
-                >
-                  Next round in {secondsLeft(props.remainingMs)}s
-                </Show>
-              </p>
-            </>
-          }
-        >
-          <p class="vote-progress">
-            {host()?.votedCount}/{host()?.connectedCount} voted, {secondsLeft(props.remainingMs)}s
-          </p>
+        <Show when={host()?.phase === 'REVEAL'}>
+          <TallyList
+            entries={toTallyEntries(host()?.tally ?? [])}
+            players={props.state.players}
+            badgeLabel="DRINKS"
+            tone="accent"
+          />
         </Show>
-
-        <div class="tv-action-bar">
-          <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'next' })}>
-            {host()?.phase === 'VOTING' ? 'Reveal Now' : 'Next Round'}
-          </button>
-          <button class="btn btn-tv" onClick={props.endGame}>
-            End Game
-          </button>
-        </div>
       </Show>
     </div>
   );
@@ -98,10 +85,28 @@ function MostLikelyMobileView(props: MobileGameViewProps<MostLikelyPlayerView>) 
           when={view()?.phase === 'VOTING'}
           fallback={
             <>
-              <Show when={view()?.iAmDrinking} fallback={<p class="ml-reveal-wait">The people have spoken.</p>}>
+              <Show
+                when={view()?.iAmDrinking}
+                fallback={<p class="ml-reveal-wait">The people have spoken.</p>}
+              >
                 <p class="ml-drink-verdict">The verdict is you. Drink up.</p>
               </Show>
-              <TallyList entries={toTallyEntries(view()?.tally ?? [])} badgeLabel="DRINKS" compact />
+              <TallyList
+                entries={toTallyEntries(view()?.tally ?? [])}
+                players={props.state.players}
+                badgeLabel="DRINKS"
+                tone="accent"
+                compact
+              />
+              <button
+                class={`btn btn-primary ml-continue-btn ${view()?.myContinueVote ? 'is-voted' : ''}`}
+                onClick={() => props.sendAction({ type: 'continue' })}
+              >
+                {view()?.myContinueVote ? 'Ready' : 'Continue'}
+              </button>
+              <p class="muted vote-tally-note">
+                {view()?.continueCount}/{view()?.connectedCount} ready
+              </p>
             </>
           }
         >

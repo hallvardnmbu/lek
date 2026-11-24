@@ -1,9 +1,11 @@
-import { For, Show, createEffect, createMemo, createSignal } from 'solid-js';
+import { Show, createEffect, createMemo, createSignal } from 'solid-js';
 import type {
   GeoGuessHostView,
   GeoGuessPlayerView,
   GeoPoint,
 } from '../../../../shared/games/geoguess';
+import { ResultList, type ResultListEntry } from '../../components/ResultList';
+import { TvActedArms } from '../../components/tv/TvActedArms';
 import {
   secondsLeft,
   type GameUiDefinition,
@@ -23,6 +25,25 @@ function GeoGuessTvView(props: TvGameViewProps<GeoGuessHostView>) {
       p.guess ? [{ id: p.playerId, label: p.name, color: p.color, point: p.guess }] : []
     );
   });
+
+  const resultEntries = createMemo<ResultListEntry[]>(() =>
+    (host()?.players ?? []).map((player) => ({
+      playerId: player.playerId,
+      name: player.name,
+      swatchColor: player.color,
+      detail: player.distanceKm !== null ? `${player.distanceKm} km` : 'No guess',
+      badge: player.isWinner
+        ? `WIN +${player.roundPoints ?? 0}`
+        : player.drinks
+          ? 'DRINK'
+          : player.roundPoints !== null
+            ? `+${player.roundPoints}`
+            : undefined,
+      badgeTone: player.isWinner ? 'accent' : player.drinks ? 'loser' : 'muted',
+      tone: player.isWinner ? 'accent' : player.drinks ? 'loser' : 'default',
+      stat: `${player.score} pts`,
+    }))
+  );
 
   return (
     <div class="tv-phase-center geo-tv-wrap">
@@ -51,10 +72,8 @@ function GeoGuessTvView(props: TvGameViewProps<GeoGuessHostView>) {
           <Show when={host()?.imageUrl}>
             {(url) => <img class="geo-tv-spot-img" src={url()} alt="Mystery location" />}
           </Show>
-          <div class="geo-tv-lock-pill">
-            {host()?.lockedCount ?? 0} / {host()?.totalCount ?? 0} locked in
-          </div>
         </div>
+        <TvActedArms players={props.state.players} actedIds={host()?.lockedPlayerIds ?? []} />
       </Show>
 
       <Show when={host()?.phase === 'REVEAL'}>
@@ -77,59 +96,20 @@ function GeoGuessTvView(props: TvGameViewProps<GeoGuessHostView>) {
                 Closest: <strong>{host()?.winnerName}</strong>
               </div>
             </Show>
-            <Show when={host()?.drinkerName}>
+            <Show when={(host()?.drinkerNames.length ?? 0) > 0}>
               <div class="guess-tv-callout geo-tv-callout is-drinker">
-                Last place: <strong>{host()?.drinkerName}</strong>. DRINKS!
+                Last place: <strong>{host()?.drinkerNames.join(', ')}</strong> · DRINK!
               </div>
             </Show>
 
-            <div class="guess-tv-board geo-tv-board">
-              <For each={host()?.players ?? []}>
-                {(player) => (
-                  <div
-                    class={`guess-tv-row geo-tv-row ${player.isWinner ? 'is-winner' : ''} ${player.drinks ? 'is-drinker' : ''}`}
-                  >
-                    <span
-                      class="geo-tv-swatch"
-                      style={{ background: player.color }}
-                    />
-                    <span class="geo-tv-name">{player.name}</span>
-                    <span class="geo-tv-dist">
-                      {player.distanceKm !== null ? `${player.distanceKm} km` : 'No guess'}
-                    </span>
-                    <span class="guess-tv-badge">
-                      {player.isWinner
-                        ? `WIN +${player.roundPoints ?? 0}`
-                        : player.drinks
-                          ? 'DRINK'
-                          : player.roundPoints !== null
-                            ? `+${player.roundPoints}`
-                            : '-'}
-                    </span>
-                    <span class="geo-tv-total">{player.score} pts</span>
-                  </div>
-                )}
-              </For>
-            </div>
+            <ResultList
+              players={props.state.players}
+              entries={resultEntries()}
+              class="geo-tv-board"
+            />
           </div>
         </div>
       </Show>
-
-      <div class="tv-action-bar">
-        <Show when={host()?.phase === 'GUESSING'}>
-          <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'skip_spot' })}>
-            Skip Spot
-          </button>
-        </Show>
-        <Show when={host()?.phase === 'REVEAL' || host()?.error}>
-          <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'next_round' })}>
-            {(host()?.round ?? 1) >= (host()?.totalRounds ?? 5) ? 'Finish' : 'Next Round'}
-          </button>
-        </Show>
-        <button class="btn btn-tv" onClick={props.endGame}>
-          End Game
-        </button>
-      </div>
     </div>
   );
 }
@@ -231,13 +211,6 @@ function GeoGuessMobileView(props: MobileGameViewProps<GeoGuessPlayerView>) {
             fitAll={true}
           />
         </Show>
-
-        <button
-          class="btn geo-mobile-submit"
-          onClick={() => props.sendAction({ type: 'next_round' })}
-        >
-          {(view()?.round ?? 1) >= (view()?.totalRounds ?? 5) ? 'Finish' : 'Next Round'}
-        </button>
       </Show>
     </div>
   );

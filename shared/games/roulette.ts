@@ -2,6 +2,7 @@ export type RoulettePhase = 'SPINNING' | 'STOPPED';
 
 export const TOTAL_SPIN_MS = 20_000;
 export const SPIN_LEAD_MS = 350;
+export const STOPPED_HOLD_MS = 4_500;
 const WEIGHT_GROWTH = 18;
 const WEIGHT_POWER = 2.5;
 

@@ -54,7 +54,9 @@ export const TANK_COLORS = [
   '#f5f5f5',
 ];
 
-export type TankGamePhase = 'COUNTDOWN' | 'PLAYING';
+export type TankGamePhase = 'COUNTDOWN' | 'PLAYING' | 'ENDING';
+
+export const END_DELAY_MS = 2_000;
 
 export interface TankInput {
   x: number;
@@ -90,15 +92,18 @@ export interface TankGameHostView {
   phase: TankGamePhase;
   timeLeftMs: number;
   aliveCount: number;
+  winnerId: string | null;
   tanks: Array<{
     playerId: string;
     x: number;
     y: number;
+    vx: number;
+    vy: number;
     angle: number;
     colorIndex: number;
     alive: boolean;
   }>;
-  bullets: Array<{ id: number; x: number; y: number }>;
+  bullets: Array<{ id: number; x: number; y: number; vx: number; vy: number }>;
   eliminations: TankGameElimination[];
 }
 

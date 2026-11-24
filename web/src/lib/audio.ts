@@ -7,6 +7,21 @@ export function createLobbyMusic(src: string, isActive: () => boolean) {
   audio.preload = 'auto';
 
   let unlocked = false;
+  let audioCtx: AudioContext | null = null;
+
+  const ensureAudioContext = (): AudioContext | null => {
+    if (audioCtx) return audioCtx;
+    const Ctor =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctor) return null;
+    try {
+      audioCtx = new Ctor();
+      return audioCtx;
+    } catch {
+      return null;
+    }
+  };
 
   const syncPlayback = () => {
     const shouldPlay = isActive() && !muted();
@@ -28,8 +43,46 @@ export function createLobbyMusic(src: string, isActive: () => boolean) {
   };
 
   const handleFirstGesture = () => {
+    const ctx = ensureAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      void ctx.resume().catch(() => {});
+    }
     if (unlocked) return;
     syncPlayback();
+  };
+
+  const playJoinPling = () => {
+    if (muted()) return;
+    const ctx = ensureAudioContext();
+    if (!ctx) return;
+
+    const triggerTone = () => {
+      const now = ctx.currentTime;
+      const notes = [587.33, 880];
+      notes.forEach((freq, idx) => {
+        const start = now + idx * 0.075;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, start);
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.linearRampToValueAtTime(0.14, start + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.24);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start + 0.25);
+      });
+    };
+
+    if (ctx.state === 'suspended') {
+      void ctx
+        .resume()
+        .then(triggerTone)
+        .catch(() => {});
+    } else {
+      triggerTone();
+    }
   };
 
   createEffect(
@@ -48,6 +101,10 @@ export function createLobbyMusic(src: string, isActive: () => boolean) {
       window.removeEventListener('keydown', handleFirstGesture);
       audio.pause();
       audio.src = '';
+      if (audioCtx) {
+        void audioCtx.close().catch(() => {});
+        audioCtx = null;
+      }
     };
   });
 
@@ -55,5 +112,5 @@ export function createLobbyMusic(src: string, isActive: () => boolean) {
     setMuted((prev) => !prev);
   };
 
-  return { muted, toggleMute };
+  return { muted, toggleMute, playJoinPling };
 }

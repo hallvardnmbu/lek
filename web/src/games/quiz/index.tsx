@@ -1,5 +1,7 @@
-import { For, Show } from 'solid-js';
+import { For, Show, createMemo } from 'solid-js';
 import type { QuizHostView, QuizPlayerView } from '../../../../shared/games/quiz';
+import { ResultList, type ResultListEntry } from '../../components/ResultList';
+import { TvActedArms } from '../../components/tv/TvActedArms';
 import type { GameUiDefinition, MobileGameViewProps, TvGameViewProps } from '../registry';
 import './quiz.css';
 
@@ -7,7 +9,24 @@ const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
 
 function QuizTvView(props: TvGameViewProps<QuizHostView>) {
   const host = () => props.state.hostState;
-  const eliminated = () => (host()?.results ?? []).filter((r) => r.eliminated);
+
+  const scoresById = createMemo(
+    () => new Map(props.state.players.map((p) => [p.id, p.score]))
+  );
+
+  const scoreboardEntries = createMemo<ResultListEntry[]>(() =>
+    (host()?.results ?? []).map((entry) => {
+      const playerScore = scoresById().get(entry.playerId) ?? 0;
+      return {
+        playerId: entry.playerId,
+        name: entry.playerName,
+        tone: entry.eliminated ? 'loser' : entry.correct ? 'accent' : 'default',
+        badge: entry.eliminated ? 'OUT' : entry.correct ? 'CORRECT' : 'SAFE',
+        badgeTone: entry.eliminated ? 'loser' : entry.correct ? 'accent' : 'muted',
+        stat: `${playerScore} pts`,
+      };
+    })
+  );
 
   return (
     <div class="tv-phase-center">
@@ -29,18 +48,21 @@ function QuizTvView(props: TvGameViewProps<QuizHostView>) {
 
         <div class="qz-options">
           <For each={host()?.options ?? []}>
-            {(option, idx) => (
-              <div
-                class={`qz-option ${
-                  host()?.phase === 'REVEAL' && host()?.correctIndex === idx()
-                    ? 'qz-option-correct'
-                    : ''
-                }`}
-              >
-                <span class="qz-option-letter">{OPTION_LETTERS[idx()]}</span>
-                <span class="qz-option-text">{option}</span>
-              </div>
-            )}
+            {(option, idx) => {
+              const stateClass = () => {
+                if (host()?.phase !== 'REVEAL') return '';
+                return host()?.correctIndex === idx()
+                  ? 'qz-option-correct'
+                  : 'qz-option-wrong';
+              };
+
+              return (
+                <div class={`qz-option ${stateClass()}`}>
+                  <span class="qz-option-letter">{OPTION_LETTERS[idx()]}</span>
+                  <span class="qz-option-text">{option}</span>
+                </div>
+              );
+            }}
           </For>
         </div>
 
@@ -48,33 +70,27 @@ function QuizTvView(props: TvGameViewProps<QuizHostView>) {
           when={host()?.phase === 'QUESTION'}
           fallback={
             <div class="qz-reveal">
-              <For each={eliminated()}>
-                {(entry) => (
-                  <p class="qz-out-name">OUT: {entry.playerName}</p>
-                )}
-              </For>
               <Show when={host()?.allWrong}>
                 <p class="qz-all-wrong">All wrong. Nobody out.</p>
               </Show>
               <Show when={host()?.winnerName}>
-                <p class="qz-winner">WINNER: {host()?.winnerName}</p>
+                {(name) => (
+                  <div class="qz-winner">
+                    <span class="status-badge badge-accent">WINNER</span>
+                    <span>{name()}</span>
+                  </div>
+                )}
               </Show>
+              <ResultList
+                players={props.state.players}
+                entries={scoreboardEntries()}
+                class="qz-scoreboard"
+              />
             </div>
           }
         >
-          <p class="qz-progress">
-            {host()?.answeredCount}/{host()?.connectedAliveCount} answered
-          </p>
+          <TvActedArms players={props.state.players} actedIds={host()?.answeredPlayerIds ?? []} />
         </Show>
-
-        <div class="tv-action-bar qz-tv-actions">
-          <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'next' })}>
-            {host()?.phase === 'QUESTION' ? 'Reveal Now' : 'Next Question'}
-          </button>
-          <button class="btn btn-tv" onClick={props.endGame}>
-            End Game
-          </button>
-        </div>
       </Show>
     </div>
   );
@@ -122,7 +138,12 @@ function QuizMobileView(props: MobileGameViewProps<QuizPlayerView>) {
               </Show>
               <p class="qz-correct-answer">Answer: {correctAnswerText()}</p>
               <Show when={view()?.winnerName}>
-                <p class="qz-winner">WINNER: {view()?.winnerName}</p>
+                {(name) => (
+                  <div class="qz-winner qz-winner-mobile">
+                    <span class="status-badge badge-accent">WINNER</span>
+                    <span>{name()}</span>
+                  </div>
+                )}
               </Show>
             </>
           }

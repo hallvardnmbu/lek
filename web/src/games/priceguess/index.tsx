@@ -1,8 +1,10 @@
-import { For, Show, createEffect, createSignal } from 'solid-js';
+import { Show, createEffect, createMemo, createSignal } from 'solid-js';
 import type {
   PriceGuessHostView,
   PriceGuessPlayerView,
 } from '../../../../shared/games/priceguess';
+import { ResultList, type ResultListEntry } from '../../components/ResultList';
+import { TvActedArms } from '../../components/tv/TvActedArms';
 import {
   secondsLeft,
   type GameUiDefinition,
@@ -20,10 +22,27 @@ function PriceGuessTvView(props: TvGameViewProps<PriceGuessHostView>) {
   const host = () => props.state.hostState;
   const product = () => host()?.product;
 
+  const resultEntries = createMemo<ResultListEntry[]>(() =>
+    (host()?.players ?? []).map((player) => ({
+      playerId: player.playerId,
+      name: player.name,
+      detail:
+        player.guess !== null
+          ? `${formatPrice(player.guess)}${player.diff !== null ? ` · ±${formatPrice(player.diff)}` : ''}`
+          : 'No guess',
+      badge: player.isWinner ? 'WIN' : player.drinks ? 'DRINK' : undefined,
+      badgeTone: player.isWinner ? 'accent' : player.drinks ? 'loser' : 'muted',
+      tone: player.isWinner ? 'accent' : player.drinks ? 'loser' : 'default',
+      stat: `${player.score} pts`,
+    }))
+  );
+
   return (
     <div class="tv-phase-center pg-tv-wrap">
       <div class="guess-tv-header pg-tv-header">
-        <p class="eyebrow">PRICE · ROUND {host()?.round ?? 1}</p>
+        <p class="eyebrow">
+          PRICE · ROUND {host()?.round ?? 1} OF {host()?.totalRounds ?? 3}
+        </p>
         <Show when={host()?.phase === 'GUESSING' && props.remainingMs !== null}>
           <span class="pg-tv-timer">{secondsLeft(props.remainingMs)}s</span>
         </Show>
@@ -79,12 +98,6 @@ function PriceGuessTvView(props: TvGameViewProps<PriceGuessHostView>) {
                 <p class="pg-tv-desc">{product()?.description}</p>
               </Show>
 
-              <Show when={host()?.phase === 'GUESSING'}>
-                <div class="pg-tv-lock-pill">
-                  {host()?.lockedCount ?? 0} / {host()?.totalCount ?? 0} locked in
-                </div>
-              </Show>
-
               <Show when={host()?.phase === 'REVEAL'}>
                 <div class="pg-tv-actual">
                   <span class="pg-tv-actual-label">ACTUAL PRICE</span>
@@ -96,57 +109,31 @@ function PriceGuessTvView(props: TvGameViewProps<PriceGuessHostView>) {
 
           <Show when={host()?.phase === 'REVEAL'}>
             <div class="guess-tv-results">
-              <Show when={host()?.winnerName}>
+              <Show when={(host()?.winnerNames.length ?? 0) > 0}>
                 <div class="guess-tv-callout pg-tv-callout is-winner">
-                  Closest: <strong>{host()?.winnerName}</strong>
+                  Closest: <strong>{host()?.winnerNames.join(', ')}</strong>
                 </div>
               </Show>
-              <Show when={host()?.drinkerName}>
+              <Show when={(host()?.drinkerNames.length ?? 0) > 0}>
                 <div class="guess-tv-callout pg-tv-callout is-drinker">
-                  Furthest: <strong>{host()?.drinkerName}</strong>. DRINKS!
+                  {host()?.drinkReason === 'no_guess' ? 'No guess' : 'Furthest'}:{' '}
+                  <strong>{host()?.drinkerNames.join(', ')}</strong> · DRINK!
                 </div>
               </Show>
 
-              <div class="guess-tv-board">
-                <For each={host()?.players ?? []}>
-                  {(player) => (
-                    <div
-                      class={`guess-tv-row pg-tv-row ${player.isWinner ? 'is-winner' : ''} ${player.drinks ? 'is-drinker' : ''}`}
-                    >
-                      <span class="pg-tv-player">{player.name}</span>
-                      <span class="pg-tv-guess">
-                        {player.guess !== null ? formatPrice(player.guess) : 'No guess'}
-                      </span>
-                      <span class="pg-tv-diff">
-                        {player.diff !== null ? `±${formatPrice(player.diff)}` : ''}
-                      </span>
-                      <span class="guess-tv-badge pg-tv-badge">
-                        {player.isWinner ? 'WIN' : player.drinks ? 'DRINK' : `${player.score} pts`}
-                      </span>
-                    </div>
-                  )}
-                </For>
-              </div>
+              <ResultList
+                players={props.state.players}
+                entries={resultEntries()}
+                class="pg-tv-board"
+              />
             </div>
           </Show>
         </div>
       </Show>
 
-      <div class="tv-action-bar">
-        <Show when={host()?.phase === 'GUESSING'}>
-          <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'skip_product' })}>
-            Skip Bottle
-          </button>
-        </Show>
-        <Show when={host()?.phase === 'REVEAL' || host()?.error}>
-          <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'next_round' })}>
-            Next Round
-          </button>
-        </Show>
-        <button class="btn btn-tv" onClick={props.endGame}>
-          End Game
-        </button>
-      </div>
+      <Show when={host()?.phase === 'GUESSING'}>
+        <TvActedArms players={props.state.players} actedIds={host()?.lockedPlayerIds ?? []} />
+      </Show>
     </div>
   );
 }
@@ -182,7 +169,9 @@ function PriceGuessMobileView(props: MobileGameViewProps<PriceGuessPlayerView>) 
   return (
     <div class="guess-mobile-wrap pg-mobile-wrap">
       <div class="guess-mobile-header">
-        <span class="eyebrow">ROUND {view()?.round ?? 1}</span>
+        <span class="eyebrow">
+          PRICE · ROUND {view()?.round ?? 1} OF {view()?.totalRounds ?? 3}
+        </span>
         <Show when={view()?.phase === 'GUESSING' && props.remainingMs !== null}>
           <span class="guess-mobile-timer pg-mobile-timer">{secondsLeft(props.remainingMs)}s</span>
         </Show>
@@ -241,7 +230,9 @@ function PriceGuessMobileView(props: MobileGameViewProps<PriceGuessPlayerView>) 
             <p class="guess-mobile-verdict pg-mobile-verdict">CLOSEST! YOU WIN</p>
           </Show>
           <Show when={view()?.drinks}>
-            <p class="guess-mobile-verdict pg-mobile-verdict">FURTHEST OFF. DRINK!</p>
+            <p class="guess-mobile-verdict pg-mobile-verdict">
+              {view()?.guess === null ? 'NO GUESS. DRINK!' : 'FURTHEST OFF. DRINK!'}
+            </p>
           </Show>
           <Show when={!view()?.isWinner && !view()?.drinks}>
             <p class="guess-mobile-verdict pg-mobile-verdict">YOU ARE SAFE</p>
@@ -255,13 +246,6 @@ function PriceGuessMobileView(props: MobileGameViewProps<PriceGuessPlayerView>) 
               : 'No guess submitted'}
           </p>
         </div>
-
-        <button
-          class="btn btn-primary btn-block"
-          onClick={() => props.sendAction({ type: 'next_round' })}
-        >
-          Next Round
-        </button>
       </Show>
     </div>
   );

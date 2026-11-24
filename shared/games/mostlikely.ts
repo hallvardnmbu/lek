@@ -17,9 +17,8 @@ export interface MostLikelyHostView {
   round: number;
   totalRounds: number;
   prompt: string | null;
-  promptIsAi: boolean;
-  votedCount: number;
-  connectedCount: number;
+  votedPlayerIds: string[];
+  continuePlayerIds: string[];
   tally: MostLikelyTallyEntry[];
 }
 
@@ -29,9 +28,11 @@ export interface MostLikelyPlayerView {
   totalRounds: number;
   prompt: string | null;
   myVote: string | null;
+  myContinueVote: boolean;
   candidates: MostLikelyCandidate[];
   myDrinks: number;
   votedCount: number;
+  continueCount: number;
   connectedCount: number;
   tally: MostLikelyTallyEntry[];
   iAmDrinking: boolean;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import {
   SPIN_LEAD_MS,
+  STOPPED_HOLD_MS,
   buildStepOffsetsMs,
   computeStepDelayMs,
   totalSpinDurationMs,
@@ -15,8 +16,9 @@ interface TestPlayer {
 }
 
 function createTestCtx(players: TestPlayer[]) {
-  const timers: number[] = [];
+  const timers: Array<{ ms: number; showCountdown?: boolean }> = [];
   let cleared = 0;
+  let ended = false;
   const events: Array<{ event: string; payload: unknown }> = [];
   const scores = new Map<string, number>();
 
@@ -37,7 +39,9 @@ function createTestCtx(players: TestPlayer[]) {
     setPlayerScore: (id, score) => scores.set(id, score),
     addPlayerScore: (id, delta) => scores.set(id, (scores.get(id) ?? 0) + delta),
     setPlayerMeta: () => {},
-    setTimer: (ms) => timers.push(ms),
+    setTimer: (ms, showCountdown) => {
+      timers.push({ ms, showCountdown });
+    },
     clearTimer: () => {
       cleared++;
     },
@@ -46,10 +50,19 @@ function createTestCtx(players: TestPlayer[]) {
     sendEventToHost: () => {},
     sendEventToPlayer: () => {},
     emitWebhook: () => {},
-    endGame: () => {},
+    endGame: () => {
+      ended = true;
+    },
   };
 
-  return { ctx, timers, events, getCleared: () => cleared, score: (id: string) => scores.get(id) ?? 0 };
+  return {
+    ctx,
+    timers,
+    events,
+    getCleared: () => cleared,
+    isEnded: () => ended,
+    score: (id: string) => scores.get(id) ?? 0,
+  };
 }
 
 const threePlayers: TestPlayer[] = [
@@ -78,13 +91,13 @@ describe('Roulette game', () => {
     expect(offsets[1]).toBe(first);
   });
 
-  it('provides synchronized spin schedule and selects the final step player on timer expiry', () => {
-    const { ctx, timers, events, getCleared, score } = createTestCtx(threePlayers);
+  it('spins once, holds on STOPPED for STOPPED_HOLD_MS, then ends the game automatically', () => {
+    const { ctx, timers, events, getCleared, isEnded, score } = createTestCtx(threePlayers);
     let state = rouletteGame.onStart(ctx);
 
     expect(state.phase).toBe('SPINNING');
     expect(timers.length).toBe(1);
-    expect(timers[0]).toBe(SPIN_LEAD_MS + totalSpinDurationMs(state.totalSteps));
+    expect(timers[0].ms).toBe(SPIN_LEAD_MS + totalSpinDurationMs(state.totalSteps));
 
     const hostSpinView = rouletteGame.getHostView(state, ctx);
     expect(hostSpinView.spin).not.toBeNull();
@@ -102,7 +115,9 @@ describe('Roulette game', () => {
 
     expect(state.phase).toBe('STOPPED');
     expect(state.selectedId).toBe(expectedSelectedId);
-    expect(getCleared()).toBe(1);
+    expect(isEnded()).toBe(false);
+    expect(timers.length).toBe(2);
+    expect(timers[1]).toEqual({ ms: STOPPED_HOLD_MS, showCountdown: false });
     expect(events.some((e) => e.event === 'roulette_stopped')).toBe(true);
 
     const selectedViews = threePlayers.filter(
@@ -119,31 +134,26 @@ describe('Roulette game', () => {
     for (const p of threePlayers) {
       expect(score(p.id)).toBe(p.id === expectedSelectedId ? 0 : 1);
     }
+
+    state = rouletteGame.onTimerExpired!(ctx, state)!;
+    expect(getCleared()).toBe(1);
+    expect(isEnded()).toBe(true);
   });
 
-  it('allows spinning again once stopped via host or player action', () => {
+  it('ignores spin actions after stopping since roulette is single-spin', () => {
     const { ctx } = createTestCtx(threePlayers);
     let state = rouletteGame.onStart(ctx);
 
     state = rouletteGame.onTimerExpired!(ctx, state)!;
     expect(state.phase).toBe('STOPPED');
-
-    state = rouletteGame.onHostAction!(ctx, state, { type: 'spin' })!;
-    expect(state.phase).toBe('SPINNING');
-
-    state = rouletteGame.onTimerExpired!(ctx, state)!;
-    expect(state.phase).toBe('STOPPED');
+    expect(rouletteGame.onHostAction).toBeUndefined();
 
     state = rouletteGame.onPlayerAction(ctx, state, 'p1', { type: 'spin' })!;
-    expect(state.phase).toBe('SPINNING');
+    expect(state.phase).toBe('STOPPED');
   });
 
   it('cleans up playerOrder and selectedId on leave and ends when empty', () => {
-    let ended = false;
-    const { ctx } = createTestCtx(threePlayers);
-    ctx.endGame = () => {
-      ended = true;
-    };
+    const { ctx, isEnded } = createTestCtx(threePlayers);
 
     let state = rouletteGame.onStart(ctx);
     state = rouletteGame.onTimerExpired!(ctx, state)!;
@@ -152,12 +162,12 @@ describe('Roulette game', () => {
     state = rouletteGame.onPlayerLeave!(ctx, state, selected)!;
     expect(state.playerOrder).not.toContain(selected);
     expect(state.selectedId).toBeNull();
-    expect(ended).toBe(false);
+    expect(isEnded()).toBe(false);
 
     for (const remaining of state.playerOrder) {
       state = rouletteGame.onPlayerLeave!(ctx, state, remaining)!;
     }
     expect(state.playerOrder).toEqual([]);
-    expect(ended).toBe(true);
+    expect(isEnded()).toBe(true);
   });
 });

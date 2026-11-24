@@ -128,6 +128,15 @@ describe('RoomManager & GameDefinition foundation', () => {
     expect(secondView.players.find((p) => p.id === p1.player.id)?.score).toBe(10);
     expect(secondView.players.find((p) => p.id === p1.player.id)?.totalScore).toBe(20);
 
+    const deniedAbort = manager.abortGame(room.code, { playerId: p1.player.id });
+    expect(deniedAbort.ok).toBe(false);
+
+    const aborted = manager.abortGame(room.code, { hostToken });
+    expect(aborted.ok).toBe(true);
+    expect(room.phase).toBe('GAME_SELECT');
+    expect(room.players.get(p1.player.id)?.score).toBe(0);
+    expect(room.players.get(p1.player.id)?.totalScore).toBe(10);
+
     manager.disposeRoom(room.code);
   });
 

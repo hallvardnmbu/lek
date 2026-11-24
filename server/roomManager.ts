@@ -645,6 +645,40 @@ export class RoomManager {
     return { ok: true };
   }
 
+  abortGame(
+    rawCode: string,
+    actor: { playerId?: string; hostToken?: string }
+  ): ActionResult<{ room: InternalRoom }> {
+    const room = this.getRoom(rawCode);
+    if (!room) {
+      return { ok: false, code: 'ROOM_NOT_FOUND', message: 'Room not found.' };
+    }
+    if (!actor.hostToken || actor.hostToken !== room.hostToken) {
+      return {
+        ok: false,
+        code: 'UNAUTHORIZED',
+        message: 'Only the TV host can abort the active game.',
+      };
+    }
+
+    if (room.phase === 'PLAYING') {
+      const game = this.getActiveGame(room);
+      if (game?.onEnd && room.gameState !== null) {
+        game.onEnd(this.createGameContext(room), room.gameState);
+      }
+      for (const p of room.players.values()) {
+        p.totalScore -= p.score;
+        p.score = 0;
+        p.meta = {};
+      }
+    }
+
+    room.randomizedMode = false;
+    this.resetRoomPhase(room, 'GAME_SELECT');
+    this.broadcastState(room);
+    return { ok: true, room };
+  }
+
   returnToLobby(
     rawCode: string,
     actor: { playerId?: string; hostToken?: string }

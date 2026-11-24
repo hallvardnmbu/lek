@@ -286,6 +286,7 @@ function finishGame(ctx: GameContext, state: QuizState): void {
 function baseView(state: QuizState, ctx: GameContext) {
   const question = currentQuestion(state);
   const connected = aliveConnectedIds(ctx, state);
+  const answeredPlayerIds = connected.filter((id) => state.answers[id] !== undefined);
   const winnerId = state.aliveIds.length === 1 ? state.aliveIds[0] : null;
 
   return {
@@ -294,7 +295,8 @@ function baseView(state: QuizState, ctx: GameContext) {
     question: question?.question ?? null,
     options: question?.options ?? [],
     correctIndex: state.phase === 'REVEAL' ? (question?.correctIndex ?? null) : null,
-    answeredCount: connected.filter((id) => state.answers[id] !== undefined).length,
+    answeredCount: answeredPlayerIds.length,
+    answeredPlayerIds,
     connectedAliveCount: connected.length,
     aliveCount: state.aliveIds.length,
     results: state.results,
@@ -377,13 +379,6 @@ export function createQuizGame(
       return maybeReveal(ctx, state);
     },
 
-    onHostAction(ctx, state, action) {
-      if (action.type !== 'next') return state;
-      if (state.phase === 'QUESTION') return reveal(ctx, state);
-      if (state.phase === 'REVEAL') return serveNextQuestion(ctx, state, generateQuestions);
-      return state;
-    },
-
     onPlayerDisconnect(ctx, state) {
       return maybeReveal(ctx, state);
     },
@@ -411,8 +406,9 @@ export function createQuizGame(
     },
 
     getPlayerView(state, playerId, ctx): QuizPlayerView {
+      const { answeredPlayerIds: _answeredPlayerIds, ...shared } = baseView(state, ctx);
       return {
-        ...baseView(state, ctx),
+        ...shared,
         myAnswerIndex: state.answers[playerId]?.optionIndex ?? null,
         iAmAlive: state.aliveIds.includes(playerId),
         myCorrect: state.results.find((r) => r.playerId === playerId)?.correct ?? null,

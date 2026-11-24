@@ -127,6 +127,8 @@
 }
 
 .debug-tv-stage {
+  position: relative;
+  overflow: hidden;
   padding: 1rem;
   min-height: 460px;
   display: flex;

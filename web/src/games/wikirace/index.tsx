@@ -1,23 +1,104 @@
-import { For, Show, createEffect } from 'solid-js';
-import type { WikiRaceHostView, WikiRacePlayerView } from '../../../../shared/games/wikirace';
+import { For, Show, createEffect, createMemo, createSignal, onCleanup } from 'solid-js';
+import {
+  STEP_ANIM_MS,
+  type WikiRaceHostView,
+  type WikiRacePhase,
+  type WikiRacePlayerProgress,
+  type WikiRacePlayerView,
+} from '../../../../shared/games/wikirace';
+import { ResultList, type ResultListEntry } from '../../components/ResultList';
 import type { GameUiDefinition, MobileGameViewProps, TvGameViewProps } from '../registry';
 import './wikirace.css';
 
+function buildResultEntries(
+  players: WikiRacePlayerProgress[],
+  phase: WikiRacePhase | undefined
+): ResultListEntry[] {
+  return players.map((player) => {
+    if (player.finishedRank === 1) {
+      return {
+        playerId: player.playerId,
+        name: player.name,
+        detail: `${player.hops} hops`,
+        badge: 'WINNER',
+        badgeTone: 'accent',
+        tone: 'accent',
+        dimmed: !player.connected,
+      };
+    }
+
+    return {
+      playerId: player.playerId,
+      name: player.name,
+      detail: `${player.hops} hops`,
+      badge: player.connected ? (phase === 'RACING' ? 'RACING' : 'DNF') : 'OFFLINE',
+      badgeTone: 'muted',
+      tone: 'default',
+      dimmed: !player.connected,
+    };
+  });
+}
+
 function WikiRaceTvView(props: TvGameViewProps<WikiRaceHostView>) {
   const host = () => props.state.hostState;
+  const [visibleSteps, setVisibleSteps] = createSignal(1);
+
+  createEffect(
+    () => ({
+      phase: host()?.phase,
+      total: host()?.winnerPath.length ?? 0,
+    }),
+    (info) => {
+      if (info.phase !== 'RESULTS' || info.total === 0) {
+        setVisibleSteps(1);
+        return;
+      }
+
+      setVisibleSteps(1);
+      if (info.total <= 1) return;
+
+      const timer = setInterval(() => {
+        setVisibleSteps((prev) => {
+          const next = prev + 1;
+          if (next >= info.total) {
+            clearInterval(timer);
+            return info.total;
+          }
+          return next;
+        });
+      }, STEP_ANIM_MS);
+
+      onCleanup(() => clearInterval(timer));
+    }
+  );
+
+  const revealedPath = createMemo(() => (host()?.winnerPath ?? []).slice(0, visibleSteps()));
+
+  const winnerHops = createMemo(() => {
+    const winnerId = host()?.winnerId;
+    const found = host()?.players.find((p) => p.playerId === winnerId);
+    if (found) return found.hops;
+    return Math.max(0, (host()?.winnerPath.length ?? 1) - 1);
+  });
+
+  const entries = createMemo(() =>
+    buildResultEntries(host()?.players ?? [], host()?.phase)
+  );
 
   return (
-    <div class="tv-phase-center">
-      <p class="eyebrow">WIKIPEDIA · ROUND {host()?.round ?? 1}</p>
+    <div class="tv-phase-center wr-tv-stage">
+      <p class="eyebrow">WIKIPEDIA</p>
 
-      <div class="wr-tv-route">
-        <span class="wr-tv-article">{host()?.startTitle}</span>
-        <span class="wr-tv-arrow">→</span>
-        <span class="wr-tv-article wr-tv-target">{host()?.targetTitle}</span>
-      </div>
+      <Show when={host()?.phase !== 'RESULTS'}>
+        <div class="wr-tv-route">
+          <span class="wr-tv-article">{host()?.startTitle}</span>
+          <span class="wr-tv-arrow">→</span>
+          <span class="wr-tv-article wr-tv-target">{host()?.targetTitle}</span>
+        </div>
+      </Show>
 
       <Show when={host()?.error}>
-        <p class="wr-error-banner">{host()?.error}</p>
+        <p class="wr-notice-banner">{host()?.error}</p>
       </Show>
 
       <Show
@@ -29,59 +110,54 @@ function WikiRaceTvView(props: TvGameViewProps<WikiRaceHostView>) {
           </Show>
         }
       >
-        <Show when={host()?.phase === 'RESULTS' && host()?.loserName}>
-          <p class="wr-tv-loser">{host()?.loserName} was last to arrive. DRINKS!</p>
+        <Show when={host()?.phase === 'RESULTS'}>
+          <h2 class="wr-tv-winner">
+            {host()?.winnerName ?? 'Winner'} won in {winnerHops()} hops!
+          </h2>
+
+          <div class="wr-path-chain">
+            <For each={revealedPath()}>
+              {(step, idx) => (
+                <>
+                  <Show when={idx() > 0}>
+                    <span class="wr-path-arrow">→</span>
+                  </Show>
+                  <span
+                    class={`wr-path-step ${idx() === revealedPath().length - 1 ? 'is-active' : ''}`}
+                  >
+                    {step}
+                  </span>
+                </>
+              )}
+            </For>
+          </div>
         </Show>
 
-        <div class="wr-tv-board">
-          <For each={host()?.players ?? []}>
-            {(player) => {
-              const isLoser = () =>
-                host()?.phase === 'RESULTS' && host()?.loserId === player.playerId;
-              const isFinished = () => player.finishedRank !== null;
-              const statusLabel = () => {
-                if (isLoser()) return 'DRINKS';
-                if (player.finishedRank !== null) return `#${player.finishedRank}`;
-                if (!player.connected) return 'OFFLINE';
-                return 'RACING';
-              };
-
-              return (
-                <div
-                  class={`wr-tv-row ${isLoser() ? 'is-loser' : ''} ${isFinished() ? 'is-finished' : ''}`}
-                >
-                  <span class="wr-tv-name">{player.name}</span>
-                  <span class="wr-tv-hops">{player.hops} hops</span>
-                  <span class="wr-tv-status">{statusLabel()}</span>
-                </div>
-              );
-            }}
-          </For>
-        </div>
+        <ResultList
+          class="wr-tv-results"
+          players={props.state.players}
+          entries={entries()}
+        />
       </Show>
-
-      <div class="tv-action-bar wr-tv-actions">
-        <Show when={host()?.phase === 'RESULTS' || host()?.error}>
-          <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'next_race' })}>
-            Next Race
-          </button>
-        </Show>
-        <button class="btn btn-tv" onClick={props.endGame}>
-          End Game
-        </button>
-      </div>
     </div>
   );
 }
 
 function WikiRaceMobileView(props: MobileGameViewProps<WikiRacePlayerView>) {
   const view = () => props.state.playerState;
+  let articleRef: HTMLDivElement | undefined;
+
+  const scrollArticleToTop = () => {
+    if (articleRef) {
+      articleRef.scrollTop = 0;
+    }
+  };
 
   createEffect(
-    () => ({ html: view()?.articleHtml, title: view()?.currentTitle }),
-    (deps) => {
-      if (!deps.html || !deps.title) return;
-      requestAnimationFrame(() => window.scrollTo(0, 0));
+    () => view()?.currentTitle,
+    (title) => {
+      if (!title) return;
+      scrollArticleToTop();
     }
   );
 
@@ -95,18 +171,39 @@ function WikiRaceMobileView(props: MobileGameViewProps<WikiRacePlayerView>) {
 
     const title = anchor.getAttribute('data-wiki-title');
     if (title) {
+      scrollArticleToTop();
       props.sendAction({ type: 'navigate', payload: { title } });
     }
   };
 
+  const handleBackClick = () => {
+    if (view()?.loading) return;
+    scrollArticleToTop();
+    props.sendAction({ type: 'back' });
+  };
+
+  const winnerHops = createMemo(() => {
+    const winnerId = view()?.winnerId;
+    const found = view()?.players.find((p) => p.playerId === winnerId);
+    if (found) return found.hops;
+    return Math.max(0, (view()?.winnerPath.length ?? 1) - 1);
+  });
+
+  const entries = createMemo(() =>
+    buildResultEntries(view()?.players ?? [], view()?.phase)
+  );
+
   return (
     <div class="wr-mobile-wrap">
       <div class="wr-mobile-bar">
-        <Show when={view()?.canGoBack} fallback={<span class="wr-bar-hops">Start: {view()?.startTitle}</span>}>
+        <Show
+          when={view()?.canGoBack}
+          fallback={<span class="wr-bar-hops">Start: {view()?.startTitle}</span>}
+        >
           <button
             class="btn wr-back-btn"
             disabled={view()?.loading}
-            onClick={() => props.sendAction({ type: 'back' })}
+            onClick={handleBackClick}
           >
             ← Back
           </button>
@@ -120,82 +217,65 @@ function WikiRaceMobileView(props: MobileGameViewProps<WikiRacePlayerView>) {
       </div>
 
       <Show when={view()?.error}>
-        <div class="wr-error-banner">{view()?.error}</div>
+        <div class="wr-notice-banner">{view()?.error}</div>
       </Show>
 
       <Show when={view()?.phase === 'LOADING'}>
         <div class="wr-status-card">
-          <Show
-            when={!view()?.error}
-            fallback={
-              <button class="btn" onClick={() => props.sendAction({ type: 'next_race' })}>
-                Try Another Pair
-              </button>
-            }
-          >
+          <Show when={!view()?.error}>
             <div class="spinner" />
-            <p class="wr-status-title">Loading {view()?.startTitle}</p>
+            <p class="wr-status-title">Loading {view()?.startTitle}...</p>
           </Show>
         </div>
       </Show>
 
       <Show when={view()?.phase === 'RESULTS'}>
-        <div class={`wr-status-card ${view()?.isLoser ? 'is-loser' : ''}`}>
-          <Show
-            when={view()?.isLoser}
-            fallback={
-              <p class="wr-status-title">
-                {view()?.finishedRank !== null
-                  ? `Finished #${view()?.finishedRank} in ${view()?.hops} hops!`
-                  : 'Race Complete'}
-              </p>
-            }
-          >
-            <p class="wr-status-title">LAST TO ARRIVE. DRINK!</p>
-          </Show>
+        <div class="wr-mobile-results">
+          <div class="wr-winner-banner">
+            <h2 class="wr-winner-headline">
+              {view()?.winnerName ?? 'Winner'} won in {winnerHops()} hops!
+            </h2>
 
-          <Show when={view()?.loserName && !view()?.isLoser}>
-            <p>{view()?.loserName} was last to arrive and drinks!</p>
-          </Show>
-
-          <div class="wr-mobile-board">
-            <For each={view()?.players ?? []}>
-              {(p) => (
-                <div class="wr-mobile-row">
-                  <span>{p.name}</span>
-                  <span>
-                    {p.finishedRank !== null ? `#${p.finishedRank} · ` : ''}
-                    {p.hops} hops
-                  </span>
-                </div>
-              )}
-            </For>
+            <Show when={(view()?.winnerPath.length ?? 0) > 0}>
+              <div class="wr-path-chain wr-path-chain-mobile">
+                <For each={view()?.winnerPath ?? []}>
+                  {(step, idx) => (
+                    <>
+                      <Show when={idx() > 0}>
+                        <span class="wr-path-arrow">→</span>
+                      </Show>
+                      <span
+                        class={`wr-path-step ${idx() === (view()?.winnerPath.length ?? 0) - 1 ? 'is-active' : ''}`}
+                      >
+                        {step}
+                      </span>
+                    </>
+                  )}
+                </For>
+              </div>
+            </Show>
           </div>
 
-          <button class="btn" onClick={() => props.sendAction({ type: 'next_race' })}>
-            Next Race
-          </button>
+          <ResultList
+            compact
+            players={props.state.players}
+            entries={entries()}
+          />
         </div>
       </Show>
 
-      <Show when={view()?.phase === 'RACING' && view()?.finishedRank !== null}>
-        <div class="wr-status-card">
-          <p class="wr-status-title">
-            Arrived #{view()?.finishedRank} in {view()?.hops} hops!
-          </p>
-          <p>Waiting for last player</p>
-        </div>
-      </Show>
-
-      <Show when={view()?.phase === 'RACING' && view()?.finishedRank === null}>
+      <Show when={view()?.phase === 'RACING'}>
         <div class="wr-article-header">
           <h1 class="wr-article-title">{view()?.currentTitle}</h1>
-          <Show when={view()?.loading}>
-            <span class="wr-loading-pill">Loading</span>
+          <Show when={view()?.loadingTitle || view()?.loading}>
+            <span class="wr-loading-pill">
+              {view()?.loadingTitle ? `Loading ${view()?.loadingTitle}...` : 'Loading...'}
+            </span>
           </Show>
         </div>
 
         <div
+          ref={(el) => (articleRef = el)}
           class={`wr-article-body ${view()?.loading ? 'is-loading' : ''}`}
           innerHTML={view()?.articleHtml ?? ''}
           onClick={handleArticleClick}

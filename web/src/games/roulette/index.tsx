@@ -77,17 +77,6 @@ function RouletteTvView(props: TvGameViewProps<RouletteHostView>) {
           )}
         </For>
       </div>
-
-      <div class="tv-action-bar roulette-tv-actions">
-        <Show when={host()?.phase === 'STOPPED'}>
-          <button class="btn btn-tv" onClick={() => props.sendAction({ type: 'spin' })}>
-            Spin Again
-          </button>
-        </Show>
-        <button class="btn btn-tv" onClick={() => props.endGame()}>
-          End Game
-        </button>
-      </div>
     </div>
   );
 }
@@ -131,13 +120,6 @@ function RouletteMobileView(props: MobileGameViewProps<RoulettePlayerView>) {
         >
           <p class="roulette-screen-label">YOU!</p>
         </Show>
-
-        <button
-          class="btn roulette-spin-again"
-          onClick={() => props.sendAction({ type: 'spin' })}
-        >
-          Spin Again
-        </button>
       </Show>
     </div>
   );

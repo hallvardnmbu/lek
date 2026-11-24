@@ -1,5 +1,6 @@
 import {
   SPIN_LEAD_MS,
+  STOPPED_HOLD_MS,
   totalSpinDurationMs,
   type RouletteHostView,
   type RoulettePhase,
@@ -7,6 +8,10 @@ import {
   type RoulettePlayerView,
   type RouletteSpinSchedule,
 } from '../../shared/games/roulette';
+import type { GameContext, GameDefinition } from '../game';
+import { awardCappedScore, connectedOrAllPlayers, playerName } from './helpers';
+
+export { STOPPED_HOLD_MS };
 
 export interface RouletteState {
   phase: RoulettePhase;
@@ -16,8 +21,6 @@ export interface RouletteState {
   spinStartAt: number;
   selectedId: string | null;
 }
-import type { GameContext, GameDefinition } from '../game';
-import { awardCappedScore, connectedOrAllPlayers, playerName } from './helpers';
 
 const MIN_STEPS = 54;
 const MIN_LAPS = 6;
@@ -27,6 +30,7 @@ function startSpin(ctx: GameContext): RouletteState {
   const playerOrder = connectedOrAllPlayers(ctx).map((p) => p.id);
   if (playerOrder.length === 0) {
     ctx.clearTimer();
+    ctx.endGame();
     return {
       phase: 'STOPPED',
       playerOrder: [],
@@ -68,17 +72,6 @@ function buildSpinSchedule(state: RouletteState): RouletteSpinSchedule | null {
   };
 }
 
-function maybeRespin(
-  ctx: GameContext,
-  state: RouletteState,
-  action: { type: string }
-): RouletteState {
-  if (action.type === 'spin' && state.phase === 'STOPPED') {
-    return startSpin(ctx);
-  }
-  return state;
-}
-
 export const rouletteGame: GameDefinition<
   RouletteState,
   RouletteHostView,
@@ -95,6 +88,11 @@ export const rouletteGame: GameDefinition<
   },
 
   onTimerExpired(ctx, state) {
+    if (state.phase === 'STOPPED') {
+      ctx.clearTimer();
+      ctx.endGame();
+      return state;
+    }
     if (state.phase !== 'SPINNING' || state.playerOrder.length === 0) {
       return state;
     }
@@ -107,8 +105,8 @@ export const rouletteGame: GameDefinition<
         awardCappedScore(ctx, id, SAFE_POINTS);
       }
     }
-    ctx.clearTimer();
     ctx.broadcastEvent('roulette_stopped', { playerId: selectedId });
+    ctx.setTimer(STOPPED_HOLD_MS, false);
     return {
       ...state,
       phase: 'STOPPED',
@@ -116,12 +114,8 @@ export const rouletteGame: GameDefinition<
     };
   },
 
-  onPlayerAction(ctx, state, _playerId, action) {
-    return maybeRespin(ctx, state, action);
-  },
-
-  onHostAction(ctx, state, action) {
-    return maybeRespin(ctx, state, action);
+  onPlayerAction(_ctx, state) {
+    return state;
   },
 
   onPlayerLeave(ctx, state, playerId) {

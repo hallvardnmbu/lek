@@ -24,6 +24,7 @@ export interface QuizHostView {
   options: string[];
   correctIndex: number | null;
   answeredCount: number;
+  answeredPlayerIds: string[];
   connectedAliveCount: number;
   aliveCount: number;
   results: QuizRevealEntry[];

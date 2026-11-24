@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, jest } from 'bun:test';
 import type { DrawHostView, DrawPlayerView } from '../../shared/games/draw';
 import { GameRegistry } from '../game';
 import { RoomManager, type RoomBroadcaster } from '../roomManager';
-import { DRAW_DURATION_MS, drawGame } from './draw';
+import { DRAW_DURATION_MS, RESULTS_DURATION_MS, drawGame } from './draw';
 
 function setupDrawRoom() {
   const registry = new GameRegistry();
@@ -30,11 +30,17 @@ function setupDrawRoom() {
 }
 
 describe('drawGame', () => {
-  it('runs a full round PROMPTING -> DRAWING -> VOTING -> RESULTS -> next_round', () => {
-    const { manager, room, hostToken, p1, p2 } = setupDrawRoom();
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('runs a single automatic round PROMPTING -> DRAWING -> VOTING (no timer) -> RESULTS -> ENDED', () => {
+    jest.useFakeTimers();
+    const { manager, room, p1, p2 } = setupDrawRoom();
 
     const hostInitial = manager.buildStateForClient(room).hostState as DrawHostView;
     expect(hostInitial.phase).toBe('PROMPTING');
+    expect(hostInitial.round).toBe(1);
     expect([p1.id, p2.id]).toContain(hostInitial.prompterId);
 
     const prompterId = hostInitial.prompterId;
@@ -74,6 +80,10 @@ describe('drawGame', () => {
       { playerId: p1.id },
       { type: 'submit_drawing', payload: { imageData: 'data:image/jpeg;base64,BBB' } }
     );
+    const p1Submitted = manager.buildStateForClient(room, p1.id).playerState as DrawPlayerView;
+    expect(p1Submitted.hasSubmitted).toBe(true);
+    expect(p1Submitted.myDrawingData).toBe('data:image/jpeg;base64,BBB');
+
     manager.handleAction(
       room.code,
       { playerId: p2.id },
@@ -83,6 +93,7 @@ describe('drawGame', () => {
     const hostVoting = manager.buildStateForClient(room).hostState as DrawHostView;
     expect(hostVoting.phase).toBe('VOTING');
     expect(['best', 'worst']).toContain(hostVoting.voteMode!);
+    expect(room.phaseEndsAt).toBeNull();
 
     const p1Voting = manager.buildStateForClient(room, p1.id).playerState as DrawPlayerView;
     expect(p1Voting.votableEntries.map((e) => e.playerId)).toEqual([p2.id]);
@@ -101,6 +112,11 @@ describe('drawGame', () => {
       { playerId: p1.id },
       { type: 'cast_vote', payload: { targetPlayerId: p2.id } }
     );
+    expect((manager.buildStateForClient(room).hostState as DrawHostView).phase).toBe('VOTING');
+
+    jest.advanceTimersByTime(120_000);
+    expect((manager.buildStateForClient(room).hostState as DrawHostView).phase).toBe('VOTING');
+
     manager.handleAction(
       room.code,
       { playerId: p2.id },
@@ -112,13 +128,57 @@ describe('drawGame', () => {
     expect(hostResults.results.every((r) => r.isWinner)).toBe(true);
 
     const stateAfterResults = manager.buildStateForClient(room);
+    expect(stateAfterResults.phaseEndsAt).toBeNull();
     expect(stateAfterResults.players.every((p) => p.score === 2)).toBe(true);
 
-    manager.handleAction(room.code, { hostToken }, { type: 'next_round' });
-    const hostNext = manager.buildStateForClient(room).hostState as DrawHostView;
-    expect(hostNext.phase).toBe('PROMPTING');
-    expect(hostNext.round).toBe(2);
-    expect(hostNext.prompterId).toBe(otherId);
+    jest.advanceTimersByTime(RESULTS_DURATION_MS - 100);
+    expect(manager.buildStateForClient(room).phase).toBe('PLAYING');
+
+    jest.advanceTimersByTime(200);
+    expect(manager.buildStateForClient(room).phase).toBe('ENDED');
+
+    manager.dispose();
+  });
+
+  it('auto-submits synced drawings when DRAWING timer expires so VOTING can complete', () => {
+    jest.useFakeTimers();
+    const { manager, room, p1, p2 } = setupDrawRoom();
+    const initial = manager.buildStateForClient(room).hostState as DrawHostView;
+
+    manager.handleAction(
+      room.code,
+      { playerId: initial.prompterId },
+      { type: 'submit_prompt', payload: { text: 'Laser Cat' } }
+    );
+
+    manager.handleAction(
+      room.code,
+      { playerId: p1.id },
+      { type: 'sync_drawing', payload: { imageData: 'data:image/jpeg;base64,SYNC1' } }
+    );
+
+    jest.advanceTimersByTime(DRAW_DURATION_MS + 100);
+
+    const hostVoting = manager.buildStateForClient(room).hostState as DrawHostView;
+    expect(hostVoting.phase).toBe('VOTING');
+    expect(room.phaseEndsAt).toBeNull();
+    expect(hostVoting.entries.find((e) => e.playerId === p1.id)?.imageData).toBe(
+      'data:image/jpeg;base64,SYNC1'
+    );
+
+    manager.handleAction(
+      room.code,
+      { playerId: p1.id },
+      { type: 'cast_vote', payload: { targetPlayerId: p2.id } }
+    );
+    manager.handleAction(
+      room.code,
+      { playerId: p2.id },
+      { type: 'cast_vote', payload: { targetPlayerId: p1.id } }
+    );
+
+    expect((manager.buildStateForClient(room).hostState as DrawHostView).phase).toBe('RESULTS');
+    manager.dispose();
   });
 
   it('reassigns prompter if prompter disconnects during PROMPTING', () => {
@@ -130,6 +190,7 @@ describe('drawGame', () => {
     manager.markPlayerDisconnected(room.code, oldPrompter);
     const updated = manager.buildStateForClient(room).hostState as DrawHostView;
     expect(updated.prompterId).toBe(expectedNext);
+    manager.dispose();
   });
 
   it('rejects votes for players who never submitted a drawing and cleans up on leave', () => {
@@ -176,6 +237,7 @@ describe('drawGame', () => {
 
     const p1AfterLeave = manager.buildStateForClient(room, p1.id).playerState as DrawPlayerView;
     expect(p1AfterLeave.hasVoted).toBe(false);
+    manager.dispose();
   });
 
   it('ends game if prompter disconnects during PROMPTING with no other connected players', () => {
@@ -187,5 +249,6 @@ describe('drawGame', () => {
     manager.markPlayerDisconnected(room.code, initial.prompterId);
 
     expect(manager.buildStateForClient(room).phase).toBe('ENDED');
+    manager.dispose();
   });
 });

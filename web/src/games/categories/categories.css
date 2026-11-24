@@ -1,7 +1,7 @@
 .cat-tv-category {
-  font-size: 3.4rem;
+  font-size: clamp(3.6rem, 5.2vw, 5rem);
   line-height: 1.15;
-  max-width: 1100px;
+  max-width: 1320px;
   margin: 0.5rem 0 1.5rem;
 }
 
@@ -24,7 +24,9 @@
 }
 
 .cat-continue-btn.is-voted {
-  background: var(--accent-soft);
+  background: var(--accent);
+  color: var(--on-accent);
+  text-decoration: none;
 }
 
 .cat-result-safe,
@@ -35,9 +37,9 @@
 }
 
 .cat-result-safe {
-  color: var(--success);
+  color: var(--accent);
 }
 
 .cat-result-fail {
-  color: var(--danger);
+  color: var(--pink);
 }

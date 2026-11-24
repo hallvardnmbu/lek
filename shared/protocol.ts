@@ -136,6 +136,10 @@ export type ClientMessage =
       payload: { code: string; playerId?: string; hostToken?: string };
     }
   | {
+      type: 'abort_game';
+      payload: { code: string; hostToken?: string };
+    }
+  | {
       type: 'return_to_lobby';
       payload: { code: string; playerId?: string; hostToken?: string };
     }

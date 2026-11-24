@@ -4,7 +4,7 @@ import type { QuizHostView, QuizPlayerView, QuizQuestion } from '../../shared/ga
 import type { QuestionGenerator, QuizState } from './quiz';
 import { createQuizGame, FALLBACK_QUESTIONS } from './quiz';
 
-type FullQuizGame = Required<GameDefinition<QuizState, QuizHostView, QuizPlayerView>>;
+type QuizGame = GameDefinition<QuizState, QuizHostView, QuizPlayerView>;
 
 interface TestPlayer {
   id: string;
@@ -72,7 +72,7 @@ function makeQuestions(count: number, prefix: string): QuizQuestion[] {
   }));
 }
 
-function answer(game: FullQuizGame, ctx: GameContext, state: QuizState, playerId: string, optionIndex: number): QuizState {
+function answer(game: QuizGame, ctx: GameContext, state: QuizState, playerId: string, optionIndex: number): QuizState {
   return game.onPlayerAction(ctx, state, playerId, {
     type: 'answer',
     payload: { optionIndex },
@@ -80,8 +80,10 @@ function answer(game: FullQuizGame, ctx: GameContext, state: QuizState, playerId
 }
 
 describe('Quiz game', () => {
-  it('eliminates wrong players, spares everyone when all are wrong, and crowns the last player', async () => {
-    const game = createQuizGame(async () => makeQuestions(10, 'q')) as FullQuizGame;
+  it('eliminates wrong players, spares everyone when all are wrong, exposes answeredPlayerIds, and crowns the last player', async () => {
+    const game = createQuizGame(async () => makeQuestions(10, 'q'));
+    expect(game.onHostAction).toBeUndefined();
+
     const players: TestPlayer[] = [
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
@@ -97,8 +99,10 @@ describe('Quiz game', () => {
     state = getState();
     expect(state.phase).toBe('QUESTION');
     expect(state.questionNumber).toBe(1);
+    expect(game.getHostView(state, ctx).answeredPlayerIds).toEqual([]);
 
     state = answer(game, ctx, state, 'p1', 0);
+    expect(game.getHostView(state, ctx).answeredPlayerIds).toEqual(['p1']);
     state = answer(game, ctx, state, 'p2', 1);
     state = answer(game, ctx, state, 'p3', 0);
     expect(state.phase).toBe('REVEAL');
@@ -107,7 +111,7 @@ describe('Quiz game', () => {
     expect(score('p3')).toBe(1);
     expect(game.getPlayerView(state, 'p2', ctx).iWasEliminated).toBe(true);
 
-    state = game.onTimerExpired(ctx, state)!;
+    state = game.onTimerExpired!(ctx, state)!;
     expect(state.phase).toBe('QUESTION');
     expect(state.questionNumber).toBe(2);
 
@@ -118,7 +122,7 @@ describe('Quiz game', () => {
     expect(state.aliveIds).toEqual(['p1', 'p3']);
     expect(game.getHostView(state, ctx).allWrong).toBe(true);
 
-    state = game.onTimerExpired(ctx, state)!;
+    state = game.onTimerExpired!(ctx, state)!;
     expect(state.phase).toBe('QUESTION');
     expect(state.questionNumber).toBe(3);
 
@@ -128,13 +132,13 @@ describe('Quiz game', () => {
     expect(state.aliveIds).toEqual(['p1']);
     expect(game.getHostView(state, ctx).winnerName).toBe('Alice');
 
-    state = game.onTimerExpired(ctx, state)!;
+    state = game.onTimerExpired!(ctx, state)!;
     expect(isEnded()).toBe(true);
     expect(score('p1')).toBe(1 + 1 + 2);
   });
 
   it('eliminates multiple wrong players in the same round', async () => {
-    const game = createQuizGame(async () => makeQuestions(10, 'q')) as FullQuizGame;
+    const game = createQuizGame(async () => makeQuestions(10, 'q'));
     const players: TestPlayer[] = [
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
@@ -159,7 +163,7 @@ describe('Quiz game', () => {
   });
 
   it('counts unanswered players as wrong when the timer expires', async () => {
-    const game = createQuizGame(async () => makeQuestions(10, 'q')) as FullQuizGame;
+    const game = createQuizGame(async () => makeQuestions(10, 'q'));
     const players: TestPlayer[] = [
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
@@ -173,19 +177,19 @@ describe('Quiz game', () => {
 
     state = answer(game, ctx, state, 'p1', 0);
     state = answer(game, ctx, state, 'p2', 1);
-    state = game.onTimerExpired(ctx, state)!;
+    state = game.onTimerExpired!(ctx, state)!;
 
     expect(state.phase).toBe('REVEAL');
     expect(state.aliveIds).toEqual(['p1']);
     expect(game.getHostView(state, ctx).winnerName).toBe('Alice');
 
-    state = game.onTimerExpired(ctx, state)!;
+    state = game.onTimerExpired!(ctx, state)!;
     expect(isEnded()).toBe(true);
     expect(score('p1')).toBe(1 + 2);
   });
 
   it('locks answers, ignores invalid answers, and ignores eliminated players', async () => {
-    const game = createQuizGame(async () => makeQuestions(10, 'q')) as FullQuizGame;
+    const game = createQuizGame(async () => makeQuestions(10, 'q'));
     const players: TestPlayer[] = [
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
@@ -211,7 +215,7 @@ describe('Quiz game', () => {
     state = answer(game, ctx, state, 'p3', 0);
     expect(state.aliveIds).toEqual(['p1', 'p3']);
 
-    state = game.onTimerExpired(ctx, state)!;
+    state = game.onTimerExpired!(ctx, state)!;
     expect(state.phase).toBe('QUESTION');
 
     state = answer(game, ctx, state, 'p2', 0);
@@ -225,7 +229,7 @@ describe('Quiz game', () => {
       calls += 1;
       return makeQuestions(count, `batch${calls}`);
     };
-    const game = createQuizGame(generator) as FullQuizGame;
+    const game = createQuizGame(generator);
     const players: TestPlayer[] = [
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
@@ -242,7 +246,7 @@ describe('Quiz game', () => {
       state = answer(game, ctx, state, 'p1', 0);
       state = answer(game, ctx, state, 'p2', 0);
       state = answer(game, ctx, state, 'p3', 0);
-      state = game.onTimerExpired(ctx, state)!;
+      state = game.onTimerExpired!(ctx, state)!;
     }
 
     expect(state.phase).toBe('QUESTION');
@@ -257,19 +261,19 @@ describe('Quiz game', () => {
     state = answer(game, ctx, state, 'p1', 0);
     state = answer(game, ctx, state, 'p2', 0);
     state = answer(game, ctx, state, 'p3', 0);
-    state = game.onTimerExpired(ctx, state)!;
+    state = game.onTimerExpired!(ctx, state)!;
     expect(state.questionNumber).toBe(9);
 
     state = answer(game, ctx, state, 'p1', 0);
     state = answer(game, ctx, state, 'p2', 0);
     state = answer(game, ctx, state, 'p3', 0);
-    state = game.onTimerExpired(ctx, state)!;
+    state = game.onTimerExpired!(ctx, state)!;
     expect(state.questionNumber).toBe(10);
 
     state = answer(game, ctx, state, 'p1', 0);
     state = answer(game, ctx, state, 'p2', 0);
     state = answer(game, ctx, state, 'p3', 0);
-    state = game.onTimerExpired(ctx, state)!;
+    state = game.onTimerExpired!(ctx, state)!;
     expect(state.questionNumber).toBe(11);
     expect(state.questions[10].question).toBe('batch2 1');
   });
@@ -277,7 +281,7 @@ describe('Quiz game', () => {
   it('dispatches question 1 when the first batch arrives asynchronously', async () => {
     const game = createQuizGame(
       () => new Promise<QuizQuestion[]>((resolve) => setTimeout(() => resolve(makeQuestions(10, 'q')), 5))
-    ) as FullQuizGame;
+    );
     const { ctx, bindState, getState } = createTestCtx('quiz-poll', [
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
@@ -298,7 +302,7 @@ describe('Quiz game', () => {
     const game = createQuizGame(async () => {
       calls += 1;
       return [];
-    }) as FullQuizGame;
+    });
     const { ctx, bindState, getState } = createTestCtx('quiz-fallback', [
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
@@ -317,14 +321,14 @@ describe('Quiz game', () => {
     expect(served.options[served.correctIndex]).toBe(original!.options[original!.correctIndex]);
 
     for (let round = 1; round <= 9; round++) {
-      state = game.onHostAction(ctx, state, { type: 'next' })!;
-      state = game.onHostAction(ctx, state, { type: 'next' })!;
+      state = game.onTimerExpired!(ctx, state)!;
+      state = game.onTimerExpired!(ctx, state)!;
     }
     expect(calls).toBe(1);
 
     const rejectGame = createQuizGame(async () => {
       throw new Error('boom');
-    }) as FullQuizGame;
+    });
     const rejectCtx = createTestCtx('quiz-reject', [
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
@@ -336,7 +340,7 @@ describe('Quiz game', () => {
   });
 
   it('skips questions already used in the same room', async () => {
-    const game = createQuizGame(async () => makeQuestions(10, 'q')) as FullQuizGame;
+    const game = createQuizGame(async () => makeQuestions(10, 'q'));
     const { ctx, bindState, getState } = createTestCtx('quiz-norepeat', [
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
@@ -355,7 +359,7 @@ describe('Quiz game', () => {
   });
 
   it('reveals when a connected player disconnects after everyone else answered, without eliminating them', async () => {
-    const game = createQuizGame(async () => makeQuestions(10, 'q')) as FullQuizGame;
+    const game = createQuizGame(async () => makeQuestions(10, 'q'));
     const players: TestPlayer[] = [
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
@@ -371,7 +375,7 @@ describe('Quiz game', () => {
     state = answer(game, ctx, state, 'p2', 1);
 
     players[2].connected = false;
-    state = game.onPlayerDisconnect(ctx, state, 'p3')!;
+    state = game.onPlayerDisconnect!(ctx, state, 'p3')!;
 
     expect(state.phase).toBe('REVEAL');
     expect(state.aliveIds).toEqual(['p1', 'p3']);
@@ -380,7 +384,7 @@ describe('Quiz game', () => {
   });
 
   it('ends the game cleanly on reveal when no alive players are connected', async () => {
-    const game = createQuizGame(async () => makeQuestions(10, 'q')) as FullQuizGame;
+    const game = createQuizGame(async () => makeQuestions(10, 'q'));
     const players: TestPlayer[] = [
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
@@ -393,12 +397,12 @@ describe('Quiz game', () => {
 
     players[0].connected = false;
     players[1].connected = false;
-    game.onTimerExpired(ctx, state);
+    game.onTimerExpired!(ctx, state);
     expect(isEnded()).toBe(true);
   });
 
   it('ends the game with a winner bonus when players leave until one remains', async () => {
-    const game = createQuizGame(async () => makeQuestions(10, 'q')) as FullQuizGame;
+    const game = createQuizGame(async () => makeQuestions(10, 'q'));
     const players: TestPlayer[] = [
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
@@ -411,11 +415,11 @@ describe('Quiz game', () => {
     state = getState();
 
     state = answer(game, ctx, state, 'p1', 0);
-    state = game.onPlayerLeave(ctx, state, 'p2')!;
+    state = game.onPlayerLeave!(ctx, state, 'p2')!;
     expect(state.phase).toBe('QUESTION');
     expect(state.aliveIds).toEqual(['p1', 'p3']);
 
-    state = game.onPlayerLeave(ctx, state, 'p3')!;
+    state = game.onPlayerLeave!(ctx, state, 'p3')!;
     expect(isEnded()).toBe(true);
     expect(score('p1')).toBe(2);
   });

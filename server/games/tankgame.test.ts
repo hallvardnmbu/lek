@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import type { GameContext, GameDefinition } from '../game';
-import type {
-  TankGameHostView,
-  TankGamePlayerView,
+import {
+  END_DELAY_MS,
+  type TankGameHostView,
+  type TankGamePlayerView,
 } from '../../shared/games/tankgame';
 import { type TankGameState, tankGame } from './tankgame';
 
@@ -112,7 +113,7 @@ describe('tank battle', () => {
     expect(test.isEnded()).toBe(false);
   });
 
-  it('moves tanks on input and stops them against walls', () => {
+  it('moves tanks on input, exposes velocity in host view, and stops them against walls', () => {
     const test = startPlaying([
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
@@ -125,11 +126,40 @@ describe('tank battle', () => {
       type: 'input',
       payload: { x: 0, y: 1 },
     });
+    const hostMoving = game.getHostView(test.state, test.ctx);
+    const p1Host = hostMoving.tanks.find((t) => t.playerId === 'p1')!;
+    expect(p1Host.vx).toBe(0);
+    expect(p1Host.vy).toBe(110);
     for (let i = 0; i < 10; i++) tick(test.ctx, test.state);
     expect(tank.y).toBeGreaterThan(120);
     expect(tank.y).toBeLessThanOrEqual(124.001);
     expect(tank.x).toBeCloseTo(200, 0);
     expect(tank.angle).toBeCloseTo(Math.PI / 2, 5);
+  });
+
+  it('simulates elapsed time before applying mid-tick player actions', () => {
+    const test = startPlaying([
+      { id: 'p1', name: 'Alice', connected: true },
+      { id: 'p2', name: 'Bob', connected: true },
+    ]);
+    const tank = test.state.tanks.p1;
+    tank.x = 500;
+    tank.y = 500;
+    tank.angle = 0;
+    game.onPlayerAction(test.ctx, test.state, 'p1', {
+      type: 'input',
+      payload: { x: 1, y: 0 },
+    });
+    test.state.tickAt = Date.now() - 40;
+    game.onPlayerAction(test.ctx, test.state, 'p1', {
+      type: 'input',
+      payload: { x: 0, y: 0 },
+    });
+    expect(tank.x).toBeGreaterThan(503);
+    const hostView = game.getHostView(test.state, test.ctx);
+    const p1View = hostView.tanks.find((t) => t.playerId === 'p1')!;
+    expect(p1View.vx).toBe(0);
+    expect(p1View.vy).toBe(0);
   });
 
   it('normalizes joystick input magnitude and rejects invalid input', () => {
@@ -150,7 +180,7 @@ describe('tank battle', () => {
     expect(test.state.inputs.p1).toBeUndefined();
   });
 
-  it('fires bullets with a cooldown', () => {
+  it('fires bullets with a cooldown and exposes bullet velocity', () => {
     const test = startPlaying([
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
@@ -164,6 +194,9 @@ describe('tank battle', () => {
     expect(test.state.bullets[0].ownerId).toBe('p1');
     expect(test.state.bullets[0].x).toBeCloseTo(223, 0);
     expect(test.state.bullets[0].y).toBeCloseTo(200, 0);
+    const host = game.getHostView(test.state, test.ctx);
+    expect(host.bullets[0].vx).toBe(420);
+    expect(host.bullets[0].vy).toBe(0);
     fireAction(test.ctx, test.state, 'p1');
     expect(test.state.bullets.length).toBe(1);
     tank.lastFiredAt -= 1000;
@@ -213,7 +246,7 @@ describe('tank battle', () => {
     expect(test.isEnded()).toBe(false);
   });
 
-  it('awards win points and ends the game when one tank remains', () => {
+  it('awards win points, enters ENDING for END_DELAY_MS, and ends on timer expiry', () => {
     const test = startPlaying([
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
@@ -228,10 +261,18 @@ describe('tank battle', () => {
     tick(test.ctx, test.state);
     expect(test.state.tanks.p2.alive).toBe(false);
     expect(test.scoreOf('p1')).toBe(3);
+    expect(test.state.phase).toBe('ENDING');
+    expect(test.state.winnerId).toBe('p1');
+    expect(test.state.inputs).toEqual({});
+    expect(test.state.bullets).toEqual([]);
+    expect(test.lastTimerCall()).toEqual({ ms: END_DELAY_MS, showCountdown: false });
+    expect(test.isEnded()).toBe(false);
+
+    game.onTimerExpired(test.ctx, test.state);
     expect(test.isEnded()).toBe(true);
   });
 
-  it('destroys tanks on disconnect and ends a two-player game', () => {
+  it('destroys tanks on disconnect, enters ENDING, and ends after delay', () => {
     const test = startPlaying([
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
@@ -240,19 +281,29 @@ describe('tank battle', () => {
     expect(next.tanks.p2.alive).toBe(false);
     expect(next.eliminations[0].byPlayerId).toBeNull();
     expect(test.scoreOf('p1')).toBe(2);
+    expect(next.phase).toBe('ENDING');
+    expect(next.winnerId).toBe('p1');
+    expect(test.isEnded()).toBe(false);
+
+    game.onTimerExpired(test.ctx, next);
     expect(test.isEnded()).toBe(true);
   });
 
-  it('ends the game on timeout without awarding win points', () => {
+  it('enters ENDING as draw on timeout without awarding win points, then ends', () => {
     const test = startPlaying([
       { id: 'p1', name: 'Alice', connected: true },
       { id: 'p2', name: 'Bob', connected: true },
     ]);
     test.state.playingStartedAt = Date.now() - 121_000;
     tick(test.ctx, test.state);
-    expect(test.isEnded()).toBe(true);
+    expect(test.state.phase).toBe('ENDING');
+    expect(test.state.winnerId).toBeNull();
+    expect(test.isEnded()).toBe(false);
     expect(test.scoreOf('p1')).toBe(0);
     expect(test.scoreOf('p2')).toBe(0);
+
+    game.onTimerExpired(test.ctx, test.state);
+    expect(test.isEnded()).toBe(true);
   });
 
   it('treats unknown players as spectators in player views', () => {

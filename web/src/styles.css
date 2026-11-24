@@ -97,14 +97,18 @@ button {
 }
 
 .btn:hover:not(:disabled),
-.btn:focus-visible {
-  background: var(--accent-soft);
-  text-decoration-color: var(--accent);
+.btn:focus-visible,
+.btn.dpad-focused {
+  background: var(--accent);
+  color: var(--on-accent);
+  text-decoration: none;
   outline: none;
 }
 
 .btn:active:not(:disabled) {
-  transform: scale(0.98);
+  background: var(--accent);
+  color: var(--on-accent);
+  text-decoration: none;
 }
 
 .btn:disabled {
@@ -121,8 +125,9 @@ button {
 .btn-tv {
   font-family: var(--font-display);
   font-weight: 400;
-  padding: 0.4rem 0.9rem;
+  padding: 0.45rem 1rem;
   font-size: 1.6rem;
+  border-radius: 8px;
 }
 
 .tv-choices {
@@ -136,7 +141,8 @@ button {
   font-family: var(--font-display);
   font-weight: 400;
   font-size: 2.4rem;
-  padding: 0.5rem 1.2rem;
+  padding: 0.55rem 1.35rem;
+  border-radius: 10px;
 }
 
 .btn-primary {
@@ -148,35 +154,48 @@ button {
   width: 100%;
   text-align: left;
   align-items: flex-start;
-  padding: 0.5rem 0.75rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: 10px;
 }
 
 .btn-vote.game-item {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 0.85rem 1.1rem;
   text-decoration: none;
 }
 
 .btn-vote.game-item .game-card-title,
 .btn-vote.game-item strong {
-  text-decoration: underline;
-  text-decoration-color: rgba(219, 169, 82, 0.55);
-  text-underline-offset: 0.25em;
-  text-decoration-thickness: 1.5px;
+  text-decoration: none;
+}
+
+.btn-vote.game-item:hover:not(:disabled),
+.btn-vote.game-item:focus-visible,
+.btn-vote.game-item.dpad-focused {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .btn-vote.game-item:hover:not(:disabled) .game-card-title,
 .btn-vote.game-item:hover:not(:disabled) strong,
+.btn-vote.game-item:hover:not(:disabled) .vote-count-pill,
+.btn-vote.game-item:hover:not(:disabled) .game-card-meta,
 .btn-vote.game-item:focus-visible .game-card-title,
 .btn-vote.game-item:focus-visible strong,
-.btn-vote.game-item.btn-primary .game-card-title,
-.btn-vote.game-item.btn-primary strong {
-  text-decoration-color: var(--accent);
+.btn-vote.game-item:focus-visible .vote-count-pill,
+.btn-vote.game-item:focus-visible .game-card-meta,
+.btn-vote.game-item.dpad-focused .game-card-title,
+.btn-vote.game-item.dpad-focused strong,
+.btn-vote.game-item.dpad-focused .vote-count-pill,
+.btn-vote.game-item.dpad-focused .game-card-meta {
+  color: var(--on-accent);
 }
 
 .dpad-focused {
-  background: var(--accent-soft);
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-  transform: scale(1.02);
+  background: var(--accent);
+  color: var(--on-accent);
+  outline: none;
 }
 
 /* Loading spinner */
@@ -232,6 +251,8 @@ button {
 }
 
 .tv-canvas {
+  position: relative;
+  overflow: hidden;
   width: 100%;
   height: 100%;
   max-width: 1920px;
@@ -242,6 +263,8 @@ button {
 }
 
 .tv-header {
+  position: relative;
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -441,7 +464,8 @@ button {
 
 .lobby-start-btn {
   width: 84%;
-  border: 2px solid var(--accent);
+  background: var(--accent-soft);
+  border: 0;
   border-radius: 999px;
   font-size: 1.25cqw;
   padding: 0.75em 1.2em;
@@ -450,6 +474,8 @@ button {
 
 .lobby-sound-btn {
   padding: 0.35em 0.75em;
+  border-radius: 999px;
+  text-decoration: none;
   opacity: 0.85;
 }
 
@@ -467,11 +493,94 @@ button {
 
 .tv-phase-center {
   flex: 1;
+  width: 100%;
+  min-height: 0;
+  margin-inline: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
+}
+
+.tv-acted-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 6;
+}
+
+.tv-acted-slot {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  opacity: 0;
+  transition:
+    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.22s ease;
+}
+
+.tv-acted-slot.edge-top {
+  top: 0;
+  height: 17%;
+  flex-direction: column;
+  justify-content: flex-start;
+  transform: translate(-50%, -110%);
+}
+
+.tv-acted-slot.edge-top.is-acted {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.tv-acted-slot.edge-bottom {
+  bottom: 0;
+  height: 18%;
+  flex-direction: column-reverse;
+  justify-content: flex-start;
+  transform: translate(-50%, 110%);
+}
+
+.tv-acted-slot.edge-bottom.is-acted {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.tv-acted-slot.edge-right {
+  right: 0;
+  height: 16%;
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+  transform: translate(110%, -50%);
+}
+
+.tv-acted-slot.edge-right.is-acted {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+.tv-acted-crop {
+  height: 76%;
+  max-width: 140px;
+}
+
+.tv-acted-slot.edge-right .tv-acted-crop {
+  height: 100%;
+}
+
+.tv-acted-name {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: var(--pink);
+  background: rgba(26, 5, 5, 0.82);
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  max-width: 10rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tv-hero-title {
@@ -528,12 +637,67 @@ button {
   border-color: var(--success);
 }
 
-/* Tally & Podium */
+.status-badge {
+  flex-shrink: 0;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  padding: 0.2rem 0.58rem;
+  border-radius: 6px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.badge-accent {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.badge-loser {
+  background: var(--pink);
+  color: var(--ink);
+}
+
+.badge-muted {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.tally-arm {
+  width: 2.7rem;
+  height: 2.7rem;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+.tally-arm.from-top {
+  align-items: flex-start;
+}
+
+.tally-arm.from-bottom {
+  align-items: flex-end;
+}
+
+.tally-arm.from-right {
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.tally-arm-crop {
+  height: 94%;
+  max-width: 100%;
+}
+
 .tally-list {
   width: 100%;
-  max-width: 760px;
+  max-width: 780px;
   display: grid;
-  gap: 0.75rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.7rem;
   margin-top: 1.5rem;
 }
 
@@ -541,11 +705,13 @@ button {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.85rem;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0.75rem 1.1rem;
+  border-radius: 12px;
+  padding: 0.55rem 1.15rem;
+  min-height: 3.8rem;
+  font-size: 1.3rem;
   font-weight: 700;
   overflow: hidden;
 }
@@ -554,8 +720,8 @@ button {
   border-color: var(--accent);
 }
 
-.tally-row.tally-danger {
-  border-color: var(--danger);
+.tally-row.tally-loser {
+  border-color: var(--pink);
 }
 
 .tally-name,
@@ -569,30 +735,16 @@ button {
   flex: 1;
   min-width: 0;
   text-align: left;
-}
-
-.tally-badge {
-  flex-shrink: 0;
-  font-size: 0.72rem;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  padding: 0.15rem 0.5rem;
-  border-radius: 6px;
-}
-
-.tally-accent .tally-badge {
-  background: var(--accent);
-  color: var(--on-accent);
-}
-
-.tally-danger .tally-badge {
-  background: var(--danger);
-  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tally-votes {
+  flex-shrink: 0;
   color: var(--muted);
-  font-size: 0.95rem;
+  font-size: 1rem;
+  white-space: nowrap;
 }
 
 .tally-bar {
@@ -610,13 +762,135 @@ button {
   background: var(--accent-soft);
 }
 
-.tally-danger .tally-fill {
-  background: rgba(239, 68, 68, 0.16);
+.tally-loser .tally-fill {
+  background: rgba(241, 145, 164, 0.16);
 }
 
 .tally-compact .tally-row {
-  padding: 0.55rem 0.9rem;
+  padding: 0.45rem 0.85rem;
+  min-height: 2.8rem;
   font-size: 0.95rem;
+  gap: 0.6rem;
+}
+
+.tally-compact .tally-arm,
+.result-compact .tally-arm {
+  width: 2rem;
+  height: 2rem;
+}
+
+.tally-compact .tally-votes {
+  font-size: 0.85rem;
+}
+
+.result-list {
+  width: 100%;
+  max-width: 780px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.6rem;
+}
+
+.result-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.55rem 1.15rem;
+  min-height: 3.6rem;
+  font-weight: 700;
+  font-size: 1.2rem;
+  min-width: 0;
+}
+
+.result-row.is-accent {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.result-row.is-loser {
+  border-color: var(--pink);
+  background: rgba(241, 145, 164, 0.14);
+}
+
+.result-row.is-dimmed {
+  opacity: 0.55;
+}
+
+.result-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.result-name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result-detail {
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.result-stat {
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  color: var(--accent);
+  font-size: 1.15rem;
+  white-space: nowrap;
+}
+
+.result-compact .result-row {
+  padding: 0.45rem 0.85rem;
+  min-height: 2.75rem;
+  font-size: 0.95rem;
+  gap: 0.6rem;
+}
+
+.result-compact .result-detail {
+  font-size: 0.85rem;
+}
+
+.result-compact .result-stat {
+  font-size: 0.95rem;
+}
+
+.result-callout {
+  padding: 0.65rem 1.1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.result-callout.is-accent {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.result-callout.is-loser {
+  border-color: var(--pink);
+  background: rgba(241, 145, 164, 0.14);
+  color: var(--pink);
+}
+
+.result-callout strong {
+  color: var(--text);
 }
 
 .podium-list {
@@ -844,7 +1118,9 @@ button {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.75rem;
   padding: 0.5rem 0 1.25rem;
+  flex-shrink: 0;
 }
 
 .mobile-header .brand {
@@ -853,19 +1129,38 @@ button {
 
 .mobile-player-pill {
   display: flex;
-  gap: 0.6rem;
+  align-items: center;
+  gap: 0.5rem;
   font-size: 0.95rem;
+  min-width: 0;
+}
+
+.mobile-player-pill > span:first-child {
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mobile-player-pill strong {
   color: var(--accent);
+  white-space: nowrap;
+}
+
+.mobile-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .join-form,
 .mobile-card {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem;
   padding: 0.25rem 0;
+  min-width: 0;
 }
 
 .field {
@@ -961,8 +1256,10 @@ button {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1.75rem;
+  gap: 1.5rem;
   flex: 1;
+  width: 100%;
+  min-height: 0;
 }
 
 .selector-header {
@@ -980,10 +1277,10 @@ button {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 0.85rem;
   width: 100%;
-  max-width: 1040px;
-  max-height: 62vh;
+  max-width: 1080px;
+  max-height: 58vh;
   overflow-y: auto;
-  padding: 0.25rem;
+  padding: 0.5rem;
 }
 
 .mobile-game-list {
@@ -1123,20 +1420,31 @@ button {
 }
 
 .guess-tv-callout {
-  border-radius: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
   background: var(--surface);
+  font-weight: 700;
 }
 
 .guess-tv-callout.is-winner {
+  border-color: var(--accent);
+  background: var(--accent-soft);
   color: var(--accent);
 }
 
 .guess-tv-callout.is-drinker {
-  color: var(--danger);
+  border-color: var(--pink);
+  background: rgba(241, 145, 164, 0.14);
+  color: var(--pink);
+}
+
+.guess-tv-callout strong {
+  color: var(--text);
 }
 
 .guess-tv-board {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.5rem;
 }
 
@@ -1152,18 +1460,22 @@ button {
 
 .guess-tv-row.is-winner {
   border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .guess-tv-row.is-drinker {
-  border-color: var(--danger);
+  border-color: var(--pink);
+  background: rgba(241, 145, 164, 0.14);
 }
 
 .guess-tv-badge {
-  font-size: 0.85rem;
+  font-size: 0.74rem;
   font-weight: 900;
-  padding: 0.2rem 0.55rem;
+  letter-spacing: 0.12em;
+  padding: 0.2rem 0.58rem;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--surface-2);
+  color: var(--muted);
   white-space: nowrap;
 }
 
@@ -1212,10 +1524,12 @@ button {
 
 .guess-mobile-result.is-winner {
   border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .guess-mobile-result.is-drinker {
-  border-color: var(--danger);
+  border-color: var(--pink);
+  background: rgba(241, 145, 164, 0.14);
 }
 
 .guess-mobile-verdict {
@@ -1227,5 +1541,5 @@ button {
 }
 
 .guess-mobile-result.is-drinker .guess-mobile-verdict {
-  color: var(--danger);
+  color: var(--pink);
 }

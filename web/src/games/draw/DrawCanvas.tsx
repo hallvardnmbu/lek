@@ -2,7 +2,9 @@ import { For, createSignal, onSettled } from 'solid-js';
 
 const CANVAS_WIDTH = 400;
 const CANVAS_HEIGHT = 300;
-const SYNC_INTERVAL_MS = 10_000;
+const CANVAS_BG = '#f5e8df';
+const SYNC_INTERVAL_MS = 800;
+const POINTER_UP_FLUSH_MS = 400;
 
 const COLORS = [
   { id: 'black', hex: '#18181b' },
@@ -11,7 +13,7 @@ const COLORS = [
   { id: 'green', hex: '#10b981' },
   { id: 'blue', hex: '#3b82f6' },
   { id: 'purple', hex: '#8b5cf6' },
-  { id: 'eraser', hex: '#ffffff' },
+  { id: 'eraser', hex: CANVAS_BG },
 ];
 
 const SIZES = [
@@ -32,13 +34,14 @@ export function DrawCanvas(props: DrawCanvasProps) {
   let canvasEl: HTMLCanvasElement | undefined;
   let drawing = false;
   let dirty = false;
+  let lastSyncAt = 0;
   let lastX = 0;
   let lastY = 0;
 
-  const fillWhite = () => {
+  const fillCanvas = () => {
     const ctx = canvasEl?.getContext('2d');
     if (!ctx) return;
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = CANVAS_BG;
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   };
 
@@ -47,13 +50,18 @@ export function DrawCanvas(props: DrawCanvasProps) {
     return canvasEl.toDataURL('image/jpeg', 0.65);
   };
 
+  const flushSync = () => {
+    dirty = false;
+    lastSyncAt = Date.now();
+    const data = exportImage();
+    if (data) props.onSync(data);
+  };
+
   onSettled(() => {
-    fillWhite();
+    fillCanvas();
     const timer = window.setInterval(() => {
       if (!dirty) return;
-      dirty = false;
-      const data = exportImage();
-      if (data) props.onSync(data);
+      flushSync();
     }, SYNC_INTERVAL_MS);
 
     return () => {
@@ -107,10 +115,13 @@ export function DrawCanvas(props: DrawCanvasProps) {
 
   const handlePointerUp = () => {
     drawing = false;
+    if (dirty && Date.now() - lastSyncAt >= POINTER_UP_FLUSH_MS) {
+      flushSync();
+    }
   };
 
   const handleClear = () => {
-    fillWhite();
+    fillCanvas();
     dirty = true;
   };
 

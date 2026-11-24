@@ -1,13 +1,13 @@
 .ml-tv-prompt {
-  font-size: 3.25rem;
+  font-size: clamp(3.6rem, 5.2vw, 5rem);
   line-height: 1.15;
-  max-width: 1100px;
+  max-width: 1320px;
   margin: 0.5rem 0 1.75rem;
 }
 
 .ml-tv-lead {
   display: block;
-  font-size: 1.3rem;
+  font-size: 1.8rem;
   font-weight: 800;
   letter-spacing: 0.06em;
   color: var(--accent);
@@ -30,4 +30,14 @@
 .ml-reveal-wait {
   margin: 0 0 1rem;
   color: var(--muted);
+}
+
+.ml-continue-btn {
+  margin-top: 1rem;
+}
+
+.ml-continue-btn.is-voted {
+  background: var(--accent);
+  color: var(--on-accent);
+  text-decoration: none;
 }

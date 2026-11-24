@@ -7,6 +7,7 @@ import type {
 import { cortiAgent, type PromptGenerator } from '../cortiModels';
 import type { GameContext, GameDefinition } from '../game';
 import {
+  actedConnectedIds,
   allConnected,
   awardCappedScore,
   buildVoteTally,
@@ -24,6 +25,7 @@ export interface MostLikelyState {
   prompt: string | null;
   promptIsAi: boolean;
   votes: Record<string, string>;
+  continueVotes: Record<string, boolean>;
   tally: MostLikelyTallyEntry[];
   drinkerIds: string[];
   drinks: Record<string, number>;
@@ -47,9 +49,7 @@ const defaultGeneratePrompts = cortiAgent.createPromptGenerator({
   normalize: (p) => p.replace(PROMPT_PREFIX_RE, '').replace(/\?\s*$/, '').trim(),
 });
 
-const VOTE_MS = 30_000;
-const REVEAL_MS = 10_000;
-const MIN_ROUNDS = 3;
+const MIN_ROUNDS = 1;
 const MAX_ROUNDS = 20;
 const DEFAULT_ROUNDS = 3;
 const WIN_POINTS = 1;
@@ -84,11 +84,10 @@ const FALLBACK_PROMPTS = [
 const promptHistory = createRoomHistory();
 
 function reveal(ctx: GameContext, state: MostLikelyState): MostLikelyState {
-  ctx.clearTimer();
-
   const baseTally = buildVoteTally(ctx, state.votes);
   const maxVotes = baseTally[0]?.votes ?? 0;
-  const drinkerIds = maxVotes > 0 ? baseTally.filter((t) => t.votes === maxVotes).map((t) => t.playerId) : [];
+  const drinkerIds =
+    maxVotes > 0 ? baseTally.filter((t) => t.votes === maxVotes).map((t) => t.playerId) : [];
   const drinkerSet = new Set(drinkerIds);
 
   for (const id of drinkerIds) {
@@ -99,28 +98,26 @@ function reveal(ctx: GameContext, state: MostLikelyState): MostLikelyState {
   state.phase = 'REVEAL';
   state.tally = baseTally.map((t) => ({ ...t, isDrinker: drinkerSet.has(t.playerId) }));
   state.drinkerIds = drinkerIds;
+  state.continueVotes = {};
 
   ctx.broadcastEvent('most_likely_reveal', {
     prompt: state.prompt,
     drinkers: state.tally.filter((t) => t.isDrinker).map((t) => t.name),
   });
-  ctx.setTimer(REVEAL_MS);
+
   return state;
 }
 
-function voteCounts(ctx: GameContext, state: MostLikelyState) {
+function viewCounts(ctx: GameContext, state: MostLikelyState) {
   const { acted: votedCount, total: connectedCount } = countConnectedActed(
     ctx,
     (id) => state.votes[id] !== undefined
   );
-  return { votedCount, connectedCount };
-}
-
-function maybeReveal(ctx: GameContext, state: MostLikelyState): MostLikelyState {
-  if (state.phase === 'VOTING' && allConnected(ctx, (id) => state.votes[id] !== undefined)) {
-    return reveal(ctx, state);
-  }
-  return state;
+  const { acted: continueCount } = countConnectedActed(
+    ctx,
+    (id) => state.continueVotes[id] === true
+  );
+  return { votedCount, continueCount, connectedCount };
 }
 
 function startRound(ctx: GameContext, state: MostLikelyState): MostLikelyState {
@@ -140,9 +137,9 @@ function startRound(ctx: GameContext, state: MostLikelyState): MostLikelyState {
   state.prompt = prompt;
   state.promptIsAi = isAi;
   state.votes = {};
+  state.continueVotes = {};
   state.tally = [];
   state.drinkerIds = [];
-  ctx.setTimer(VOTE_MS);
   return state;
 }
 
@@ -154,9 +151,13 @@ function nextRound(ctx: GameContext, state: MostLikelyState): MostLikelyState {
   return startRound(ctx, state);
 }
 
-function advancePhase(ctx: GameContext, state: MostLikelyState): MostLikelyState {
-  if (state.phase === 'VOTING') return reveal(ctx, state);
-  if (state.phase === 'REVEAL') return nextRound(ctx, state);
+function advanceIfReady(ctx: GameContext, state: MostLikelyState): MostLikelyState {
+  if (state.phase === 'VOTING' && allConnected(ctx, (id) => state.votes[id] !== undefined)) {
+    return reveal(ctx, state);
+  }
+  if (state.phase === 'REVEAL' && allConnected(ctx, (id) => state.continueVotes[id] === true)) {
+    return nextRound(ctx, state);
+  }
   return state;
 }
 
@@ -180,6 +181,7 @@ export function createMostLikelyGame(
         prompt: null,
         promptIsAi: false,
         votes: {},
+        continueVotes: {},
         tally: [],
         drinkerIds: [],
         drinks: {},
@@ -200,33 +202,36 @@ export function createMostLikelyGame(
       return state;
     },
 
-    onTimerExpired(ctx, state) {
-      return advancePhase(ctx, state);
-    },
-
     onPlayerAction(ctx, state, playerId, action) {
-      if (state.phase !== 'VOTING' || action.type !== 'vote') {
-        return state;
+      if (state.phase === 'VOTING' && action.type === 'vote') {
+        const targetId = (action.payload as { targetId?: unknown } | undefined)?.targetId;
+        if (typeof targetId !== 'string' || !ctx.getPlayer(targetId)) {
+          return state;
+        }
+        state.votes = { ...state.votes, [playerId]: targetId };
+        return advanceIfReady(ctx, state);
       }
-      const targetId = (action.payload as { targetId?: unknown } | undefined)?.targetId;
-      if (typeof targetId !== 'string' || !ctx.getPlayer(targetId)) {
-        return state;
-      }
-      state.votes = { ...state.votes, [playerId]: targetId };
-      return maybeReveal(ctx, state);
-    },
 
-    onHostAction(ctx, state, action) {
-      return action.type === 'next' ? advancePhase(ctx, state) : state;
+      if (state.phase === 'REVEAL' && action.type === 'continue') {
+        state.continueVotes = { ...state.continueVotes, [playerId]: true };
+        return advanceIfReady(ctx, state);
+      }
+
+      return state;
     },
 
     onPlayerDisconnect(ctx, state) {
-      return maybeReveal(ctx, state);
+      return advanceIfReady(ctx, state);
+    },
+
+    onPlayerReconnect(ctx, state) {
+      return advanceIfReady(ctx, state);
     },
 
     onPlayerLeave(ctx, state, playerId) {
       state.votes = withoutKey(state.votes, playerId);
-      return maybeReveal(ctx, state);
+      state.continueVotes = withoutKey(state.continueVotes, playerId);
+      return advanceIfReady(ctx, state);
     },
 
     getHostView(state, ctx): MostLikelyHostView {
@@ -235,8 +240,8 @@ export function createMostLikelyGame(
         round: state.round,
         totalRounds: state.totalRounds,
         prompt: state.prompt,
-        promptIsAi: state.promptIsAi,
-        ...voteCounts(ctx, state),
+        votedPlayerIds: actedConnectedIds(ctx, (id) => state.votes[id] !== undefined),
+        continuePlayerIds: actedConnectedIds(ctx, (id) => state.continueVotes[id] === true),
         tally: state.tally,
       };
     },
@@ -248,9 +253,10 @@ export function createMostLikelyGame(
         totalRounds: state.totalRounds,
         prompt: state.prompt,
         myVote: state.votes[playerId] ?? null,
+        myContinueVote: state.continueVotes[playerId] === true,
         candidates: ctx.getPlayers().map((p) => ({ id: p.id, name: p.name })),
         myDrinks: state.drinks[playerId] ?? 0,
-        ...voteCounts(ctx, state),
+        ...viewCounts(ctx, state),
         tally: state.tally,
         iAmDrinking: state.drinkerIds.includes(playerId),
       };

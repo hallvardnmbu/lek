@@ -1,6 +1,7 @@
 .geo-tv-wrap {
   width: 100%;
   max-width: 1280px;
+  margin-inline: auto;
   gap: 0.75rem;
 }
 
@@ -36,17 +37,6 @@
   display: block;
 }
 
-.geo-tv-lock-pill {
-  position: absolute;
-  bottom: 1rem;
-  right: 1rem;
-  padding: 0.45rem 1rem;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.88);
-  font-weight: 800;
-  font-size: 1.05rem;
-}
-
 .geo-tv-reveal-grid {
   width: 100%;
   display: grid;
@@ -57,7 +47,7 @@
 
 .geo-tv-reveal-map-box {
   position: relative;
-  height: 54vh;
+  height: 58vh;
   border-radius: 16px;
   overflow: hidden;
   border: 2px solid var(--border);
@@ -74,7 +64,9 @@
   left: 0.75rem;
   padding: 0.4rem 0.9rem;
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.9);
+  background: rgba(26, 5, 5, 0.88);
+  border: 1px solid var(--border);
+  color: var(--text);
   font-weight: 800;
   font-size: 1rem;
   z-index: 6;
@@ -86,51 +78,15 @@
   border-width: 2px;
   font-size: 1.2rem;
   text-align: left;
-  color: inherit;
-}
-
-.geo-tv-callout.is-drinker {
-  color: var(--danger);
 }
 
 .geo-tv-board {
   overflow-y: auto;
-  max-height: 36vh;
-}
-
-.geo-tv-row {
-  grid-template-columns: 14px 1fr auto auto auto;
-  gap: 0.75rem;
-  padding: 0.6rem 0.9rem;
-}
-
-.geo-tv-swatch {
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-}
-
-.geo-tv-name {
-  text-align: left;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.geo-tv-dist {
-  color: var(--muted);
-  font-size: 0.95rem;
-  white-space: nowrap;
-}
-
-.geo-tv-total {
-  font-size: 0.95rem;
-  color: var(--accent);
-  white-space: nowrap;
+  max-height: 44vh;
 }
 
 .geo-error-banner {
-  color: var(--danger);
+  color: var(--pink);
   font-weight: 700;
 }
 
@@ -157,8 +113,8 @@
 }
 
 .geo-mobile-reveal-map {
-  height: 36vh;
-  min-height: 200px;
+  height: 42vh;
+  min-height: 220px;
 }
 
 .geo-mobile-submit {
@@ -203,7 +159,7 @@
 .geo-map {
   position: relative;
   overflow: hidden;
-  background: #1e293b;
+  background: var(--surface);
   user-select: none;
   touch-action: none;
 }
@@ -255,7 +211,7 @@
 .geo-pin-selected .geo-pin-dot {
   width: 20px;
   height: 20px;
-  background: #ef4444;
+  background: var(--accent);
 }
 
 .geo-pin-target {
@@ -266,8 +222,8 @@
   width: 26px;
   height: 26px;
   border-radius: 999px;
-  background: #facc15;
-  color: #0f172a;
+  background: var(--accent);
+  color: var(--ink);
   font-weight: 900;
   font-size: 15px;
   display: flex;
@@ -284,16 +240,16 @@
   transform: translateX(-50%);
   padding: 1px 6px;
   border-radius: 6px;
-  background: rgba(15, 23, 42, 0.9);
-  color: #ffffff;
+  background: rgba(26, 5, 5, 0.88);
+  color: var(--text);
   font-size: 11px;
   font-weight: 800;
   white-space: nowrap;
 }
 
 .geo-pin-target-label {
-  background: #facc15;
-  color: #0f172a;
+  background: var(--accent);
+  color: var(--ink);
 }
 
 .geo-map-controls {
@@ -310,9 +266,9 @@
   width: 38px;
   height: 38px;
   border-radius: 10px;
-  border: 0;
-  background: rgba(15, 23, 42, 0.9);
-  color: #ffffff;
+  border: 1px solid var(--border);
+  background: rgba(26, 5, 5, 0.88);
+  color: var(--text);
   font-size: 1.3rem;
   font-weight: 900;
   cursor: pointer;
@@ -324,8 +280,8 @@
   left: 6px;
   padding: 1px 5px;
   border-radius: 4px;
-  background: rgba(15, 23, 42, 0.72);
-  color: #cbd5e1;
+  background: rgba(26, 5, 5, 0.78);
+  color: var(--text);
   font-size: 10px;
   z-index: 5;
   pointer-events: none;
