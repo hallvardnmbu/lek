@@ -3,7 +3,7 @@ import type {
   PriceGuessHostView,
   PriceGuessPlayerView,
 } from '../../../../shared/games/priceguess';
-import { ResultList, type ResultListEntry } from '../../components/ResultList';
+import { PodiumList } from '../../components/tv/PodiumList';
 import { TvActedArms } from '../../components/tv/TvActedArms';
 import {
   secondsLeft,
@@ -22,19 +22,8 @@ function PriceGuessTvView(props: TvGameViewProps<PriceGuessHostView>) {
   const host = () => props.state.hostState;
   const product = () => host()?.product;
 
-  const resultEntries = createMemo<ResultListEntry[]>(() =>
-    (host()?.players ?? []).map((player) => ({
-      playerId: player.playerId,
-      name: player.name,
-      detail:
-        player.guess !== null
-          ? `${formatPrice(player.guess)}${player.diff !== null ? ` · ±${formatPrice(player.diff)}` : ''}`
-          : 'No guess',
-      badge: player.isWinner ? 'WIN' : player.drinks ? 'DRINK' : 'SAFE',
-      badgeTone: player.isWinner ? 'accent' : player.drinks ? 'loser' : 'muted',
-      tone: player.isWinner ? 'accent' : player.drinks ? 'loser' : 'default',
-      stat: `${player.score} pts`,
-    }))
+  const rankedPlayers = createMemo(() =>
+    [...props.state.players].sort((a, b) => b.score - a.score)
   );
 
   return (
@@ -109,11 +98,6 @@ function PriceGuessTvView(props: TvGameViewProps<PriceGuessHostView>) {
 
           <Show when={host()?.phase === 'REVEAL'}>
             <div class="guess-tv-results">
-              <Show when={(host()?.winnerNames.length ?? 0) > 0}>
-                <div class="guess-tv-callout pg-tv-callout is-winner">
-                  Closest: <strong>{host()?.winnerNames.join(', ')}</strong>
-                </div>
-              </Show>
               <Show when={(host()?.drinkerNames.length ?? 0) > 0}>
                 <div class="guess-tv-callout pg-tv-callout is-drinker">
                   {host()?.drinkReason === 'no_guess' ? 'No guess' : 'Furthest'}:{' '}
@@ -121,11 +105,7 @@ function PriceGuessTvView(props: TvGameViewProps<PriceGuessHostView>) {
                 </div>
               </Show>
 
-              <ResultList
-                players={props.state.players}
-                entries={resultEntries()}
-                compact
-              />
+              <PodiumList players={rankedPlayers()} compact />
             </div>
           </Show>
         </div>

@@ -104,7 +104,7 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
   const renderedTanks = new Map<string, RenderedTank>();
   const renderedBullets = new Map<number, RenderedBullet>();
   let aliveIds = new Set<string>();
-  let knownBulletIds = new Set<number>();
+  let knownShots: number | null = null;
   const blasts: { x: number; y: number; at: number }[] = [];
 
   function getCanvasCtx(): CanvasRenderingContext2D | null {
@@ -164,12 +164,10 @@ function TankGameTvView(props: TvGameViewProps<TankGameHostView>) {
       for (const id of renderedBullets.keys()) {
         if (!activeBulletIds.has(id)) renderedBullets.delete(id);
       }
-      if (host.phase === 'PLAYING') {
-        for (const id of activeBulletIds) {
-          if (!knownBulletIds.has(id)) playShootSound();
-        }
+      if (host.phase === 'PLAYING' && knownShots !== null && host.shots > knownShots) {
+        playShootSound();
       }
-      knownBulletIds = activeBulletIds;
+      knownShots = host.shots;
 
       if (host.phase === 'COUNTDOWN') {
         draw(now);

@@ -414,6 +414,7 @@ export const tankGame: GameDefinition<TankGameState, TankGameHostView, TankGameP
       timeLeftMs: timeLeftMs(state, now),
       aliveCount: aliveTanks(state).length,
       winnerId: state.winnerId,
+      shots: state.nextBulletId,
       tanks: Object.values(state.tanks).map((t) => {
         const vel = tankVelocity(state, t);
         return {

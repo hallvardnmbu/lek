@@ -93,6 +93,7 @@ export interface TankGameHostView {
   timeLeftMs: number;
   aliveCount: number;
   winnerId: string | null;
+  shots: number;
   tanks: Array<{
     playerId: string;
     x: number;
