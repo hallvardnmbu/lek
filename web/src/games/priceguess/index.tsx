@@ -59,7 +59,7 @@ function PriceGuessTvView(props: TvGameViewProps<PriceGuessHostView>) {
         </div>
       </Show>
 
-      <Show when={host()?.phase === 'GUESSING' || host()?.phase === 'REVEAL'}>
+      <Show when={host()?.phase === 'GUESSING'}>
         <div class="pg-tv-stage">
           <div class="pg-tv-product">
             <Show when={product()?.imageUrl}>
@@ -97,22 +97,19 @@ function PriceGuessTvView(props: TvGameViewProps<PriceGuessHostView>) {
               <Show when={product()?.description}>
                 <p class="pg-tv-desc">{product()?.description}</p>
               </Show>
-
-              <Show when={host()?.phase === 'REVEAL'}>
-                <div class="pg-tv-actual">
-                  <span class="pg-tv-actual-label">ACTUAL PRICE</span>
-                  <span class="pg-tv-actual-value">{formatPrice(host()?.actualPrice)}</span>
-                </div>
-              </Show>
             </div>
           </div>
+        </div>
+      </Show>
 
-          <Show when={host()?.phase === 'REVEAL'}>
-            <div class="guess-tv-results">
-
-              <ResultList players={props.state.players} entries={resultEntries()} />
-            </div>
-          </Show>
+      <Show when={host()?.phase === 'REVEAL'}>
+        <div class="pg-tv-stage">
+          <h2 class="pg-tv-name">{product()?.name}</h2>
+          <div class="pg-tv-actual">
+            <span class="pg-tv-actual-label">ACTUAL PRICE</span>
+            <span class="pg-tv-actual-value">{formatPrice(host()?.actualPrice)}</span>
+          </div>
+          <ResultList players={props.state.players} entries={resultEntries()} />
         </div>
       </Show>
 
